@@ -1,0 +1,30 @@
+[project]
+name = "homelab-hub"
+version = "0.1.0"
+description = "A Django-based central hub for home lab and personal activities"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "cryptography>=45.0.7",
+    "django>=5.0",
+    "django-allauth>=65.11.1",
+    "django-browser-reload>=1.18.0",
+    "django-jazzmin>=3.0.0",
+    "django-tailwind>=4.2.0",
+    "kubernetes>=33.1.0",
+    "psutil>=7.0.0",
+    "pyjwt>=2.10.1",
+    "python-dotenv>=1.1.1",
+    "python-synology>=1.0.0",
+    "requests>=2.32.5",
+]
+
+[tool.uv]
+managed = true
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []

@@ -1,0 +1,14 @@
+{% extends "dashboard/base.html" %}
+{% load socialaccount %}  
+
+{% block content %}
+<div class="flex items-center justify-center min-h-screen bg-gray-900">
+  <div class="bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+    <h2 class="text-2xl font-bold text-white mb-6">Login</h2>
+    <a href="{% provider_login_url 'google' %}"
+       class="w-full inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition">
+      Continue with Google
+    </a>
+  </div>
+</div>
+{% endblock %}

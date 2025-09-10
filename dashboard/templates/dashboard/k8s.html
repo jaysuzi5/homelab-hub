@@ -1,0 +1,165 @@
+<!-- dashboard/k8s.html -->
+
+{% extends "dashboard/base.html" %}
+{% block content %}
+
+<!-- Include DataTables CSS/JS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+    <!-- ---------- Cluster Summary ---------- -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 col-span-1 md:col-span-2">
+        <h2 class="text-2xl font-bold mb-4">Kubernetes Cluster Summary</h2>
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+
+            <!-- Total Pods (larger, 2/6 width) -->
+            <div class="bg-gray-700 p-6 rounded-2xl text-center md:col-span-2">
+                <h3 class="text-lg font-bold">Total Pods</h3>
+                <p class="text-3xl font-extrabold">{{ total_pods }}</p>
+                <p class="mt-2">
+                    Running: <span class="text-green-400 font-bold text-xl">{{ pods_status.running }}</span>, 
+                    Pending: <span class="text-yellow-400 font-bold text-xl">{{ pods_status.pending }}</span>, 
+                    Failed: <span class="text-red-400 font-bold text-xl">{{ pods_status.failed }}</span>
+                </p>
+            </div>
+
+            <!-- CPU Usage (smaller, 1/6 width, centered) -->
+            <div class="bg-gray-700 p-4 rounded-2xl text-center md:col-span-1 flex flex-col justify-center items-center">
+                <h3 class="text-lg font-bold">CPU Usage</h3>
+                <p class="text-2xl font-semibold">{{ cluster_cpu_percent }}%</p>
+            </div>
+
+            <!-- Memory Usage (smaller, 1/6 width, centered) -->
+            <div class="bg-gray-700 p-4 rounded-2xl text-center md:col-span-1 flex flex-col justify-center items-center">
+                <h3 class="text-lg font-bold">Memory Usage</h3>
+                <p class="text-2xl font-semibold">{{ cluster_mem_percent }}%</p>
+            </div>
+
+            <!-- Alerts (larger, 2/6 width) -->
+            <div class="bg-gray-700 p-6 rounded-2xl text-center md:col-span-2">
+                <h3 class="text-lg font-bold">Alerts</h3>
+                <ul class="mt-2 text-left">
+                    {% for alert in cluster_alerts %}
+                        <li class="text-red-400">{{ alert }}</li>
+                    {% empty %}
+                        <li class="text-green-400">No pending or failed pods</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ---------- Node Metrics ---------- -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 col-span-1 md:col-span-2 overflow-x-auto">
+        <h3 class="text-xl font-bold mb-4">Nodes</h3>
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="border-b border-gray-700">
+                    <th class="px-2 py-1">Node</th>
+                    <th class="px-2 py-1">CPU Alloc / Cap</th>
+                    <th class="px-2 py-1">CPU %</th>
+                    <th class="px-2 py-1">Mem Alloc / Cap (GiB)</th>
+                    <th class="px-2 py-1">Mem %</th>
+                    <th class="px-2 py-1">Ready</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for node in nodes_info %}
+                <tr class="border-b border-gray-700">
+                    <td class="px-2 py-1">{{ node.name }}</td>
+                    <td class="px-2 py-1">{{ node.cpu_allocatable }} / {{ node.cpu_capacity }}</td>
+                    <td class="px-2 py-1 
+                        {% if node.cpu_percent >= 85 %}text-red-400 font-bold{% elif node.cpu_percent >= 70 %}text-yellow-400 font-bold{% endif %}">
+                        {{ node.cpu_percent }}%
+                    </td>
+                    <td class="px-2 py-1">{{ node.mem_usage }} / {{ node.mem_allocatable }}</td>
+                    <td class="px-2 py-1 
+                        {% if node.mem_percent >= 85 %}text-red-400 font-bold{% elif node.mem_percent >= 70 %}text-yellow-400 font-bold{% endif %}">
+                        {{ node.mem_percent }}%
+                    </td>
+                    <td class="px-2 py-1">
+                        {% if node.ready %}
+                            ✅
+                        {% else %}
+                            ❌
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ---------- Pod Details ---------- -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 col-span-1 md:col-span-2 overflow-x-auto">
+        <h3 class="text-xl font-bold mb-4">Pods</h3>
+        <table id="pods-table" class="w-full text-left table-auto">
+            <thead>
+                <tr>
+                    <th>Namespace</th>
+                    <th>Pod Name</th>
+                    <th>Node</th>
+                    <th>Status</th>
+                    <th>Restarts</th>
+                    <th>CPU Req / Lim (cores)</th>
+                    <th>Mem Req / Lim (GiB)</th>
+                    <th>CPU Usage</th>
+                    <th>Mem Usage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pod in pod_details %}
+                <tr>
+                    <td>{{ pod.namespace }}</td>
+                    <td>{{ pod.name }}</td>
+                    <td>{{ pod.node }}</td>
+                    <td class="{% if pod.status == 'Running' %}text-green-400 font-bold{% else %}text-red-400 font-bold{% endif %}">
+                        {{ pod.status }}
+                    </td>
+                    <td>{{ pod.restarts }}</td>
+                    <td>{{ pod.cpu_request|default:"-" }} / {{ pod.cpu_limit|default:"-" }}</td>
+                    <td>{{ pod.mem_request|default:"-" }} / {{ pod.mem_limit|default:"-" }}</td>
+                    <td>{{ pod.cpu_usage|default:"-"|floatformat:2 }}</td>
+                    <td>{{ pod.mem_usage|default:"-"|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ---------- Placeholder for Charts ---------- -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+            <h3 class="text-xl font-bold mb-4">CPU Usage Trend</h3>
+            <canvas id="cpuTrendChart"></canvas>
+        </div>
+        <div>
+            <h3 class="text-xl font-bold mb-4">Memory Usage Trend</h3>
+            <canvas id="memTrendChart"></canvas>
+        </div>
+    </div>
+
+    
+</div>
+
+
+
+<script>
+    $(document).ready(function() {
+        $('#pods-table').DataTable({
+            paging: true,
+            searching: true,
+            ordering: true,
+            order: [[0, 'asc']],  // default sort by Namespace
+            columnDefs: [
+                { type: 'num', targets: [4,5,6,7,8] } // treat numeric columns as numbers
+            ]
+        });
+    });
+    </script>
+
+{% endblock %}

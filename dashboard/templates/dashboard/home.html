@@ -1,0 +1,366 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Dashboard Overview</h2>
+    
+    {% if user.is_authenticated %}
+        <div class="flex items-center space-x-4">
+            <span class="text-gray-300">
+                Logged in as <span class="font-semibold">{{ user.username }}</span>
+            </span>
+            <a href="{% url 'account_logout' %}"
+               class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition">
+               Logout
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Kubernetes Overview Card -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 row-span-1 sm:row-span-2 lg:row-span-2">
+        <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+            <span>Kubernetes Overview</span>
+            <span class="text-lg text-gray-300 font-semibold">
+            Total Pods: {{ total_pods }}
+            </span>
+        </h3>
+
+        <!-- Pod Status Breakdown -->
+        <div class="mb-4">
+            <h4 class="text-md font-semibold text-gray-200 mb-2">Pods Status</h4>
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-green-700 rounded p-2">
+                    <span class="font-bold">{{ pods.running }}</span><br>
+                    <span class="text-gray-300 text-sm">Running</span>
+                </div>
+                {% if pods.pending > 0 %}
+                <div class="bg-yellow-600 rounded p-2">
+                    <span class="font-bold">{{ pods.pending }}</span><br>
+                    <span class="text-gray-300 text-sm">Pending</span>
+                </div>
+                {% endif %}
+        
+                {% if pods.failed > 0 %}
+                <div class="bg-red-700 rounded p-2">
+                    <span class="font-bold">{{ pods.failed }}</span><br>
+                    <span class="text-gray-300 text-sm">Failed</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Node Summary Table -->
+        <h4 class="text-md font-semibold text-gray-200 mb-2">Node Summary</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                <th class="px-2 py-1">Node</th>
+                <th class="px-2 py-1">CPU Alloc / Cap</th>
+                <th class="px-2 py-1">CPU %</th>
+                <th class="px-2 py-1">Mem Alloc / Cap (GiB)</th>
+                <th class="px-2 py-1">Mem %</th>
+                <th class="px-2 py-1">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for node in nodes %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700">
+                <td class="px-2 py-1">{{ node.name }}</td>
+                <td class="px-2 py-1">{{ node.cpu_allocatable }} / {{ node.cpu_capacity }}</td>
+                <td class="px-2 py-1 {% if node.cpu_percent >= 85 %}font-bold text-red-400{% elif node.cpu_percent >= 70 %}font-bold text-yellow-400{% endif %}">
+                    {{ node.cpu_percent }}%
+                </td>
+                <td class="px-2 py-1">{{ node.mem_usage }} / {{ node.mem_allocatable }}</td>
+                <td class="px-2 py-1 {% if node.mem_percent >= 85 %}font-bold text-red-400{% elif node.mem_percent >= 70 %}font-bold text-yellow-400{% endif %}">
+                    {{ node.mem_percent }}%
+                </td>
+                <td class="px-2 py-1">
+                    {% if node.ready %}
+                    <span class="text-green-400 font-semibold">Ready</span>
+                    {% else %}
+                    <span class="text-red-400 font-semibold">NotReady</span>
+                    {% endif %}
+                </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>
+
+        <!-- Cluster Load -->
+        <div class="mt-4 flex gap-4 justify-around">
+            <div class="text-center">
+            <span class="block text-gray-300 text-sm">CPU Load</span>
+            <span class="block font-bold text-lg">{{ cluster_cpu_percent }}%</span>
+            </div>
+            <div class="text-center">
+            <span class="block text-gray-300 text-sm">Memory Load</span>
+            <span class="block font-bold text-lg">{{ cluster_mem_percent }}%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Synology NAS Overview Card -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 row-span-1 sm:row-span-2 lg:row-span-2">
+        <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+            <span>Synology NAS Overview</span>
+            <span class="text-lg text-gray-300 font-semibold">
+                Model: {{ synology_metrics.system.model }}
+            </span>
+        </h3>
+
+        <!-- CPU / Memory / Storage Status -->
+        <div class="mb-4">
+            <h4 class="text-md font-semibold text-gray-200 mb-2">Health Overview</h4>
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <!-- CPU -->
+                <div class="rounded p-2 {% if synology_metrics.utilization.cpu_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.cpu_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
+                    <span class="font-bold text-lg">{{ synology_metrics.utilization.cpu_percent }}%</span><br>
+                    <span class="text-gray-300 text-sm">CPU Usage</span>
+                </div>
+
+                <!-- Memory -->
+                <div class="rounded p-2 {% if synology_metrics.utilization.memory_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.memory_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
+                    <span class="font-bold text-lg">{{ synology_metrics.utilization.memory_percent }}%</span><br>
+                    <span class="text-gray-300 text-sm">Memory Usage</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volume Summary Table -->
+        <h4 class="text-md font-semibold text-gray-200 mb-2">Volume Summary</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                <th class="px-2 py-1">Volume</th>
+                <th class="px-2 py-1">Size</th>
+                <th class="px-2 py-1">Used</th>
+                <th class="px-2 py-1">Storage %</th>
+                <th class="px-2 py-1">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vol in synology_metrics.volumes %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700">
+                <td class="px-2 py-1">{{ vol.id }}</td>
+                <td class="px-2 py-1">{{ vol.size_total }}</td>
+                <td class="px-2 py-1">{{ vol.size_used }}</td>
+                <td class="px-2 py-1 {% if node.cpu_percent >= 85 %}font-bold text-red-400{% elif node.cpu_percent >= 70 %}font-bold text-yellow-400{% endif %}">
+                    {{ vol.percent_used }}%
+                </td>
+                <td class="px-2 py-1">
+                    {% if vol.status and vol.status == 'normal' %}
+                    <span class="text-green-400 font-semibold">{{ vol.status }}</span>
+                    {% else %}
+                    <span class="text-red-400 font-semibold">{{ vol.status }}</span>
+                    {% endif %}
+                </td>                
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>
+        <br />
+        <!-- Disk Summary Table -->
+        <h4 class="text-md font-semibold text-gray-200 mb-2">Disk Summary</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                <th class="px-2 py-1">Disk</th>
+                <th class="px-2 py-1">Name</th>
+                <th class="px-2 py-1">Tempature</th>
+                <th class="px-2 py-1">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for disk in synology_metrics.disks %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700">
+                <td class="px-2 py-1">{{ disk.id }}</td>
+                <td class="px-2 py-1">{{ disk.name }}</td>
+                <td class="px-2 py-1">{{ disk.temperature }}</td>
+                <td class="px-2 py-1">
+                    {% if disk.smart_status and disk.smart_status == 'normal' %}
+                    <span class="text-green-400 font-semibold">{{ disk.smart_status }}</span>
+                    {% else %}
+                    <span class="text-red-400 font-semibold">{{ disk.smart_status }}</span>
+                    {% endif %}
+                </td>                
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>      
+
+        <!--  Network Info and Uptime -->
+        <div class="mt-4 flex gap-4 justify-around">
+            <div class="text-center">
+                <span class="block text-gray-300 text-sm">Net Up</span>
+                <span class="block font-bold text-lg">{{ synology_metrics.utilization.net_up|filesizeformat }}/s</span>
+            </div>
+            <div class="text-center">
+                <span class="block text-gray-300 text-sm">Net Down</span>
+                <span class="block font-bold text-lg">{{ synology_metrics.utilization.net_down|filesizeformat }}/s</span>
+            </div>
+            <div class="text-center">
+                <span class="block text-gray-300 text-sm">Uptime</span>
+                <span class="block font-bold text-lg">{{ synology_metrics.system.uptime_days }}d {{ synology_metrics.system.uptime_hours }}h {{ synology_metrics.system.uptime_minutes }}m</span>
+            </div>
+        </div>
+
+
+    </div>
+
+    <!-- Network Overview Card -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 row-span-1 sm:row-span-2 lg:row-span-2">
+        <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+            <span>Network Overview</span>
+        </h3>
+
+        <!-- Devices -->
+        <div class="mb-4">
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-green-700 rounded p-2">
+                    <span class="font-bold">{{ network_metrics.devices }}</span><br>
+                    <span class="text-gray-300 text-sm">Devices</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Grid -->
+        <div class="grid grid-cols-1 gap-4 text-sm text-gray-300 mb-4">
+            <div>
+                <span class="font-semibold text-gray-200">Online:</span>
+                {% if network_metrics.online %}
+                    <span class="text-green-400 font-semibold">✅ Yes</span>
+                {% else %}
+                    <span class="text-red-400 font-semibold">❌ No</span>
+                {% endif %}
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">Ethernet Link:</span>
+                {% if network_metrics.ethernet_link %}
+                    <span class="text-green-400 font-semibold">✅ Up</span>
+                {% else %}
+                    <span class="text-red-400 font-semibold">❌ Down</span>
+                {% endif %}
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">IP Method:</span>
+                {{ network_metrics.ip_method }}
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">IP Address:</span>
+                {{ network_metrics.ip_address }}
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">Gateway:</span>
+                {{ network_metrics.gateway }}
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">DNS Servers:</span>
+                {{ network_metrics.dns_servers }}
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">Lease Duration:</span>
+                {{ network_metrics.lease_days }}d {{ network_metrics.lease_hours }}h {{ network_metrics.lease_minutes }}m
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">Uptime:</span>
+                {{ network_metrics.uptime_days }}d {{ network_metrics.uptime_hours }}h {{ network_metrics.uptime_minutes }}m
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">Update Required:</span>
+                {% if network_metrics.update_required %}
+                    <span class="text-red-400 font-semibold">Yes</span>
+                {% else %}
+                    <span class="text-green-400 font-semibold">No</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        <h3 class="text-xl font-bold mb-2">Server Status</h3>
+        <p class="text-gray-400">Uptime, load, and health metrics.</p>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        <h3 class="text-xl font-bold mb-2">Network</h3>
+        <p class="text-gray-400">Bandwidth, devices, firewall status.</p>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        <h3 class="text-xl font-bold mb-2">Energy</h3>
+        <p class="text-gray-400">Electricity usage and cost tracking.</p>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        <h3 class="text-xl font-bold mb-2">Media</h3>
+        <p class="text-gray-400">Plex, Jellyfin, or other server stats.</p>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        <h3 class="text-xl font-bold mb-2">Logs</h3>
+        <p class="text-gray-400">Splunk / ELK alerts summary.</p>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        <h3 class="text-xl font-bold mb-2">Misc</h3>
+        <p class="text-gray-400">Other integrations or notes.</p>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition col-span-1 sm:col-span-2 lg:col-span-2" style="min-height: 24rem;">
+        <h3 class="text-xl font-bold mb-4">501 Single Out - Average 3 Dart Score</h3>
+        <div class="w-full h-72">
+            <canvas id="dartChart501" class="w-full h-full"></canvas>
+        </div>
+    </div>
+
+    <div class="divide-y bg-gray-800 rounded-2xl shadow p-6 row-span-1 sm:row-span-3 lg:row-span-3">
+        <h3 class="text-xl font-bold mb-4">
+            <div class="grid grid-cols-2 py-2">
+                    <span>Kubernetes Pods</span>
+                <span class="text-lg text-gray-300 font-semibold">
+                Total: {{ total_pods }}
+                </span>
+            </div>
+        </h3>
+        
+        <div class="divide-y divide-gray-700">
+            {% for ns, count in pods.items %}
+            <div class="grid grid-cols-2 py-2">
+                <span class="text-gray-300">{{ ns }}</span>
+                <span class="{% if count >= 10 %}font-bold text-white{% else %}text-gray-400{% endif %}">
+                {{ count }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+      </div>
+    
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition col-span-1 sm:col-span-2 lg:col-span-2" style="min-height: 24rem;">
+        <h3 class="text-xl font-bold mb-4">Score Training - Average 3 Dart Score</h3>
+        <div class="w-full h-72">
+            <canvas id="dartChartScoreTraining" class="h-50 relative"></canvas>
+        </div>
+    </div>
+    
+      
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+<script src="{% static 'dashboard/dashboard.js' %}"></script>
+<script>
+    const avgScores501 = {{ dart_avg_scores_501|safe }};
+    const avgScoreScoreTraining = {{ dart_avg_scores_score_training|safe }};
+    renderDartChart('dartChart501', avgScores501);
+    renderDartChart('dartChartScoreTraining', avgScoreScoreTraining);
+</script>
+{% endblock %}
