@@ -1,9 +1,13 @@
+import json
+from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from dashboard.services.k8s import collect_k8s_metrics_summary, collect_k8s_metrics_detailed
 from dashboard.services.darts import collect_dart_summary
 from dashboard.services.synology import collect_synology_metrics_summary
 from dashboard.services.network import collect_network_summary
+from dashboard.services.emporia import collect_emporia_summary, collect_emporia_daily_summary
+from dashboard.services.splunk import collect_collector_summary
 
 @login_required
 def home(request):
@@ -12,7 +16,10 @@ def home(request):
     pods_status, nodes, total_pods, cluster_cpu, cluster_mem = collect_k8s_metrics_summary()
     synology_metrics = collect_synology_metrics_summary()
     network_metrics = collect_network_summary()
-    
+    emporia_metrics = collect_emporia_summary()
+    emporia_daily_summary = collect_emporia_daily_summary()
+    collector_summary = collect_collector_summary()
+
     context = {
         "dart_avg_scores_501": dart_avg_scores_501,
         "dart_avg_scores_score_training": dart_avg_scores_score_training,
@@ -22,7 +29,10 @@ def home(request):
         "cluster_cpu_percent": cluster_cpu,
         "cluster_mem_percent": cluster_mem,
         "synology_metrics": synology_metrics,
-        "network_metrics": network_metrics
+        "network_metrics": network_metrics,
+        "emporia_metrics": json.dumps(emporia_metrics, cls=DjangoJSONEncoder),
+        "emporia_daily_summary": emporia_daily_summary, 
+        "collector_summary": collector_summary
     }
 
     return render(request, "dashboard/home.html", context)

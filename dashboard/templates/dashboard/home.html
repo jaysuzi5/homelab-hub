@@ -284,35 +284,54 @@
         </div>
     </div>
 
+    <!-- Collector Job Summary Table -->
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <h3 class="text-xl font-bold mb-2">Server Status</h3>
-        <p class="text-gray-400">Uptime, load, and health metrics.</p>
+        <h3 class="text-xl font-bold mb-4">Collector Job Summary: Last 24 hours</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left table-auto">
+                <thead>
+                    <tr class="text-gray-300 text-sm border-b border-gray-700">
+                        <th class="px-2 py-1">Component</th>
+                        <th class="px-2 py-1">Return Code</th>
+                        <th class="px-2 py-1 text-right">Count</th>
+                        <th class="px-2 py-1 text-right">Duration (s)</th>
+                        <th class="px-2 py-1">Last Run (EST)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in collector_summary %}
+                    <tr class="text-sm border-b border-gray-700">
+                        <td class="px-2 py-1 font-semibold text-gray-200">{{ item.component }}</td>
+                        <td class="px-2 py-1">{{ item.return_code }}</td>
+                        <td class="px-2 py-1 text-right">{{ item.count }}</td>
+                        <td class="px-2 py-1 text-center">{{ item.duration }}</td>
+                        <td class="px-2 py-1">
+                            {% if item.is_stale %}
+                                <span class="text-red-400 font-semibold">❌ {{ item.last_run_est }}</span>
+                            {% else %}
+                                <span class="text-green-400 font-semibold">✅ {{ item.last_run_est }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <h3 class="text-xl font-bold mb-2">Network</h3>
-        <p class="text-gray-400">Bandwidth, devices, firewall status.</p>
-    </div>
-
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <h3 class="text-xl font-bold mb-2">Energy</h3>
-        <p class="text-gray-400">Electricity usage and cost tracking.</p>
-    </div>
-
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <h3 class="text-xl font-bold mb-2">Media</h3>
-        <p class="text-gray-400">Plex, Jellyfin, or other server stats.</p>
-    </div>
+    
 
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
         <h3 class="text-xl font-bold mb-2">Logs</h3>
         <p class="text-gray-400">Splunk / ELK alerts summary.</p>
     </div>
 
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <h3 class="text-xl font-bold mb-2">Misc</h3>
-        <p class="text-gray-400">Other integrations or notes.</p>
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition" style="min-height: 24rem;">
+        <h3 class="text-xl font-bold mb-4">Electricity Usage by Day</h3>
+        <div class="w-full h-72">
+            <canvas id="emporiaUsageChart" class="h-50 relative"></canvas>
+        </div>
     </div>
+
 
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition col-span-1 sm:col-span-2 lg:col-span-2" style="min-height: 24rem;">
         <h3 class="text-xl font-bold mb-4">501 Single Out - Average 3 Dart Score</h3>
@@ -321,27 +340,38 @@
         </div>
     </div>
 
-    <div class="divide-y bg-gray-800 rounded-2xl shadow p-6 row-span-1 sm:row-span-3 lg:row-span-3">
-        <h3 class="text-xl font-bold mb-4">
-            <div class="grid grid-cols-2 py-2">
-                    <span>Kubernetes Pods</span>
-                <span class="text-lg text-gray-300 font-semibold">
-                Total: {{ total_pods }}
-                </span>
-            </div>
-        </h3>
-        
-        <div class="divide-y divide-gray-700">
-            {% for ns, count in pods.items %}
-            <div class="grid grid-cols-2 py-2">
-                <span class="text-gray-300">{{ ns }}</span>
-                <span class="{% if count >= 10 %}font-bold text-white{% else %}text-gray-400{% endif %}">
-                {{ count }}
-                </span>
-            </div>
-            {% endfor %}
+    <!-- Emporia Daily Summary Table -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        {% with emporia_daily_summary|first as first_item %}
+            <h3 class="text-xl font-bold mb-4">
+                Electricity Daily Usage: <span class="text-green-400 ml-2">{{ first_item.date }}</span>
+            </h3>
+        {% endwith %}
+        <h4 class="text-md font-semibold text-gray-200 mb-2">Daily Usage Summary</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left table-auto">
+                <thead>
+                    <tr class="text-gray-300 text-sm border-b border-gray-700">
+                        <th class="px-2 py-1">Name</th>
+                        <th class="px-2 py-1 text-right">Usage (kWh)</th>
+                        <th class="pl-5 pr-2 py-1 text-right">Cost</th>
+                        <th class="px-2 py-1 text-right">Percentage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in emporia_daily_summary %}
+                    <tr class="text-gray-200 text-sm border-b border-gray-700">
+                        <td class="px-2 py-1">{{ item.name }}</td>
+                        <td class="px-2 py-1 text-right">{{ item.usage|floatformat:2 }}</td>
+                        <td class="pl-5 pr-2 py-1 text-right">${{ item.cost|floatformat:2 }}</td>
+                        <td class="px-2 py-1 text-right">{{ item.percentage|floatformat:1 }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-      </div>
+    </div>
+
     
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition col-span-1 sm:col-span-2 lg:col-span-2" style="min-height: 24rem;">
         <h3 class="text-xl font-bold mb-4">Score Training - Average 3 Dart Score</h3>
@@ -349,7 +379,6 @@
             <canvas id="dartChartScoreTraining" class="h-50 relative"></canvas>
         </div>
     </div>
-    
       
 </div>
 
@@ -360,7 +389,11 @@
 <script>
     const avgScores501 = {{ dart_avg_scores_501|safe }};
     const avgScoreScoreTraining = {{ dart_avg_scores_score_training|safe }};
+    const emporiaMetrics = {{ emporia_metrics|safe }};
     renderDartChart('dartChart501', avgScores501);
     renderDartChart('dartChartScoreTraining', avgScoreScoreTraining);
+    renderEmporiaUsageChart("emporiaUsageChart", emporiaMetrics);
+
 </script>
 {% endblock %}
+

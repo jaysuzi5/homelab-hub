@@ -11,6 +11,7 @@ dependencies = [
     "django-browser-reload>=1.18.0",
     "django-jazzmin>=3.0.0",
     "django-tailwind>=4.2.0",
+    "j-utilities-toolkit==0.0.2",
     "kubernetes>=33.1.0",
     "psutil>=7.0.0",
     "pyjwt>=2.10.1",
