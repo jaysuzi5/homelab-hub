@@ -9,6 +9,7 @@ from dashboard.services.network import collect_network_summary
 from dashboard.services.emporia import collect_emporia_summary, collect_emporia_daily_summary
 from dashboard.services.enphase import collect_enhase_summary
 from dashboard.services.splunk import collect_collector_summary
+from dashboard.services.weather import collect_weather_summary
 
 @login_required
 def home(request):
@@ -21,7 +22,7 @@ def home(request):
     emporia_daily_summary = collect_emporia_daily_summary()
     enhase_summary = collect_enhase_summary()
     collector_summary = collect_collector_summary()
-
+    weather_summary = collect_weather_summary()
 
     context = {
         "dart_avg_scores_501": dart_avg_scores_501,
@@ -36,9 +37,9 @@ def home(request):
         "emporia_metrics": json.dumps(emporia_metrics, cls=DjangoJSONEncoder),
         "enphase_metrics": enhase_summary,
         "emporia_daily_summary": emporia_daily_summary, 
-        "collector_summary": collector_summary
+        "collector_summary": collector_summary,
+        "weather_summary": weather_summary
     }
-
     return render(request, "dashboard/home.html", context)
 
 

@@ -327,16 +327,87 @@
     </div>
     
 
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition" style="min-height: 24rem;">
-        <h3 class="text-xl font-bold mb-4">Solar Energy Produced by Day</h3>
-        <div class="w-full h-72">
-            <canvas id="enphaseChart" class="h-50 relative"></canvas>
+            <!-- Weather Card -->
+            <div class="bg-gray-800 rounded-2xl shadow p-6">
+            
+            <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+                <span>Weather Overview</span>
+                {% if weather_summary %}
+                    <span class="text-lg text-gray-300 font-semibold">
+                        {{ weather_summary.weather.collection_time|date:"M d, Y H:i" }}
+                    </span>
+                {% else %}
+                <span class="text-lg text-gray-300 font-semibold">
+                    There were no weather results found
+                </span>
+            {% endif %}
+            </h3>
+        
+            {% if weather_summary %}
+                <!-- Current Weather -->
+                <div class="mb-6 grid grid-cols-3 gap-4 text-center">
+                    <div class="bg-blue-700 rounded p-4">
+                        <span class="block font-bold text-2xl">{{ weather_summary.weather.temperature }}°F</span>
+                        <span class="text-gray-300 text-sm">Current Temp</span>
+                    </div>
+                    <div class="bg-green-700 rounded p-4">
+                        <span class="block font-bold text-lg">{{ weather_summary.weather.temperature_min }}°F / {{ weather_summary.weather.temperature_max }}°F</span>
+                        <span class="text-gray-300 text-sm">Low / High</span>
+                    </div>
+                    <div class="bg-purple-700 rounded p-4">
+                        <span class="block font-bold text-lg">{{ weather_summary.weather.humidity }}%</span>
+                        <span class="text-gray-300 text-sm">Humidity</span>
+                    </div>
+                </div>
+            
+                <!-- Extra Weather Details -->
+                <div class="grid grid-cols-3 gap-4 text-center mb-6">
+                    <div class="bg-gray-700 rounded p-2">
+                        <span class="block font-bold">{{ weather_summary.weather.feels_like }}°F</span>
+                        <span class="text-gray-300 text-sm">Feels Like</span>
+                    </div>
+                    <div class="bg-gray-700 rounded p-2">
+                        <span class="block font-bold">{{ weather_summary.weather.wind_speed }} mph</span>
+                        <span class="text-gray-300 text-sm">Wind Speed</span>
+                    </div>
+                    <div class="bg-gray-700 rounded p-2">
+                        <span class="block font-bold">{{ weather_summary.weather.wind_direction }}°</span>
+                        <span class="text-gray-300 text-sm">Wind Dir</span>
+                    </div>
+                </div>
+            
+                <!-- Forecast Table -->
+                <h4 class="text-md font-semibold text-gray-200 mb-2">Forecast</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left table-auto">
+                        <thead>
+                            <tr class="text-gray-300 text-sm border-b border-gray-700">
+                                <th class="px-2 py-1">Date</th>
+                                <th class="px-2 py-1">Temperature</th>
+                                <th class="px-2 py-1">Humidity</th>
+                                <th class="px-2 py-1">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in weather_summary.forecast %}
+                            <tr class="text-gray-200 text-sm border-b border-gray-700">
+                                <td class="px-2 py-1">{{ f.forecast_date }}</td>
+                                <td class="px-2 py-1">{{ f.temperature_max }}°F</td>
+                                <td class="px-2 py-1">{{ f.humidity_max }}%</td>
+                                <td class="px-2 py-1 capitalize">{{ f.description }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
         </div>
-    </div>
+  
+    
 
 
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition" style="min-height: 24rem;">
-        <h3 class="text-xl font-bold mb-4">Electricity Produce and Usage by Day</h3>
+        <h3 class="text-xl font-bold mb-4">Electricity Produced and Usage by Day</h3>
         <div class="w-full h-72">
             <canvas id="emporiaUsageChart" class="h-50 relative"></canvas>
         </div>
