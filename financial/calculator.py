@@ -12,14 +12,13 @@ def monte_carlo_simulation(
     n_simulations=1000,
     freq="monthly",
     ss_age = 67,
-    ss_amount = 0
+    ss_amount = 0,
+    target_success = 0.85
 ):
-
-
     balances_average = []
     balances_median = []
-    balances_p15 = []
-    balances_p85 = []
+    balances_p_target = []
+    balances_p65 = []
     simulation_balances = {}
     periods_per_year = 12 if freq == "monthly" else 1
     periods = int(round(years * periods_per_year))  # <-- convert to integer
@@ -50,20 +49,21 @@ def monte_carlo_simulation(
             success_count += 1
 
     success_percent = success_count / n_simulations
+    p_target = 100 - target_success * 100
     for age in ages:
         balances_list = simulation_balances[age]
         balances_average.append(round(sum(balances_list) / n_simulations,0))
         balances_median.append(round(statistics.median(balances_list),0))
-        balances_p15.append(round(float(np.percentile(balances_list, 15)),0))
-        balances_p85.append(round(float(np.percentile(balances_list, 85)),0))
+        balances_p_target.append(round(float(np.percentile(balances_list, p_target)),0))
+        balances_p65.append(round(float(np.percentile(balances_list, 65)),0))
     constant_balances, ages = generate_balance_constant_return(balance, current_age, annual_return, inflation, years, withdrawal, freq, ss_age, ss_amount)
 
     data = {
         "success_percent": success_percent, 
         "balances_average": balances_average, 
         "balances_median": balances_median, 
-        "balances_p15": balances_p15, 
-        "balances_p85": balances_p85, 
+        "balances_p_target": balances_p_target, 
+        "balances_p65": balances_p65, 
         "constant_balances": constant_balances, 
         "ages": ages
     }
@@ -96,7 +96,7 @@ def find_max_withdrawal(
         mid = (low + high) / 2
         data = monte_carlo_simulation(
             balance, annual_return, annual_volatility, inflation,
-            years, mid, current_age, n_simulations, freq, ss_age, ss_amount
+            years, mid, current_age, n_simulations, freq, ss_age, ss_amount, target_success
         )
         if data["success_percent"] >= target_success:
             return_data = data

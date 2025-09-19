@@ -8,6 +8,13 @@ class RetirementForm(forms.Form):
         ("fixed", "Fixed Withdrawal → Evaluate Success"),
     ]
 
+    SS_PRESETS = [
+        ("", "Custom"),
+        ("62", f"Age 62 - ${os.getenv('SS_BENEFITS_62', 0)}"),
+        ("65", f"Age 65 - ${os.getenv('SS_BENEFITS_65', 0)}"),
+        ("67", f"Age 67 - ${os.getenv('SS_BENEFITS_67', 0)}"),
+    ]
+
     mode = forms.ChoiceField(
         choices=MODE_CHOICES,
         initial="target",
@@ -65,15 +72,24 @@ class RetirementForm(forms.Form):
         required=False,
         help_text="(Fixed mode only) Enter a monthly or yearly withdrawal amount to test."
     )
-    ss_benefits = forms.FloatField(
-        label="Social Security Montly Benefits ($)",
-        initial=os.getenv("SS_MONTLY_BENEFITS", 0),
-        help_text="Expected monthly benefits.  This can be combined with spouse."
+
+    ss_preset = forms.ChoiceField(
+        choices=SS_PRESETS,
+        required=False,
+        label="Social Security Preset",
+        help_text="Choose a preset or leave blank for custom"
     )
+
     ss_age = forms.FloatField(
         label="Social Security Age",
-        initial=os.getenv("SS_AGE", 67),
-        help_text="Age that you plan to start receiving Social Security."
+        initial=os.getenv("SS_AGE", 62),
+        help_text="Age you plan to start receiving Social Security."
+    )
+
+    ss_benefits = forms.FloatField(
+        label="Social Security Monthly Benefits ($)",
+        initial=os.getenv("SS_BENEFITS_62", 0),
+        help_text="Expected monthly benefits (combined with spouse if needed)."
     )
 
     target_success = forms.FloatField(

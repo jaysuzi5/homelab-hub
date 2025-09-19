@@ -29,7 +29,7 @@
         </div>
         <p class="text-sm text-gray-400">{{ form.mode.help_text }}</p>
         </div>
-
+ 
         <!-- Loop through all fields -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             {% include "financial/_form_field.html" with field=form.current_age %}
@@ -38,23 +38,25 @@
             {% include "financial/_form_field.html" with field=form.annual_return %}
             {% include "financial/_form_field.html" with field=form.balance %}
             {% include "financial/_form_field.html" with field=form.inflation %}
-            {% include "financial/_form_field.html" with field=form.ss_age %}
+            {% include "financial/_form_field.html" with field=form.ss_preset %}
             {% include "financial/_form_field.html" with field=form.annual_volatility %}
-            {% include "financial/_form_field.html" with field=form.ss_benefits %}
+            {% include "financial/_form_field.html" with field=form.ss_age %}
             {% include "financial/_form_field.html" with field=form.n_simulations %}
-            {% include "financial/_form_field.html" with field=form.withdrawal %}
+            {% include "financial/_form_field.html" with field=form.ss_benefits %}
             {% include "financial/_form_field.html" with field=form.target_success %}
+            {% include "financial/_form_field.html" with field=form.withdrawal %}
+            <div class="col-span-1 flex justify-center items-center">
+                <div id="spinner" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg shadow">
+                    Calculate
+                </button>
+            </div>
         </div>
 
-        <div class="col-span-2 flex justify-end">
-            <div id="spinner" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-                <div class="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-            <button type="submit"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg shadow">
-                Calculate
-            </button>
-        </div>
+
 
     </form>
     </div>
@@ -92,16 +94,23 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 });
 
+document.addEventListener("DOMContentLoaded", () => {
+    const presetField = document.querySelector("#id_ss_preset");
+    const ageField = document.querySelector("#id_ss_age");
+    const benefitsField = document.querySelector("#id_ss_benefits");
 
-document.addEventListener("DOMContentLoaded", function() {
-    const form = document.getElementById("retirement-form");
-    const spinner = document.getElementById("spinner");
-    const submitBtn = document.getElementById("submit-btn");
+    const presets = {
+        "62": { age: 62, benefits: {{ presets.ss_benefits_62 }} },
+        "65": { age: 65, benefits: {{ presets.ss_benefits_65 }} },
+        "67": { age: 67, benefits: {{ presets.ss_benefits_67 }} },
+    };
 
-    form.addEventListener("submit", function() {
-        spinner.classList.remove("hidden");
-        submitBtn.disabled = true;  // prevent double submission
-        submitBtn.classList.add("opacity-50", "cursor-not-allowed");
+    presetField.addEventListener("change", () => {
+        const selected = presetField.value;
+        if (presets[selected]) {
+            ageField.value = presets[selected].age;
+            benefitsField.value = presets[selected].benefits;
+        }
     });
 });
 
@@ -110,8 +119,8 @@ const ctx = document.getElementById('balanceChart').getContext('2d');
 const ages = {{ result.ages|safe }};
 const balances_average = {{ result.balances_average|safe }};
 const balances_median = {{ result.balances_median|safe }};
-const balances_p15 = {{ result.balances_p15|safe }};
-const balances_p85 = {{ result.balances_p85|safe }};
+const balances_p_target = {{ result.balances_p_target|safe }};
+const balances_p65 = {{ result.balances_p65|safe }};
 const constantBalances = {{ result.constant_balances|safe }};
 
 new Chart(ctx, {
@@ -119,15 +128,15 @@ new Chart(ctx, {
     data: {
         labels: ages,
         datasets: [
-            {
-                label: 'Random Returns: Average',
-                data: balances_average,
-                borderColor: 'rgba(59,130,246,1)', // blue-500
-                backgroundColor: 'rgba(59,130,246,0.2)',
-                fill: true,
-                tension: 0.2,
-                pointRadius: 0
-            },
+            // {
+            //     label: 'Random Returns: Average',
+            //     data: balances_average,
+            //     borderColor: 'rgba(59,130,246,1)', // blue-500
+            //     backgroundColor: 'rgba(59,130,246,0.2)',
+            //     fill: true,
+            //     tension: 0.2,
+            //     pointRadius: 0
+            // },
             {
                 label: 'Random Returns: Median',
                 data: balances_median,
@@ -138,23 +147,23 @@ new Chart(ctx, {
                 pointRadius: 0
             },
             {
-                label: 'Random Returns: P15',
-                data: balances_p15,
+                label: 'Random Returns: Target Success',
+                data: balances_p_target,
                 borderColor: 'rgba(248,113,113,1)', // red-400
                 backgroundColor: 'rgba(248,113,113,0.2)',
                 fill: true,
                 tension: 0.2,
                 pointRadius: 0
             },
-            {
-                label: 'Random Returns: P85',
-                data: balances_p85,
-                borderColor: 'rgba(251,146,60,1)', // orange-400
-                backgroundColor: 'rgba(251,146,60,0.2)',
-                fill: true,
-                tension: 0.2,
-                pointRadius: 0
-            },
+            // {
+            //     label: 'Random Returns: P65',
+            //     data: balances_p65,
+            //     borderColor: 'rgba(251,146,60,1)', // orange-400
+            //     backgroundColor: 'rgba(251,146,60,0.2)',
+            //     fill: true,
+            //     tension: 0.2,
+            //     pointRadius: 0
+            // },
             {
                 label: 'Constant Return',
                 data: constantBalances,
