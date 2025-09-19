@@ -13,6 +13,7 @@ dependencies = [
     "django-tailwind>=4.2.0",
     "j-utilities-toolkit==0.0.2",
     "kubernetes>=33.1.0",
+    "numpy>=2.3.3",
     "psutil>=7.0.0",
     "pyjwt>=2.10.1",
     "python-dotenv>=1.1.1",

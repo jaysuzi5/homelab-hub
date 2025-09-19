@@ -302,7 +302,14 @@
                     {% for item in collector_summary %}
                     <tr class="text-sm border-b border-gray-700">
                         <td class="px-2 py-1 font-semibold text-gray-200">{{ item.component }}</td>
-                        <td class="px-2 py-1">{{ item.return_code }}</td>
+                        <td class="px-2 py-1">
+                            {% if item.is_bad_return_code %}
+                                <span class="text-red-400 font-semibold">❌ {{ item.return_code }}</span>
+                            {% else %}
+                                <span class="text-green-400 font-semibold">✅ {{ item.return_code }}</span>
+                            {% endif %}
+                        </td>                        
+                    </td>
                         <td class="px-2 py-1 text-right">{{ item.count }}</td>
                         <td class="px-2 py-1 text-center">{{ item.duration }}</td>
                         <td class="px-2 py-1">

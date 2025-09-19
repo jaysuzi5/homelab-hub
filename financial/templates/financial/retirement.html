@@ -1,0 +1,185 @@
+{% extends "financial/base.html" %}
+{% load financials.form_tags %}
+{% load humanize %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+
+{% block content %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 w-full">    
+
+    <!-- Left column: Form -->
+    <div class="w-full mx-auto bg-gray-800 shadow-md rounded-2xl p-8 space-y-6 ">
+    <h2 class="text-2xl font-bold text-blue-400">Retirement Drawdown Calculator</h2>
+    <p class="text-gray-300">Enter your assumptions below. Adjust individual items to see how it impacts your retirement outlook.</p>
+
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Mode -->
+        <div class="space-y-1">
+        {{ form.mode.label_tag }}
+        <div class="flex space-x-4">
+            {% for radio in form.mode %}
+            <label class="flex items-center space-x-1">
+                {{ radio.tag }} <span class="text-gray-200">{{ radio.choice_label }}</span>
+            </label>
+            {% endfor %}
+        </div>
+        <p class="text-sm text-gray-400">{{ form.mode.help_text }}</p>
+        </div>
+
+        <!-- Loop through all fields -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for field in form %}
+                {% if field.name != "mode" %}
+                    <div class="space-y-1">
+                        {{ field.label_tag }}
+                        {% if field.help_text %}
+                            <p class="text-sm text-gray-400">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <p class="text-sm text-red-400">{{ error }}</p>
+                        {% endfor %}
+                        {{ field|add_class:"w-full bg-gray-700 text-gray-200 border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400" }}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="col-span-2 flex justify-end">
+            <div id="spinner" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+                <div class="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <button type="submit"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg shadow">
+                Calculate
+            </button>
+        </div>
+
+    </form>
+    </div>
+
+    {% if result %}
+    <!-- Right column: Results -->
+    <div class="w-full mx-auto bg-gray-800 shadow-md rounded-2xl p-8 space-y-6">
+        <h2 class="text-2xl font-bold text-blue-400">Results</h2>
+        <div class="mt-6 p-4 bg-gray-600 rounded-lg">
+        {% if result.mode == "fixed" %}
+        <p class="text-gray-200">Monte Carlo Success Rate: {{ result.success_rate }}%</p>
+        <p class="text-gray-200">Withdrawal: ${{ result.withdrawal|floatformat:2|intcomma }}</p>
+            <p class="text-gray-200">4 Percent Rule: ${{ result.four_percent_rule|intcomma }}</p>
+        {% elif result.mode == "target" %}
+            <p class="text-gray-200">Target Success Rate: {{ result.target_success }}%</p>
+            <p class="text-gray-200">Safe Withdrawal: ${{ result.withdrawal|floatformat:2|intcomma }}</p>
+            <p class="text-gray-200">4 Percent Rule: ${{ result.four_percent_rule|intcomma }}</p>
+        {% endif %}
+        </div>
+        <div>
+            <canvas id="balanceChart" class="w-full h-64"></canvas>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.querySelector("form");
+    const spinner = document.getElementById("spinner");
+
+    form.addEventListener("submit", function() {
+        spinner.classList.remove("hidden");  // show spinner
+    });
+});
+
+
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.getElementById("retirement-form");
+    const spinner = document.getElementById("spinner");
+    const submitBtn = document.getElementById("submit-btn");
+
+    form.addEventListener("submit", function() {
+        spinner.classList.remove("hidden");
+        submitBtn.disabled = true;  // prevent double submission
+        submitBtn.classList.add("opacity-50", "cursor-not-allowed");
+    });
+});
+
+{% if result.balances_average %}
+const ctx = document.getElementById('balanceChart').getContext('2d');
+const ages = {{ result.ages|safe }};
+const balances_average = {{ result.balances_average|safe }};
+const balances_median = {{ result.balances_median|safe }};
+const balances_p10 = {{ result.balances_p10|safe }};
+const balances_p20 = {{ result.balances_p20|safe }};
+const constantBalances = {{ result.constant_balances|safe }};
+
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: ages,
+        datasets: [
+        {
+            label: 'Random Returns: Average',
+            data: balances_average,
+            borderColor: 'rgba(59,130,246,1)', // blue-500
+            backgroundColor: 'rgba(59,130,246,0.2)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0
+        },
+        {
+            label: 'Random Returns: Median',
+            data: balances_median,
+            borderColor: 'rgba(139,92,246,1)', // purple-500
+            backgroundColor: 'rgba(139,92,246,0.2)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0
+        },
+        {
+            label: 'Random Returns: P10',
+            data: balances_p10,
+            borderColor: 'rgba(248,113,113,1)', // red-400
+            backgroundColor: 'rgba(248,113,113,0.2)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0
+        },
+        {
+            label: 'Random Returns: P20',
+            data: balances_p20,
+            borderColor: 'rgba(251,146,60,1)', // orange-400
+            backgroundColor: 'rgba(251,146,60,0.2)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0
+        },
+        {
+            label: 'Constant Return',
+            data: constantBalances,
+            borderColor: 'rgba(34,197,94,1)', // green-500
+            backgroundColor: 'rgba(34,197,94,0.2)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0
+        }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } },
+            x: { title: { display: true, text: 'Age' } }
+        }
+    }
+});
+{% endif %}
+
+</script>
+
+{% endblock %}

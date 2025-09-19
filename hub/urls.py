@@ -7,4 +7,5 @@ urlpatterns = [
     path("", home, name="home"),
     path("k8s", k8s, name="k8s"),
     path("accounts/", include("allauth.urls")),  
+    path('financial/', include('financial.urls')),
 ]

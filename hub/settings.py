@@ -38,7 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
+    'django.contrib.humanize',
+    
     # Allauth apps
     'allauth',
     'allauth.account',
@@ -47,6 +48,7 @@ INSTALLED_APPS = [
     
     "django_browser_reload",
     "dashboard",
+    'financial',
 ]
 
 
