@@ -35,10 +35,97 @@ function renderDartChart(canvasId, scores) {
     });
 }
 
-
 function renderEmporiaUsageChart(canvasId, metrics) {
     const labels = metrics.map(m => m.date);
     const usage = metrics.map(m => m.usage);
+    const produced = metrics.map(m => m.produced);
+
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Usage', 
+                    data: usage,
+                    fill: true,
+                    borderColor: 'rgba(248,113,113,1)', // red-400
+                    backgroundColor: 'rgba(248,113,113,0.2)',
+                    tension: 0.2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Produced', 
+                    data: produced,
+                    fill: true,
+                    borderColor: 'rgba(34,197,94,1)',
+                    backgroundColor: 'rgba(34,197,94,0.2)',
+                    tension: 0.2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date',
+                        color: 'white',
+                        font: { size: 16, weight: 'bold' }
+                    },
+                    ticks: {
+                        color: 'white',
+                        font: { size: 14 }
+                    },
+                    grid: {
+                        color: 'rgba(255,255,255,0.2)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'kWh',
+                        color: 'white',
+                        font: { size: 16, weight: 'bold' }
+                    },
+                    ticks: {
+                        color: 'white',
+                        font: { size: 14 }
+                    },
+                    grid: {
+                        color: 'rgba(255,255,255,0.2)'
+                    },
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: 'white',
+                        font: {
+                            size: 14
+                        }
+                    }
+                },
+                title: {
+                    display: false
+                }
+            },
+        }        
+    });
+    
+}
+
+function renderEnphaseChart(canvasId, metrics) {
+    const labels = metrics.map(m => m.date);
+    const produced = metrics.map(m => m.produced);
 
     const ctx = document.getElementById(canvasId).getContext('2d');
     return new Chart(ctx, {
@@ -46,8 +133,8 @@ function renderEmporiaUsageChart(canvasId, metrics) {
         data: {
             labels: labels,
             datasets: [{
-                label: '',  // empty label
-                data: usage,
+                label: '',
+                data: produced,
                 fill: true,
                 borderColor: 'rgba(34,197,94,1)',
                 backgroundColor: 'rgba(34,197,94,0.2)',
@@ -69,8 +156,8 @@ function renderEmporiaUsageChart(canvasId, metrics) {
                 }
             },
             plugins: {
-                legend: { display: false },    // 🔹 now correctly hides the rectangle
-                tooltip: { enabled: true }   // optional
+                legend: { display: false },
+                tooltip: { enabled: true } 
             }
         }        
     });

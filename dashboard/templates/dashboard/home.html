@@ -1,4 +1,4 @@
-{% extends "dashboard/base.html" %}
+{% extends "base.html" %}
 {% load static %}
 {% block content %}
 <div class="flex items-center justify-between mb-6">
@@ -327,13 +327,16 @@
     </div>
     
 
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <h3 class="text-xl font-bold mb-2">Logs</h3>
-        <p class="text-gray-400">Splunk / ELK alerts summary.</p>
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition" style="min-height: 24rem;">
+        <h3 class="text-xl font-bold mb-4">Solar Energy Produced by Day</h3>
+        <div class="w-full h-72">
+            <canvas id="enphaseChart" class="h-50 relative"></canvas>
+        </div>
     </div>
 
+
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition" style="min-height: 24rem;">
-        <h3 class="text-xl font-bold mb-4">Electricity Usage by Day</h3>
+        <h3 class="text-xl font-bold mb-4">Electricity Produce and Usage by Day</h3>
         <div class="w-full h-72">
             <canvas id="emporiaUsageChart" class="h-50 relative"></canvas>
         </div>
@@ -397,9 +400,11 @@
     const avgScores501 = {{ dart_avg_scores_501|safe }};
     const avgScoreScoreTraining = {{ dart_avg_scores_score_training|safe }};
     const emporiaMetrics = {{ emporia_metrics|safe }};
+    const enphaseMetrics = {{ enphase_metrics|safe }};
     renderDartChart('dartChart501', avgScores501);
     renderDartChart('dartChartScoreTraining', avgScoreScoreTraining);
     renderEmporiaUsageChart("emporiaUsageChart", emporiaMetrics);
+    renderEnphaseChart("enphaseChart", enphaseMetrics);
 
 </script>
 {% endblock %}

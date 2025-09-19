@@ -13,6 +13,7 @@
         theme: { extend: {} }
       }
     </script>
+
     {% block head %}{% endblock %}
 </head>
 <body class="bg-gray-900 text-gray-200 flex min-h-screen">
@@ -26,7 +27,7 @@
             <a href="#" class="hover:bg-gray-700 p-2 rounded">Networking</a>
             <a href="#" class="hover:bg-gray-700 p-2 rounded">Energy</a>
             <a href="#" class="hover:bg-gray-700 p-2 rounded">Media</a>
-            <a href="#" class="hover:bg-gray-700 p-2 rounded">Logs</a>
+            <a href="{% url 'retirement_dashboard' %}" class="hover:bg-gray-700 p-2 rounded">Financials</a>
         </nav>
     </aside>
 
