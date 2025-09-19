@@ -127,6 +127,12 @@
                     <span class="font-bold text-lg">{{ synology_metrics.utilization.memory_percent }}%</span><br>
                     <span class="text-gray-300 text-sm">Memory Usage</span>
                 </div>
+
+                <!-- Disk -->
+                <div class="rounded p-2 {% if synology_metrics.utilization.memory_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.memory_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
+                    <span class="font-bold text-lg">{{ synology_metrics.utilization.overall_percent_used }}%</span><br>
+                    <span class="text-gray-300 text-sm">Disk Usage</span>
+                </div>
             </div>
         </div>
 
@@ -137,22 +143,22 @@
             <thead>
                 <tr class="text-gray-300 text-sm border-b border-gray-700">
                 <th class="px-2 py-1">Volume</th>
-                <th class="px-2 py-1">Size</th>
-                <th class="px-2 py-1">Used</th>
-                <th class="px-2 py-1">Storage %</th>
-                <th class="px-2 py-1">Status</th>
+                <th class="px-2 py-1 text-center">Size</th>
+                <th class="px-2 py-1 text-center">Used</th>
+                <th class="px-2 py-1 text-center">Storage %</th>
+                <th class="px-2 py-1 text-center">Status</th>
                 </tr>
             </thead>
             <tbody>
                 {% for vol in synology_metrics.volumes %}
                 <tr class="text-gray-200 text-sm border-b border-gray-700">
-                <td class="px-2 py-1">{{ vol.id }}</td>
-                <td class="px-2 py-1">{{ vol.size_total }}</td>
-                <td class="px-2 py-1">{{ vol.size_used }}</td>
-                <td class="px-2 py-1 {% if node.cpu_percent >= 85 %}font-bold text-red-400{% elif node.cpu_percent >= 70 %}font-bold text-yellow-400{% endif %}">
+                <td class="px-2 py-1">{{ vol.name }}</td>
+                <td class="px-2 py-1 text-center">{{ vol.size_total }}</td>
+                <td class="px-2 py-1 text-center">{{ vol.size_used }}</td>
+                <td class="px-2 py-1 text-center {% if node.cpu_percent >= 85 %}font-bold text-red-400{% elif node.cpu_percent >= 70 %}font-bold text-yellow-400{% endif %}">
                     {{ vol.percent_used }}%
                 </td>
-                <td class="px-2 py-1">
+                <td class="px-2 py-1 text-center">
                     {% if vol.status and vol.status == 'normal' %}
                     <span class="text-green-400 font-semibold">{{ vol.status }}</span>
                     {% else %}
@@ -172,18 +178,18 @@
             <thead>
                 <tr class="text-gray-300 text-sm border-b border-gray-700">
                 <th class="px-2 py-1">Disk</th>
-                <th class="px-2 py-1">Name</th>
-                <th class="px-2 py-1">Tempature</th>
-                <th class="px-2 py-1">Status</th>
+                <th class="px-2 py-1 text-center">Name</th>
+                <th class="px-2 py-1 text-center">Tempature</th>
+                <th class="px-2 py-1 text-center">Status</th>
                 </tr>
             </thead>
             <tbody>
                 {% for disk in synology_metrics.disks %}
                 <tr class="text-gray-200 text-sm border-b border-gray-700">
                 <td class="px-2 py-1">{{ disk.id }}</td>
-                <td class="px-2 py-1">{{ disk.name }}</td>
-                <td class="px-2 py-1">{{ disk.temperature }}</td>
-                <td class="px-2 py-1">
+                <td class="px-2 py-1 text-center">{{ disk.name }}</td>
+                <td class="px-2 py-1 text-center">{{ disk.temperature }}</td>
+                <td class="px-2 py-1 text-center">
                     {% if disk.smart_status and disk.smart_status == 'normal' %}
                     <span class="text-green-400 font-semibold">{{ disk.smart_status }}</span>
                     {% else %}
@@ -383,8 +389,8 @@
                         <thead>
                             <tr class="text-gray-300 text-sm border-b border-gray-700">
                                 <th class="px-2 py-1">Date</th>
-                                <th class="px-2 py-1">Temperature</th>
-                                <th class="px-2 py-1">Humidity</th>
+                                <th class="px-2 py-1 text-center">Temperature</th>
+                                <th class="px-2 py-1 text-center">Humidity</th>
                                 <th class="px-2 py-1">Description</th>
                             </tr>
                         </thead>
@@ -392,8 +398,8 @@
                             {% for f in weather_summary.forecast %}
                             <tr class="text-gray-200 text-sm border-b border-gray-700">
                                 <td class="px-2 py-1">{{ f.forecast_date }}</td>
-                                <td class="px-2 py-1">{{ f.temperature_max }}°F</td>
-                                <td class="px-2 py-1">{{ f.humidity_max }}%</td>
+                                <td class="px-2 py-1 text-center">{{ f.temperature_max }}°F</td>
+                                <td class="px-2 py-1 text-center">{{ f.humidity_max }}%</td>
                                 <td class="px-2 py-1 capitalize">{{ f.description }}</td>
                             </tr>
                             {% endfor %}

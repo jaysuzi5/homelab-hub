@@ -52,16 +52,29 @@ def _get_metrics():
         # Storage volumes
         # print(api.storage._data)
         volumes = []
+        overall_bytes = 0
+        overall_used_bytes = 0
         for vol_id in api.storage.volumes_ids:
             total_bytes = api.storage.volume_size_total(vol_id)
-            used_bytes = api.storage.volume_size_used(vol_id)            
+            used_bytes = api.storage.volume_size_used(vol_id)
+            if total_bytes:
+                overall_bytes += total_bytes
+            if used_bytes:
+                overall_used_bytes += used_bytes    
+            if vol_id == "volume_1":
+                vol_name = "nas"
+            elif vol_id == "volume_2":
+                vol_name = "k8s-data"
             volumes.append({
+                "name": vol_name,
                 "id": vol_id,
                 "status": api.storage.volume_status(vol_id),
                 "percent_used": api.storage.volume_percentage_used(vol_id),
                 "size_total": round(total_bytes / (1024**4), 2) if total_bytes else None,
                 "size_used": round(used_bytes / (1024**4), 2) if used_bytes else None,                
             })
+
+        utilization["overall_percent_used"] = int(round((overall_used_bytes/overall_bytes)*100,0)) if overall_bytes > 0 else 0
 
         # Disks
         disks = []
