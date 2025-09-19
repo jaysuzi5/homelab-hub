@@ -65,14 +65,70 @@
     <!-- Right column: Results -->
     <div class="w-full mx-auto bg-gray-800 shadow-md rounded-2xl p-8 space-y-6">
         <h2 class="text-2xl font-bold text-blue-400">Results</h2>
-        <div class="mt-6 p-4 bg-gray-600 rounded-lg">
+        <div class="mt-6 p-4 bg-gray-800 rounded-lg">
         {% if result.mode == "fixed" %}
-            <p class="text-gray-200">Monte Carlo Success Rate: {{ result.success_rate }}%</p>
-            <p class="text-gray-200">Withdrawal: ${{ result.withdrawal|floatformat:2|intcomma }} as compared to ${{ result.four_percent_rule|intcomma }} at the 4 percent rule</p>
-        {% elif result.mode == "target" %}
-            <p class="text-gray-200">Target Success Rate: {{ result.target_success }}%</p>
-            <p class="text-gray-200">Safe Withdrawal: ${{ result.withdrawal|floatformat:2|intcomma }} as compared to ${{ result.four_percent_rule|intcomma }} at the 4 percent rule</p>
+            <div class="text-gray-200 space-y-2 w-64">
+                <div class="flex justify-between">
+                <span>Monte Carlo Success Rate:</span>
+                <span class="font-bold {% if result.success_rate < result.target_success %}text-red-400{% else %}text-green-400{% endif %}">
+                    {{ result.success_rate }}%
+                </span>
+                </div>
+            </div>
+            <p class="text-gray-200">
+                Withdrawal::
+                <span class="font-bold text-blue-400">
+                    ${{ result.withdrawal|floatformat:0|intcomma }}
+                  </span>
+                as compared to 
+                <span class="font-bold text-blue-400">
+                    ${{ result.four_percent_rule|floatformat:0|intcomma }}
+                </span>
+                 at the 4 percent rule
+              </p>
+
+            {% elif result.mode == "target" %}
+            <div class="text-gray-200 space-y-2 w-64">
+                <div class="flex justify-between">
+                <span>Target Success Rate:</span>
+                <span class="font-bold text-blue-400">
+                    {{ result.target_success }}%
+                </span>
+                </div>
+            </div>
+            <p class="text-gray-200">
+                Safe Withdrawal:
+                <span class="font-bold text-green-400">
+                    ${{ result.withdrawal|floatformat:0|intcomma }}
+                  </span>
+                as compared to 
+                <span class="font-bold text-blue-400">
+                    ${{ result.four_percent_rule|floatformat:0|intcomma }}
+                </span>
+                 at the 4 percent rule
+              </p>
         {% endif %}
+        <br />
+        <div class="text-gray-200 space-y-2 w-64">
+            <div class="flex justify-between">
+              <span>Ending Fixed Rate:</span>
+              <span class="font-bold text-blue-400">
+                ${{ result.last_values.constant_balances|floatformat:0|intcomma }}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span>Ending Median Rate:</span>
+              <span class="font-bold text-blue-400">
+                ${{ result.last_values.balances_median|floatformat:0|intcomma }}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span>Ending Target Rate:</span>
+              <span class="font-bold text-blue-400">
+                ${{ result.last_values.balances_p_target|floatformat:0|intcomma }}
+              </span>
+            </div>
+          </div>
         </div>
         <div>
             <canvas id="balanceChart" class="w-full h-64"></canvas>

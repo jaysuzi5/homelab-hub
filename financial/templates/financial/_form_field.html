@@ -1,12 +1,21 @@
 {% load financials.form_tags %}
 
 <div class="space-y-1">
-    {{ field.label_tag }}
-    {% if field.help_text %}
-        <p class="text-sm text-gray-400">{{ field.help_text }}</p>
-    {% endif %}
+    <label class="relative group cursor-help">
+        {{ field.label }}
+        {% if field.help_text %}
+            <span class="absolute left-full ml-2 top-1/2 -translate-y-1/2 
+                         hidden group-hover:inline-block 
+                         bg-gray-800 text-gray-200 text-sm px-3 py-2 rounded shadow-lg z-10
+                         w-64 whitespace-normal">
+                {{ field.help_text }}
+            </span>
+        {% endif %}
+    </label>
+
     {% for error in field.errors %}
         <p class="text-sm text-red-400">{{ error }}</p>
     {% endfor %}
+
     {{ field|add_class:"w-full bg-gray-700 text-gray-200 border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400" }}
 </div>

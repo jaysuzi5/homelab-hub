@@ -49,15 +49,16 @@ def retirement(request):
                 )
                 result = {
                     "mode": "target",
-                    "target_success": round(target_success * 100, 1),
                     "withdrawal": round(data["best_withdrawal"], 2),
                 }
-        
+
+            result["target_success"] = round(target_success * 100, 1)
             result['balances_average'] = data["balances_average"]
             result['balances_median'] = data["balances_median"]
             result['balances_p_target'] = data["balances_p_target"]
             result['balances_p65'] = data["balances_p65"]
             result['constant_balances'] = data["constant_balances"]
+            result['last_values'] = data["last_values"]
             result['ages'] = data["ages"]
             result['four_percent_rule'] = four_percent_rule
     else:

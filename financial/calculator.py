@@ -20,7 +20,10 @@ def monte_carlo_simulation(
     balances_p_target = []
     balances_p65 = []
     simulation_balances = {}
+    ss_amount_original = ss_amount
     periods_per_year = 12 if freq == "monthly" else 1
+    if freq != "monthly":
+        ss_amount = ss_amount * 12    # ss amount is always sent in as monthly
     periods = int(round(years * periods_per_year))  # <-- convert to integer
     dt = 1 / periods_per_year
 
@@ -38,7 +41,7 @@ def monte_carlo_simulation(
             portfolio = gbm_step(portfolio, annual_return, annual_volatility, dt)
             # withdraw (inflation adjusted)
             withdrawal_adj = withdrawal * ((1 + inflation) ** (t * dt))
-            if age > ss_age:
+            if age >= ss_age:
                 ss_amount_adj = ss_amount * ((1 + inflation) ** (t * dt))
                 withdrawal_adj -= ss_amount_adj
             portfolio -= withdrawal_adj
@@ -56,7 +59,15 @@ def monte_carlo_simulation(
         balances_median.append(round(statistics.median(balances_list),0))
         balances_p_target.append(round(float(np.percentile(balances_list, p_target)),0))
         balances_p65.append(round(float(np.percentile(balances_list, 65)),0))
-    constant_balances, ages = generate_balance_constant_return(balance, current_age, annual_return, inflation, years, withdrawal, freq, ss_age, ss_amount)
+    constant_balances, ages = generate_balance_constant_return(balance, current_age, annual_return, inflation, years, withdrawal, freq, ss_age, ss_amount_original)
+
+    last_values = {
+        "balances_average": balances_average[-1], 
+        "balances_median": balances_median[-1], 
+        "balances_p_target": balances_p_target[-1], 
+        "balances_p65": balances_p65[-1], 
+        "constant_balances": constant_balances[-1], 
+    }
 
     data = {
         "success_percent": success_percent, 
@@ -65,7 +76,8 @@ def monte_carlo_simulation(
         "balances_p_target": balances_p_target, 
         "balances_p65": balances_p65, 
         "constant_balances": constant_balances, 
-        "ages": ages
+        "ages": ages,
+        "last_values": last_values
     }
 
     return data
@@ -123,6 +135,8 @@ def generate_balance_constant_return(
     using a constant (deterministic) return, along with corresponding ages.
     """
     periods_per_year = 12 if freq == "monthly" else 1
+    if freq != "monthly":
+        ss_amount = ss_amount * 12    # ss amount is always sent in as monthly
     periods = int(years * periods_per_year)
     dt = 1 / periods_per_year
 
@@ -140,7 +154,8 @@ def generate_balance_constant_return(
         withdrawal_adj = withdrawal * ((1 + inflation) ** (t * dt))
         if age > ss_age:
             ss_amount_adj = ss_amount * ((1 + inflation) ** (t * dt))
-            withdrawal_adj -= ss_amount_adj        
+            withdrawal_adj -= ss_amount_adj
+
         portfolio -= withdrawal_adj
         portfolio = max(portfolio, 0)
 
