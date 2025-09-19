@@ -1,34 +1,35 @@
+import os
 from django import forms
+
 
 class RetirementForm(forms.Form):
     MODE_CHOICES = [
-        ("fixed", "Fixed Withdrawal → Evaluate Success"),
         ("target", "Target Success Rate → Find Withdrawal"),
+        ("fixed", "Fixed Withdrawal → Evaluate Success"),
     ]
 
     mode = forms.ChoiceField(
         choices=MODE_CHOICES,
         initial="target",
         widget=forms.RadioSelect,
-        help_text="Choose whether to test a fixed withdrawal amount, or to find the maximum safe withdrawal for a target success rate."
+        help_text="Choose whether to find the maximum safe withdrawal for a target success rate or test a fixed withdrawal amount."
     )
 
     current_age = forms.FloatField(
         label="Current Age",
-        initial=65,
+        initial=os.getenv("RETIREMENT_AGE", 65),
         help_text="Enter your current age (decimals allowed, e.g., 66.5)."
     )
     end_age = forms.FloatField(
-        label="Planned End Age",
+        label="Life Expectancy",
         initial=90,
         help_text="Life expectancy or horizon to plan for (typical range 85–100)."
     )
     balance = forms.FloatField(
         label="Portfolio Balance ($)",
-        initial=1_000_000,
+        initial=os.getenv("PORTFOLIO_BALANCE", 1000000),
         help_text="Your total investable assets at retirement."
     )
-
     annual_return = forms.FloatField(
         label="Expected Annual Return (0–1)",
         initial=0.05,
@@ -64,10 +65,21 @@ class RetirementForm(forms.Form):
         required=False,
         help_text="(Fixed mode only) Enter a monthly or yearly withdrawal amount to test."
     )
+    ss_benefits = forms.FloatField(
+        label="Social Security Montly Benefits ($)",
+        initial=os.getenv("SS_MONTLY_BENEFITS", 0),
+        help_text="Expected monthly benefits.  This can be combined with spouse."
+    )
+    ss_age = forms.FloatField(
+        label="Social Security Age",
+        initial=os.getenv("SS_AGE", 67),
+        help_text="Age that you plan to start receiving Social Security."
+    )
+
     target_success = forms.FloatField(
         label="Target Success Rate (0–1)",
         required=False,
-        initial=0.9,
+        initial=0.85,
         help_text="(Target mode only) Desired probability of not running out of money. Typical range: 0.75–0.95."
     )
 
@@ -81,3 +93,4 @@ class RetirementForm(forms.Form):
                 self.add_error("withdrawal", "Withdrawal amount is required when using Fixed Withdrawal mode.")
             elif mode == "target" and target_success in [None, ""]:
                 self.add_error("target_success", "Target success rate is required when using Target Success mode.")
+            

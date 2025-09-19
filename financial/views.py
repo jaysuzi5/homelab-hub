@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from .forms import RetirementForm
-from .calculator import monte_carlo_simulation, find_max_withdrawal, generate_balance_over_time, generate_balance_constant_return
+from .calculator import monte_carlo_simulation, find_max_withdrawal
 
 def retirement(request):
     result = None
@@ -17,47 +17,46 @@ def retirement(request):
             annual_volatility = form.cleaned_data["annual_volatility"]
             n_simulations = form.cleaned_data["n_simulations"]
             freq = form.cleaned_data["withdrawal_freq"]
+            ss_age = form.cleaned_data["ss_age"] 
+            ss_amount = form.cleaned_data["ss_benefits"]
 
             years = end_age - current_age
-            four_percent_rule = round(balance * 0.04 / 12,2)
+            periods_per_year = 12 if freq == "monthly" else 1
+            four_percent_rule = round(balance * 0.04 / periods_per_year, 2)
 
             if mode == "fixed":
                 withdrawal = form.cleaned_data["withdrawal"]
-                success_rate = monte_carlo_simulation(
+                data = monte_carlo_simulation(
                     balance, annual_return, annual_volatility,
-                    inflation, years, withdrawal,
-                    n_simulations=n_simulations, freq=freq
+                    inflation, years, withdrawal, current_age,
+                    n_simulations=n_simulations, freq=freq,
+                    ss_age=ss_age, ss_amount=ss_amount
                 )
                 result = {
                     "mode": "fixed",
                     "withdrawal": withdrawal,
-                    "success_rate": round(success_rate * 100, 1),
+                    "success_rate": round(data["success_percent"] * 100, 1),
                 }
             elif mode == "target":
                 target_success = form.cleaned_data["target_success"]
-                withdrawal = find_max_withdrawal(
+                data = find_max_withdrawal(
                     balance, annual_return, annual_volatility,
-                    inflation, years, target_success,
-                    n_simulations=n_simulations, freq=freq
+                    inflation, years, target_success, current_age,
+                    n_simulations=n_simulations, freq=freq,
+                    ss_age=ss_age, ss_amount=ss_amount
                 )
                 result = {
                     "mode": "target",
                     "target_success": round(target_success * 100, 1),
-                    "withdrawal": round(withdrawal, 2),
+                    "withdrawal": round(data["best_withdrawal"], 2),
                 }
-            balances_average, balances_median, balances_p10, balances_p20, ages = generate_balance_over_time(
-                balance, current_age, annual_return, annual_volatility,
-                inflation, years, withdrawal, freq
-            )
-            constant_balances, _ = generate_balance_constant_return(
-                balance, current_age, annual_return, inflation, years, withdrawal, freq
-            )            
-            result['balances_average'] = balances_average
-            result['balances_median'] = balances_median
-            result['balances_p10'] = balances_p10
-            result['balances_p20'] = balances_p20
-            result['constant_balances'] = constant_balances
-            result['ages'] = ages
+        
+            result['balances_average'] = data["balances_average"]
+            result['balances_median'] = data["balances_median"]
+            result['balances_p15'] = data["balances_p15"]
+            result['balances_p85'] = data["balances_p85"]
+            result['constant_balances'] = data["constant_balances"]
+            result['ages'] = data["ages"]
             result['four_percent_rule'] = four_percent_rule
     else:
         form = RetirementForm()

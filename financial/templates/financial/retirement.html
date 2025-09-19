@@ -1,6 +1,6 @@
 {% extends "financial/base.html" %}
-{% load financials.form_tags %}
 {% load humanize %}
+
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
@@ -32,20 +32,18 @@
 
         <!-- Loop through all fields -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {% for field in form %}
-                {% if field.name != "mode" %}
-                    <div class="space-y-1">
-                        {{ field.label_tag }}
-                        {% if field.help_text %}
-                            <p class="text-sm text-gray-400">{{ field.help_text }}</p>
-                        {% endif %}
-                        {% for error in field.errors %}
-                            <p class="text-sm text-red-400">{{ error }}</p>
-                        {% endfor %}
-                        {{ field|add_class:"w-full bg-gray-700 text-gray-200 border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400" }}
-                    </div>
-                {% endif %}
-            {% endfor %}
+            {% include "financial/_form_field.html" with field=form.current_age %}
+            {% include "financial/_form_field.html" with field=form.withdrawal_freq %}
+            {% include "financial/_form_field.html" with field=form.end_age %}
+            {% include "financial/_form_field.html" with field=form.annual_return %}
+            {% include "financial/_form_field.html" with field=form.balance %}
+            {% include "financial/_form_field.html" with field=form.inflation %}
+            {% include "financial/_form_field.html" with field=form.ss_age %}
+            {% include "financial/_form_field.html" with field=form.annual_volatility %}
+            {% include "financial/_form_field.html" with field=form.ss_benefits %}
+            {% include "financial/_form_field.html" with field=form.n_simulations %}
+            {% include "financial/_form_field.html" with field=form.withdrawal %}
+            {% include "financial/_form_field.html" with field=form.target_success %}
         </div>
 
         <div class="col-span-2 flex justify-end">
@@ -67,13 +65,11 @@
         <h2 class="text-2xl font-bold text-blue-400">Results</h2>
         <div class="mt-6 p-4 bg-gray-600 rounded-lg">
         {% if result.mode == "fixed" %}
-        <p class="text-gray-200">Monte Carlo Success Rate: {{ result.success_rate }}%</p>
-        <p class="text-gray-200">Withdrawal: ${{ result.withdrawal|floatformat:2|intcomma }}</p>
-            <p class="text-gray-200">4 Percent Rule: ${{ result.four_percent_rule|intcomma }}</p>
+            <p class="text-gray-200">Monte Carlo Success Rate: {{ result.success_rate }}%</p>
+            <p class="text-gray-200">Withdrawal: ${{ result.withdrawal|floatformat:2|intcomma }} as compared to ${{ result.four_percent_rule|intcomma }} at the 4 percent rule</p>
         {% elif result.mode == "target" %}
             <p class="text-gray-200">Target Success Rate: {{ result.target_success }}%</p>
-            <p class="text-gray-200">Safe Withdrawal: ${{ result.withdrawal|floatformat:2|intcomma }}</p>
-            <p class="text-gray-200">4 Percent Rule: ${{ result.four_percent_rule|intcomma }}</p>
+            <p class="text-gray-200">Safe Withdrawal: ${{ result.withdrawal|floatformat:2|intcomma }} as compared to ${{ result.four_percent_rule|intcomma }} at the 4 percent rule</p>
         {% endif %}
         </div>
         <div>
@@ -109,13 +105,13 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 });
 
-{% if result.balances_average %}
+{% if result.ages %}
 const ctx = document.getElementById('balanceChart').getContext('2d');
 const ages = {{ result.ages|safe }};
 const balances_average = {{ result.balances_average|safe }};
 const balances_median = {{ result.balances_median|safe }};
-const balances_p10 = {{ result.balances_p10|safe }};
-const balances_p20 = {{ result.balances_p20|safe }};
+const balances_p15 = {{ result.balances_p15|safe }};
+const balances_p85 = {{ result.balances_p85|safe }};
 const constantBalances = {{ result.constant_balances|safe }};
 
 new Chart(ctx, {
@@ -123,61 +119,104 @@ new Chart(ctx, {
     data: {
         labels: ages,
         datasets: [
-        {
-            label: 'Random Returns: Average',
-            data: balances_average,
-            borderColor: 'rgba(59,130,246,1)', // blue-500
-            backgroundColor: 'rgba(59,130,246,0.2)',
-            fill: true,
-            tension: 0.2,
-            pointRadius: 0
-        },
-        {
-            label: 'Random Returns: Median',
-            data: balances_median,
-            borderColor: 'rgba(139,92,246,1)', // purple-500
-            backgroundColor: 'rgba(139,92,246,0.2)',
-            fill: true,
-            tension: 0.2,
-            pointRadius: 0
-        },
-        {
-            label: 'Random Returns: P10',
-            data: balances_p10,
-            borderColor: 'rgba(248,113,113,1)', // red-400
-            backgroundColor: 'rgba(248,113,113,0.2)',
-            fill: true,
-            tension: 0.2,
-            pointRadius: 0
-        },
-        {
-            label: 'Random Returns: P20',
-            data: balances_p20,
-            borderColor: 'rgba(251,146,60,1)', // orange-400
-            backgroundColor: 'rgba(251,146,60,0.2)',
-            fill: true,
-            tension: 0.2,
-            pointRadius: 0
-        },
-        {
-            label: 'Constant Return',
-            data: constantBalances,
-            borderColor: 'rgba(34,197,94,1)', // green-500
-            backgroundColor: 'rgba(34,197,94,0.2)',
-            fill: true,
-            tension: 0.2,
-            pointRadius: 0
-        }
+            {
+                label: 'Random Returns: Average',
+                data: balances_average,
+                borderColor: 'rgba(59,130,246,1)', // blue-500
+                backgroundColor: 'rgba(59,130,246,0.2)',
+                fill: true,
+                tension: 0.2,
+                pointRadius: 0
+            },
+            {
+                label: 'Random Returns: Median',
+                data: balances_median,
+                borderColor: 'rgba(139,92,246,1)', // purple-500
+                backgroundColor: 'rgba(139,92,246,0.2)',
+                fill: true,
+                tension: 0.2,
+                pointRadius: 0
+            },
+            {
+                label: 'Random Returns: P15',
+                data: balances_p15,
+                borderColor: 'rgba(248,113,113,1)', // red-400
+                backgroundColor: 'rgba(248,113,113,0.2)',
+                fill: true,
+                tension: 0.2,
+                pointRadius: 0
+            },
+            {
+                label: 'Random Returns: P85',
+                data: balances_p85,
+                borderColor: 'rgba(251,146,60,1)', // orange-400
+                backgroundColor: 'rgba(251,146,60,0.2)',
+                fill: true,
+                tension: 0.2,
+                pointRadius: 0
+            },
+            {
+                label: 'Constant Return',
+                data: constantBalances,
+                borderColor: 'rgba(34,197,94,1)', // green-500
+                backgroundColor: 'rgba(34,197,94,0.2)',
+                fill: true,
+                tension: 0.2,
+                pointRadius: 0
+            }
         ]
     },
     options: {
         responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: 'white',
+                    font: {
+                        size: 14
+                    }
+                }
+            },
+            title: {
+                display: false
+            }
+        },
         scales: {
-            y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } },
-            x: { title: { display: true, text: 'Age' } }
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    color: 'white',
+                    font: {
+                        size: 13
+                    },
+                    callback: v => '$' + v.toLocaleString()
+                },
+                title: {
+                    display: true,
+                    text: 'Portfolio Value',
+                    color: 'white',
+                    font: { size: 14 }
+                }
+            },
+            x: {
+                ticks: {
+                    color: 'white',
+                    font: {
+                        size: 13
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Age',
+                    color: 'white',
+                    font: { size: 14 }
+                }
+            }
         }
     }
 });
+
 {% endif %}
 
 </script>

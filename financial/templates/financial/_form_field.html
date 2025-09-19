@@ -1,0 +1,12 @@
+{% load financials.form_tags %}
+
+<div class="space-y-1">
+    {{ field.label_tag }}
+    {% if field.help_text %}
+        <p class="text-sm text-gray-400">{{ field.help_text }}</p>
+    {% endif %}
+    {% for error in field.errors %}
+        <p class="text-sm text-red-400">{{ error }}</p>
+    {% endfor %}
+    {{ field|add_class:"w-full bg-gray-700 text-gray-200 border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400" }}
+</div>
