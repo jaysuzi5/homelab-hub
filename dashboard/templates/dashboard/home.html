@@ -227,12 +227,32 @@
             <span>Network Overview</span>
         </h3>
 
-        <!-- Devices -->
+        <!-- Devices / Metrics -->
         <div class="mb-4">
-            <div class="grid grid-cols-3 gap-2 text-center">
-                <div class="bg-green-700 rounded p-2">
-                    <span class="font-bold">{{ network_metrics.devices }}</span><br>
-                    <span class="text-gray-300 text-sm">Devices</span>
+            <div class="grid grid-cols-4 gap-2 text-center">
+                <div class="rounded p-2 {% if network_metrics.network.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                    <span class="font-bold">
+                        {{ network_metrics.network.tcp_latency|floatformat:1 }} ms
+                    </span><br>
+                    <span class="text-gray-300 text-sm">TCP Latency</span>
+                </div>
+                <div class="rounded p-2 {% if network_metrics.network.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                    <span class="font-bold">
+                        {{ network_metrics.network.internet_ping|floatformat:1 }} ms
+                    </span><br>
+                    <span class="text-gray-300 text-sm">Ping</span>
+                </div>
+                <div class="rounded p-2 {% if network_metrics.network.internet_download < 250 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                    <span class="font-bold">
+                        {{ network_metrics.network.internet_download|floatformat:1 }} Mbps
+                    </span><br>
+                    <span class="text-gray-300 text-sm">Download</span>
+                </div>
+                <div class="rounded p-2 {% if network_metrics.network.internet_upload < 20 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                    <span class="font-bold">
+                        {{ network_metrics.network.internet_upload|floatformat:1 }} Mbps
+                    </span><br>
+                    <span class="text-gray-300 text-sm">Upload</span>
                 </div>
             </div>
         </div>
@@ -241,7 +261,7 @@
         <div class="grid grid-cols-1 gap-4 text-sm text-gray-300 mb-4">
             <div>
                 <span class="font-semibold text-gray-200">Online:</span>
-                {% if network_metrics.online %}
+                {% if network_metrics.network.online %}
                     <span class="text-green-400 font-semibold">✅ Yes</span>
                 {% else %}
                     <span class="text-red-400 font-semibold">❌ No</span>
@@ -249,39 +269,51 @@
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Ethernet Link:</span>
-                {% if network_metrics.ethernet_link %}
+                {% if network_metrics.network.ethernet_link %}
                     <span class="text-green-400 font-semibold">✅ Up</span>
                 {% else %}
                     <span class="text-red-400 font-semibold">❌ Down</span>
                 {% endif %}
             </div>
             <div>
+                <span class="font-semibold text-gray-200">LED Status:</span>
+                {{ network_metrics.network.led_status }}
+            </div>
+            <div>
                 <span class="font-semibold text-gray-200">IP Method:</span>
-                {{ network_metrics.ip_method }}
+                {{ network_metrics.network.ip_method }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">IP Address:</span>
-                {{ network_metrics.ip_address }}
+                {{ network_metrics.network.ip_address }}
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">Local IP Address:</span>
+                {{ network_metrics.network.local_ip_address }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Gateway:</span>
-                {{ network_metrics.gateway }}
+                {{ network_metrics.network.gateway }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">DNS Servers:</span>
-                {{ network_metrics.dns_servers }}
+                {{ network_metrics.network.dns_servers }}
+            </div>
+            <div>
+                <span class="font-semibold text-gray-200">DNS Resolution:</span>
+                {{ network_metrics.network.dns }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Lease Duration:</span>
-                {{ network_metrics.lease_days }}d {{ network_metrics.lease_hours }}h {{ network_metrics.lease_minutes }}m
+                {{ network_metrics.network.lease_days }}d {{ network_metrics.network.lease_hours }}h {{ network_metrics.network.lease_minutes }}m
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Uptime:</span>
-                {{ network_metrics.uptime_days }}d {{ network_metrics.uptime_hours }}h {{ network_metrics.uptime_minutes }}m
+                {{ network_metrics.network.uptime_days }}d {{ network_metrics.network.uptime_hours }}h {{ network_metrics.network.uptime_minutes }}m
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Update Required:</span>
-                {% if network_metrics.update_required %}
+                {% if network_metrics.network.update_required %}
                     <span class="text-red-400 font-semibold">Yes</span>
                 {% else %}
                     <span class="text-green-400 font-semibold">No</span>
@@ -289,6 +321,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- Collector Job Summary Table -->
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">

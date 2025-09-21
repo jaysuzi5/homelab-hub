@@ -1,7 +1,10 @@
+import asyncio
 import json
+import time
+from django.core.serializers.json import DjangoJSONEncoder
+from django.shortcuts import render
 from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
 from dashboard.services.k8s import collect_k8s_metrics_summary, collect_k8s_metrics_detailed
 from dashboard.services.darts import collect_dart_summary
 from dashboard.services.synology import collect_synology_metrics_summary
@@ -12,17 +15,36 @@ from dashboard.services.splunk import collect_collector_summary
 from dashboard.services.weather import collect_weather_summary
 
 @login_required
-def home(request):
-    # Collect the data from the services
-    dart_avg_scores_501, dart_avg_scores_score_training = collect_dart_summary()
-    pods_status, nodes, total_pods, cluster_cpu, cluster_mem = collect_k8s_metrics_summary()
-    synology_metrics = collect_synology_metrics_summary()
-    network_metrics = collect_network_summary()
-    emporia_metrics = collect_emporia_summary()
-    emporia_daily_summary = collect_emporia_daily_summary()
-    enhase_summary = collect_enhase_summary()
-    collector_summary = collect_collector_summary()
-    weather_summary = collect_weather_summary()
+async def home(request):
+    async def timed_call(name, func):
+        start = time.perf_counter()
+        # Run sync function in a thread so it doesn’t block the event loop
+        result = await asyncio.to_thread(func)
+        elapsed = time.perf_counter() - start
+        print(f"{name} took {elapsed:.2f} seconds")
+        return result
+
+    (
+        (dart_avg_scores_501, dart_avg_scores_score_training),
+        (pods_status, nodes, total_pods, cluster_cpu, cluster_mem),
+        synology_metrics,
+        network_metrics,
+        emporia_metrics,
+        emporia_daily_summary,
+        enhase_summary,
+        collector_summary,
+        weather_summary,
+    ) = await asyncio.gather(
+        timed_call("collect_dart_summary", collect_dart_summary),
+        timed_call("collect_k8s_metrics_summary", collect_k8s_metrics_summary),
+        timed_call("collect_synology_metrics_summary", collect_synology_metrics_summary),
+        timed_call("collect_network_summary", collect_network_summary),
+        timed_call("collect_emporia_summary", collect_emporia_summary),
+        timed_call("collect_emporia_daily_summary", collect_emporia_daily_summary),
+        timed_call("collect_enhase_summary", collect_enhase_summary),
+        timed_call("collect_collector_summary", collect_collector_summary),
+        timed_call("collect_weather_summary", collect_weather_summary),
+    )
 
     context = {
         "dart_avg_scores_501": dart_avg_scores_501,
@@ -36,12 +58,11 @@ def home(request):
         "network_metrics": network_metrics,
         "emporia_metrics": json.dumps(emporia_metrics, cls=DjangoJSONEncoder),
         "enphase_metrics": enhase_summary,
-        "emporia_daily_summary": emporia_daily_summary, 
+        "emporia_daily_summary": emporia_daily_summary,
         "collector_summary": collector_summary,
-        "weather_summary": weather_summary
+        "weather_summary": weather_summary,
     }
     return render(request, "dashboard/home.html", context)
-
 
 @login_required
 def k8s(request):
