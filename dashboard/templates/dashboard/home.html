@@ -2,7 +2,7 @@
 {% load static %}
 {% block content %}
 <div class="flex items-center justify-between mb-6">
-    <h2 class="text-3xl font-semibold">Dashboard Overview</h2>
+    <h2 class="text-3xl font-semibold">HomeLab Overview</h2>
     
     {% if user.is_authenticated %}
         <div class="flex items-center space-x-4">
@@ -108,7 +108,7 @@
         <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
             <span>Synology NAS Overview</span>
             <span class="text-lg text-gray-300 font-semibold">
-                Model: {{ synology_metrics.system.model }}
+                Model: {{ synology_metrics.model }}
             </span>
         </h3>
 
@@ -118,19 +118,19 @@
             <div class="grid grid-cols-3 gap-2 text-center">
                 <!-- CPU -->
                 <div class="rounded p-2 {% if synology_metrics.utilization.cpu_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.cpu_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
-                    <span class="font-bold text-lg">{{ synology_metrics.utilization.cpu_percent }}%</span><br>
+                    <span class="font-bold text-lg">{{ synology_metrics.cpu_percent }}%</span><br>
                     <span class="text-gray-300 text-sm">CPU Usage</span>
                 </div>
 
                 <!-- Memory -->
                 <div class="rounded p-2 {% if synology_metrics.utilization.memory_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.memory_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
-                    <span class="font-bold text-lg">{{ synology_metrics.utilization.memory_percent }}%</span><br>
+                    <span class="font-bold text-lg">{{ synology_metrics.memory_percent }}%</span><br>
                     <span class="text-gray-300 text-sm">Memory Usage</span>
                 </div>
 
                 <!-- Disk -->
                 <div class="rounded p-2 {% if synology_metrics.utilization.memory_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.memory_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
-                    <span class="font-bold text-lg">{{ synology_metrics.utilization.overall_percent_used }}%</span><br>
+                    <span class="font-bold text-lg">{{ synology_metrics.overall_percent_used }}%</span><br>
                     <span class="text-gray-300 text-sm">Disk Usage</span>
                 </div>
             </div>
@@ -206,15 +206,15 @@
         <div class="mt-4 flex gap-4 justify-around">
             <div class="text-center">
                 <span class="block text-gray-300 text-sm">Net Up</span>
-                <span class="block font-bold text-lg">{{ synology_metrics.utilization.net_up|filesizeformat }}/s</span>
+                <span class="block font-bold text-lg">{{ synology_metrics.net_up|filesizeformat }}/s</span>
             </div>
             <div class="text-center">
                 <span class="block text-gray-300 text-sm">Net Down</span>
-                <span class="block font-bold text-lg">{{ synology_metrics.utilization.net_down|filesizeformat }}/s</span>
+                <span class="block font-bold text-lg">{{ synology_metrics.net_down|filesizeformat }}/s</span>
             </div>
             <div class="text-center">
                 <span class="block text-gray-300 text-sm">Uptime</span>
-                <span class="block font-bold text-lg">{{ synology_metrics.system.uptime_days }}d {{ synology_metrics.system.uptime_hours }}h {{ synology_metrics.system.uptime_minutes }}m</span>
+                <span class="block font-bold text-lg">{{ synology_metrics.uptime_days }}d {{ synology_metrics.uptime_hours }}h {{ synology_metrics.uptime_minutes }}m</span>
             </div>
         </div>
 
@@ -230,27 +230,27 @@
         <!-- Devices / Metrics -->
         <div class="mb-4">
             <div class="grid grid-cols-4 gap-2 text-center">
-                <div class="rounded p-2 {% if network_metrics.network.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                <div class="rounded p-2 {% if network_metrics.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
                     <span class="font-bold">
-                        {{ network_metrics.network.tcp_latency|floatformat:1 }} ms
+                        {{ network_metrics.tcp_latency|floatformat:1 }} ms
                     </span><br>
                     <span class="text-gray-300 text-sm">TCP Latency</span>
                 </div>
-                <div class="rounded p-2 {% if network_metrics.network.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                <div class="rounded p-2 {% if network_metrics.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
                     <span class="font-bold">
-                        {{ network_metrics.network.internet_ping|floatformat:1 }} ms
+                        {{ network_metrics.internet_ping|floatformat:1 }} ms
                     </span><br>
                     <span class="text-gray-300 text-sm">Ping</span>
                 </div>
-                <div class="rounded p-2 {% if network_metrics.network.internet_download < 250 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                <div class="rounded p-2 {% if network_metrics.internet_download < 250 %}bg-red-700{% else %}bg-green-700{% endif %}">
                     <span class="font-bold">
-                        {{ network_metrics.network.internet_download|floatformat:1 }} Mbps
+                        {{ network_metrics.internet_download|floatformat:1 }} Mbps
                     </span><br>
                     <span class="text-gray-300 text-sm">Download</span>
                 </div>
-                <div class="rounded p-2 {% if network_metrics.network.internet_upload < 20 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                <div class="rounded p-2 {% if network_metrics.internet_upload < 20 %}bg-red-700{% else %}bg-green-700{% endif %}">
                     <span class="font-bold">
-                        {{ network_metrics.network.internet_upload|floatformat:1 }} Mbps
+                        {{ network_metrics.internet_upload|floatformat:1 }} Mbps
                     </span><br>
                     <span class="text-gray-300 text-sm">Upload</span>
                 </div>
@@ -261,7 +261,7 @@
         <div class="grid grid-cols-1 gap-4 text-sm text-gray-300 mb-4">
             <div>
                 <span class="font-semibold text-gray-200">Online:</span>
-                {% if network_metrics.network.online %}
+                {% if network_metrics.online %}
                     <span class="text-green-400 font-semibold">✅ Yes</span>
                 {% else %}
                     <span class="text-red-400 font-semibold">❌ No</span>
@@ -269,7 +269,7 @@
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Ethernet Link:</span>
-                {% if network_metrics.network.ethernet_link %}
+                {% if network_metrics.ethernet_link %}
                     <span class="text-green-400 font-semibold">✅ Up</span>
                 {% else %}
                     <span class="text-red-400 font-semibold">❌ Down</span>
@@ -277,43 +277,43 @@
             </div>
             <div>
                 <span class="font-semibold text-gray-200">LED Status:</span>
-                {{ network_metrics.network.led_status }}
+                {{ network_metrics.led_status }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">IP Method:</span>
-                {{ network_metrics.network.ip_method }}
+                {{ network_metrics.ip_method }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">IP Address:</span>
-                {{ network_metrics.network.ip_address }}
+                {{ network_metrics.ip_address }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Local IP Address:</span>
-                {{ network_metrics.network.local_ip_address }}
+                {{ network_metrics.local_ip_address }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Gateway:</span>
-                {{ network_metrics.network.gateway }}
+                {{ network_metrics.gateway }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">DNS Servers:</span>
-                {{ network_metrics.network.dns_servers }}
+                {{ network_metrics.dns_servers }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">DNS Resolution:</span>
-                {{ network_metrics.network.dns }}
+                {{ network_metrics.dns }}
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Lease Duration:</span>
-                {{ network_metrics.network.lease_days }}d {{ network_metrics.network.lease_hours }}h {{ network_metrics.network.lease_minutes }}m
+                {{ network_metrics.lease_days }}d {{ network_metrics.lease_hours }}h {{ network_metrics.lease_minutes }}m
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Uptime:</span>
-                {{ network_metrics.network.uptime_days }}d {{ network_metrics.network.uptime_hours }}h {{ network_metrics.network.uptime_minutes }}m
+                {{ network_metrics.uptime_days }}d {{ network_metrics.uptime_hours }}h {{ network_metrics.uptime_minutes }}m
             </div>
             <div>
                 <span class="font-semibold text-gray-200">Update Required:</span>
-                {% if network_metrics.network.update_required %}
+                {% if network_metrics.update_required %}
                     <span class="text-red-400 font-semibold">Yes</span>
                 {% else %}
                     <span class="text-green-400 font-semibold">No</span>
@@ -338,7 +338,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in collector_summary %}
+                    {% for item in splunk_summary %}
                     <tr class="text-sm border-b border-gray-700">
                         <td class="px-2 py-1 font-semibold text-gray-200">{{ item.component }}</td>
                         <td class="px-2 py-1">

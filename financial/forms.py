@@ -23,13 +23,13 @@ class RetirementForm(forms.Form):
     )
 
     current_age = forms.FloatField(
-        label="Current Age",
+        label="Retirement Age",
         initial=os.getenv("RETIREMENT_AGE", 65),
         help_text="Enter your current age (decimals allowed, e.g., 66.5)."
     )
     end_age = forms.FloatField(
         label="Life Expectancy",
-        initial=90,
+        initial=95,
         help_text="Life expectancy or horizon to plan for (typical range 85–100)."
     )
     balance = forms.FloatField(
@@ -82,20 +82,20 @@ class RetirementForm(forms.Form):
 
     ss_age = forms.FloatField(
         label="Social Security Age",
-        initial=os.getenv("SS_AGE", 62),
+        initial=os.getenv("SS_AGE", 67),
         help_text="Age you plan to start receiving Social Security."
     )
 
     ss_benefits = forms.FloatField(
         label="Social Security Monthly Benefits ($)",
-        initial=os.getenv("SS_BENEFITS_62", 0),
+        initial=os.getenv("SS_BENEFITS_67", 0),
         help_text="Expected monthly benefits (combined with spouse if needed)."
     )
 
     target_success = forms.FloatField(
         label="Target Success Rate (0–1)",
         required=False,
-        initial=0.85,
+        initial=0.90,
         help_text="(Target mode only) Desired probability of not running out of money. Typical range: 0.75–0.95."
     )
 
