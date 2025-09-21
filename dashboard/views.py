@@ -1,6 +1,5 @@
 import asyncio
 import json
-import time
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import render
 from django.core.serializers.json import DjangoJSONEncoder
