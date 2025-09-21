@@ -1,14 +1,13 @@
 import requests
-from datetime import datetime, timedelta, timezone
-from django.core.serializers.json import DjangoJSONEncoder
+from config.utils import get_config
 
-API_URL = "http://home.dev.com/api/v1/synology?page=1&limit=1"
+SYNOLOGY_URL = get_config("SYNOLOGY_URL")
 
 
 def _get_metrics():
     results = {}
     try:
-        response = requests.get(API_URL)
+        response = requests.get(SYNOLOGY_URL)
         response.raise_for_status()  # raise exception if status != 2xx
         results = response.json()[0]
     except requests.RequestException as ex:

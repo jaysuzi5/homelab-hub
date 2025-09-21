@@ -1,9 +1,8 @@
 import requests
 from datetime import datetime, timedelta, timezone
-from django.core.serializers.json import DjangoJSONEncoder
+from config.utils import get_config
 
-API_SEARCH_URL = "http://home.dev.com/api/v1/enphase/summary"
-COST_PER_KWH = 0.182
+ENPHASE_API_SEARCH_URL = get_config("ENPHASE_API_SEARCH_URL")
 
 
 def _get_metrics():
@@ -13,7 +12,7 @@ def _get_metrics():
     params = {"start_date": start_date}
     
     try:
-        response = requests.get(API_SEARCH_URL, params=params)
+        response = requests.get(ENPHASE_API_SEARCH_URL, params=params)
         response.raise_for_status()  # raise exception if status != 2xx
         summary_info = response.json()
     except requests.RequestException as e:

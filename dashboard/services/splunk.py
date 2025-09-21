@@ -4,14 +4,12 @@ import os
 import pytz
 from jTookkit.jSplunk import SplunkClient
 from jTookkit.jDateTime import DateUtility
+from config.utils import get_config
 
-
-load_dotenv()
-SPLUNK_HOST = "splunk.home"
-SPLUNK_PORT = 8089
-SPLUNK_USER = "admin"
-SPLUNK_PASSWORD = os.getenv("SPLUNK_PASSWORD")
-
+SPLUNK_HOST = get_config("SPLUNK_HOST")
+SPLUNK_PORT = int(get_config("SPLUNK_PORT",0))
+SPLUNK_USER = get_config("SPLUNK_USER")
+SPLUNK_PASSWORD = get_config("SPLUNK_PASSWORD")
 
 def _transform_splunk_collector_summary(results: list):
     ten_minutes_ago = datetime.now(tz=pytz.UTC) - timedelta(minutes=10)
@@ -53,7 +51,6 @@ def splunk_collector_summary():
         username = SPLUNK_USER,
         password = SPLUNK_PASSWORD
     )
-
     query = """
         search index="otel_logging" component="*-collector" event_type="transaction_end"
         | stats count, avg(duration) as duration, max(duration) as max_duration, max(timestamp) as last_run, max(_time) as last_run_2 by component, return_code

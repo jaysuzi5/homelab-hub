@@ -1,7 +1,12 @@
-import os
 from django.shortcuts import render
 from .forms import RetirementForm
 from .calculator import monte_carlo_simulation, find_max_withdrawal
+from config.utils import get_config
+
+SS_BENEFITS_62 = get_config("SS_BENEFITS_62",0)
+SS_BENEFITS_65 = get_config("SS_BENEFITS_65",0)
+SS_BENEFITS_67 = get_config("SS_BENEFITS_67",0)
+SS_BENEFITS_70 = get_config("SS_BENEFITS_70",0)
 
 def retirement(request):
     result = None
@@ -66,9 +71,10 @@ def retirement(request):
 
 
     presets = {
-        "ss_benefits_62": os.getenv("SS_BENEFITS_62", 0),
-        "ss_benefits_65": os.getenv("SS_BENEFITS_65", 0),
-        "ss_benefits_67": os.getenv("SS_BENEFITS_67", 0),
+        "ss_benefits_62": SS_BENEFITS_62,
+        "ss_benefits_65": SS_BENEFITS_65,
+        "ss_benefits_67": SS_BENEFITS_67,
+        "ss_benefits_70": SS_BENEFITS_70,
     }
     return render(request, "financial/retirement.html", {"form": form, "result": result, "presets": presets})
 

@@ -1,10 +1,9 @@
 import requests
-from datetime import datetime, timedelta, timezone
-from django.core.serializers.json import DjangoJSONEncoder
+from config.utils import get_config
 
-WEATHER_URL = "http://home.dev.com/api/v1/weather?page=1&limit=1"
-FORECAST_URL = "http://home.dev.com/api/v1/forecast/latest"
-
+WEATHER_URL = get_config("WEATHER_URL")
+FORECAST_URL = get_config("FORECAST_URL")
+ 
 
 def _get_metrics():
     results = {}

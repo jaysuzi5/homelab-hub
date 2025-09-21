@@ -1,6 +1,13 @@
-import os
 from django import forms
+from config.utils import get_config
 
+SS_BENEFITS_62 = get_config("SS_BENEFITS_62",0)
+SS_BENEFITS_65 = get_config("SS_BENEFITS_65",0)
+SS_BENEFITS_67 = get_config("SS_BENEFITS_67",0)
+SS_BENEFITS_70 = get_config("SS_BENEFITS_70",0)
+RETIREMENT_AGE = get_config("RETIREMENT_AGE",65)
+PORTFOLIO_BALANCE = get_config("PORTFOLIO_BALANCE",1000000)
+SS_AGE = get_config("SS_AGE", 67)
 
 class RetirementForm(forms.Form):
     MODE_CHOICES = [
@@ -10,9 +17,10 @@ class RetirementForm(forms.Form):
 
     SS_PRESETS = [
         ("", "Custom"),
-        ("62", f"Age 62 - ${os.getenv('SS_BENEFITS_62', 0)}"),
-        ("65", f"Age 65 - ${os.getenv('SS_BENEFITS_65', 0)}"),
-        ("67", f"Age 67 - ${os.getenv('SS_BENEFITS_67', 0)}"),
+        ("62", f"Age 62 - ${SS_BENEFITS_62}"),
+        ("65", f"Age 65 - ${SS_BENEFITS_65}"),
+        ("67", f"Age 67 - ${SS_BENEFITS_67}"),
+        ("70", f"Age 70 - ${SS_BENEFITS_70}"),
     ]
 
     mode = forms.ChoiceField(
@@ -24,7 +32,7 @@ class RetirementForm(forms.Form):
 
     current_age = forms.FloatField(
         label="Retirement Age",
-        initial=os.getenv("RETIREMENT_AGE", 65),
+        initial=RETIREMENT_AGE,
         help_text="Enter your current age (decimals allowed, e.g., 66.5)."
     )
     end_age = forms.FloatField(
@@ -34,7 +42,7 @@ class RetirementForm(forms.Form):
     )
     balance = forms.FloatField(
         label="Portfolio Balance ($)",
-        initial=os.getenv("PORTFOLIO_BALANCE", 1000000),
+        initial=PORTFOLIO_BALANCE,
         help_text="Your total investable assets at retirement."
     )
     annual_return = forms.FloatField(
@@ -82,13 +90,13 @@ class RetirementForm(forms.Form):
 
     ss_age = forms.FloatField(
         label="Social Security Age",
-        initial=os.getenv("SS_AGE", 67),
+        initial=SS_AGE,
         help_text="Age you plan to start receiving Social Security."
     )
 
     ss_benefits = forms.FloatField(
         label="Social Security Monthly Benefits ($)",
-        initial=os.getenv("SS_BENEFITS_67", 0),
+        initial=SS_BENEFITS_67,
         help_text="Expected monthly benefits (combined with spouse if needed)."
     )
 

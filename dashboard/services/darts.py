@@ -1,4 +1,9 @@
 import requests
+from asgiref.sync import sync_to_async
+from config.utils import get_config
+
+DARTS_URL = get_config("DARTS_URL")
+
 
 # For now, exception handler will be here and only printing
 def _handle_exception(ex):
@@ -10,9 +15,9 @@ def _handle_exception(ex):
 
 
 def _get_darts_scores(game: str) -> list:
+    avg_scores = 0
     try:
-        url = "http://home.dev.com/api/v1/darts?page=1&limit=1000"
-        response = requests.get(url)
+        response = requests.get(DARTS_URL)
         data = response.json()
 
         # Filter for the game
@@ -24,11 +29,7 @@ def _get_darts_scores(game: str) -> list:
         _handle_exception(ex)
     return avg_scores
 
-
-# ---------- Wrappers ----------
 def collect_dart_summary():
     dart_avg_scores_501 = _get_darts_scores("501 - single out")
-    dart_avg_scores_score_training = _get_darts_scores("score training")    
-    return dart_avg_scores_501, dart_avg_scores_score_training
-
-    
+    dart_avg_scores_score_training = _get_darts_scores("score training")
+    return dart_avg_scores_501, dart_avg_scores_score_training    
