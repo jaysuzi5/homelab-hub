@@ -28,7 +28,6 @@ def _get_metrics():
                "name": "Electricity Monitor"}
     try:
         response = requests.post(EMPORIA_API_SEARCH_URL, json=payload)
-        print(f'EMPORIA_API_SEARCH_URL: {EMPORIA_API_SEARCH_URL}')
         response.raise_for_status()
         for item in response.json():
             date = item["instant"].split("T")[0]

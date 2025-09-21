@@ -208,10 +208,14 @@ def _collect_k8s_pod_details():
 
 # ---------- Wrappers ----------
 def collect_k8s_metrics_summary():
-    v1, custom = _get_k8s_client()
-    pods_status, total_pods = _get_pod_counts(v1)
-    nodes_info, cluster_cpu_percent, cluster_mem_percent = _get_nodes(v1, custom)
-    return pods_status, nodes_info, total_pods, cluster_cpu_percent, cluster_mem_percent
+    try: 
+        v1, custom = _get_k8s_client()
+        pods_status, total_pods = _get_pod_counts(v1)
+        nodes_info, cluster_cpu_percent, cluster_mem_percent = _get_nodes(v1, custom)
+        return pods_status, nodes_info, total_pods, cluster_cpu_percent, cluster_mem_percent
+    except Exception as ex:
+        print(f'Exception with collect_k8s_metrics_detailed: {ex}')
+        return None, None, None, None, None
 
 def collect_k8s_metrics_detailed():
     """
@@ -219,21 +223,33 @@ def collect_k8s_metrics_detailed():
     plus pod-level details.
     """
     pods_status, nodes_info, total_pods, cluster_cpu_percent, cluster_mem_percent = collect_k8s_metrics_summary()
-    pod_details = _collect_k8s_pod_details()
+    try: 
+        pod_details = _collect_k8s_pod_details()
 
-    # ---------- Alerts ----------
-    cluster_alerts = []
-    if pods_status["pending"] > 0:
-        cluster_alerts.append(f"{pods_status['pending']} pods pending")
-    if pods_status["failed"] > 0:
-        cluster_alerts.append(f"{pods_status['failed']} pods failed")
+        # ---------- Alerts ----------
+        cluster_alerts = []
+        if pods_status["pending"] > 0:
+            cluster_alerts.append(f"{pods_status['pending']} pods pending")
+        if pods_status["failed"] > 0:
+            cluster_alerts.append(f"{pods_status['failed']} pods failed")
 
-    return {
-        "pods_status": pods_status,
-        "total_pods": total_pods,
-        "nodes_info": nodes_info,
-        "cluster_cpu_percent": cluster_cpu_percent,
-        "cluster_mem_percent": cluster_mem_percent,
-        "pod_details": pod_details,
-        "cluster_alerts": cluster_alerts,
-    }
+        return {
+            "pods_status": pods_status,
+            "total_pods": total_pods,
+            "nodes_info": nodes_info,
+            "cluster_cpu_percent": cluster_cpu_percent,
+            "cluster_mem_percent": cluster_mem_percent,
+            "pod_details": pod_details,
+            "cluster_alerts": cluster_alerts,
+        }
+    except Exception as ex:
+        print(f'Exception with collect_k8s_metrics_detailed: {ex}')
+        return {
+            "pods_status": None,
+            "total_pods": None,
+            "nodes_info": None,
+            "cluster_cpu_percent": None,
+            "cluster_mem_percent": None,
+            "pod_details": None,
+            "cluster_alerts": None,
+        }

@@ -116,8 +116,6 @@ def find_max_withdrawal(
             low = mid
         else:
             high = mid
-
-    print(f"success after {iterations} iterations - high: {high} - low: {low} = {high - low} ")
     return return_data
 
 def generate_balance_constant_return(

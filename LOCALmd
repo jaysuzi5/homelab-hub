@@ -1,0 +1,25 @@
+
+### K8s Deployment
+1. Get packages ready for Docker
+```bash
+uv pip compile -o requirements.txt pyproject.toml
+```
+
+2. Add gunicorn==23.0.0 to requirements.txt
+
+3. Collect static files
+```bash
+python manage.py collectstatic --noinput
+```
+
+4. Create Docker file
+
+5. Build Docker file
+```bash
+docker build -t homelab-hub:latest .
+```
+
+6. Test Locally
+```bash
+docker run -p 8000:8000 -e DJANGO_SECRET_KEY='django-insecure-in=-q5c8)fm&#&k36rk7_m=y=9c#_5$+8g(9i226-7lmi4dw1x' -e DJANGO_DEBUG='True' homelab-hub:latest
+```
