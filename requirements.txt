@@ -107,3 +107,5 @@ websocket-client==1.8.0
     # via kubernetes
 gunicorn==23.0.0
     # adding for running on k8s
+whitenoise==6.11.0
+    # adding for running on k8s
