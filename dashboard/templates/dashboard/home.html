@@ -515,7 +515,11 @@
     renderDartChart('dartChartScoreTraining', avgScoreScoreTraining);
     renderEmporiaUsageChart("emporiaUsageChart", emporiaMetrics);
     renderEnphaseChart("enphaseChart", enphaseMetrics);
-
 </script>
+<script>
+    setInterval(function() {
+      window.location.reload();
+    }, 120000); // 120000 ms = 2 minutes
+  </script>
 {% endblock %}
 

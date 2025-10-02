@@ -115,7 +115,7 @@
                     <td>{{ pod.namespace }}</td>
                     <td>{{ pod.name }}</td>
                     <td>{{ pod.node }}</td>
-                    <td class="{% if pod.status == 'Running' %}text-green-400 font-bold{% else %}text-red-400 font-bold{% endif %}">
+                    <td class="{% if pod.status == 'Running' or pod.status == 'Succeeded' %}text-green-400 font-bold{% else %}text-red-400 font-bold{% endif %}">
                         {{ pod.status }}
                     </td>
                     <td>{{ pod.restarts }}</td>
