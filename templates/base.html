@@ -24,8 +24,8 @@
         <nav class="flex flex-col space-y-2">
             <a href="{% url 'home' %}" class="hover:bg-gray-700 p-2 rounded">Dashboard</a>
             <a href="{% url 'k8s' %}" class="hover:bg-gray-700 p-2 rounded">Kubernetes</a>
-            <a href="#" class="hover:bg-gray-700 p-2 rounded">Networking</a>
-            <a href="#" class="hover:bg-gray-700 p-2 rounded">Energy</a>
+            <a href="{% url 'networking' %}" class="hover:bg-gray-700 p-2 rounded">Networking</a>
+            <a href="{% url 'energy' %}" class="hover:bg-gray-700 p-2 rounded">Energy</a>
             <a href="#" class="hover:bg-gray-700 p-2 rounded">Media</a>
             <a href="{% url 'retirement_dashboard' %}" class="hover:bg-gray-700 p-2 rounded">Financials</a>
         </nav>

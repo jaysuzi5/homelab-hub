@@ -199,3 +199,89 @@ def collect_emporia_daily_summary(target_date=None):
 
 def collect_emporia_monthly_summary(year, month):
     return _get_metrics_by_month(year, month)
+
+def collect_emporia_monthly_category_summary(year, month):
+    """
+    Fetch monthly category totals for a specific month.
+
+    Args:
+        year: Year (e.g., 2025)
+        month: Month number (1-12)
+
+    Returns:
+        List of category summaries with total usage, cost, and percentage.
+    """
+    # Calculate the first day of the month
+    start_dt = datetime(year, month, 1, tzinfo=timezone.utc)
+
+    # Calculate the last day of the month
+    if month == 12:
+        end_dt = datetime(year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+    else:
+        end_dt = datetime(year, month + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+
+    # Set end_date to the first of the next month (API query boundary)
+    if month == 12:
+        end_dt_next = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end_dt_next = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+
+    start_date = start_dt.strftime("%Y-%m-%d")
+    end_date = end_dt.strftime("%Y-%m-%d")
+
+    payload = {
+        "start_date": start_dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z'),
+        "end_date": end_dt_next.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+    }
+
+    try:
+        print(f"[DEBUG] Monthly Category Emporia POST call: {EMPORIA_API_SEARCH_URL}")
+        print(f"[DEBUG] Monthly Category Emporia payload: {payload}")
+        response = requests.post(EMPORIA_API_SEARCH_URL, json=payload)
+        print(f"[DEBUG] Monthly Category Emporia response status: {response.status_code}")
+        if response.status_code in (200, 201):
+            summary_info = response.json()
+            print(f"[DEBUG] Monthly Category Emporia raw response count: {len(summary_info)} items")
+        else:
+            print(f"Failed to post to Emporia API: {response.status_code}, {response.text}")
+            return []
+    except requests.RequestException as e:
+        print(f"Error posting to Emporia API: {e}")
+        return []
+
+    # Filter to only the selected month and aggregate by category name
+    category_totals = {}
+    for item in summary_info:
+        item_date = item["instant"].split("T")[0]
+        if start_date <= item_date <= end_date:
+            name = item["name"]
+            usage = item["usage"]
+            if name not in category_totals:
+                category_totals[name] = 0
+            category_totals[name] += usage
+
+    # Calculate total usage for percentage calculation
+    total_usage = sum(category_totals.values())
+
+    # Build the result list
+    result = []
+    for name, usage in category_totals.items():
+        percentage = (usage / total_usage * 100) if total_usage > 0 else 0
+        cost = usage * COST_PER_KWH
+        result.append({
+            "name": name,
+            "usage": usage,
+            "cost": cost,
+            "percentage": percentage
+        })
+
+    # Sort by usage descending, then move "Balance" to the end
+    result_sorted = sorted(
+        [d for d in result if d["name"] != "Balance"],
+        key=lambda x: x["usage"],
+        reverse=True
+    )
+    balance_row = [d for d in result if d["name"] == "Balance"]
+    result_sorted.extend(balance_row)
+
+    return result_sorted
