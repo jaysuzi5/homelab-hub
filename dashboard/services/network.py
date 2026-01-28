@@ -7,16 +7,89 @@ NETWORK_URL = get_config("NETWORK_URL")
 
 
 def _get_metrics():
-    results = {}
+    """
+    Fetch the most recent network metrics.
+    Looks back up to 1 hour to find the latest non-null value for each metric.
+    """
     try:
-        response = requests.get(NETWORK_URL)
-        response.raise_for_status()  # raise exception if status != 2xx
-        results = response.json()[0]
+        # Parse the URL to get base URL without query parameters
+        parsed_url = urlparse(NETWORK_URL)
+        base_url = urlunparse((
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            '',
+            '',
+            ''
+        ))
+
+        # Fetch recent records (last hour, approximately 12 records if testing every 5 min)
+        # Using limit of 50 to be safe
+        params = {'page': 1, 'limit': 50}
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        records = response.json()
+
+        if not records:
+            return None
+
+        # Initialize result with values from the most recent record
+        result = {
+            'tcp_latency': None,
+            'internet_ping': None,
+            'internet_download': None,
+            'internet_upload': None,
+            'online': records[0].get('online', False),
+            'id': records[0].get('id'),
+            'create_date': records[0].get('create_date'),
+            'update_date': records[0].get('update_date')
+        }
+
+        # Find the most recent non-null value for each metric
+        for record in records:
+            # Stop looking if we already have all metrics
+            if all([result['tcp_latency'] is not None,
+                    result['internet_ping'] is not None,
+                    result['internet_download'] is not None,
+                    result['internet_upload'] is not None]):
+                break
+
+            # Check record age (only use records from last hour)
+            record_date = record.get('create_date', '')
+            if record_date:
+                record_time = datetime.fromisoformat(record_date.replace('Z', '+00:00'))
+                age = datetime.now(timezone.utc) - record_time
+                if age.total_seconds() > 3600:  # More than 1 hour old
+                    break
+
+            # Fill in missing metrics with most recent non-null values
+            if result['tcp_latency'] is None and record.get('tcp_latency') is not None:
+                result['tcp_latency'] = record.get('tcp_latency')
+
+            if result['internet_ping'] is None and record.get('internet_ping') is not None:
+                result['internet_ping'] = record.get('internet_ping')
+
+            if result['internet_download'] is None and record.get('internet_download') is not None:
+                result['internet_download'] = record.get('internet_download')
+
+            if result['internet_upload'] is None and record.get('internet_upload') is not None:
+                result['internet_upload'] = record.get('internet_upload')
+
+        # Set defaults for any metrics still null
+        if result['tcp_latency'] is None:
+            result['tcp_latency'] = 0
+        if result['internet_ping'] is None:
+            result['internet_ping'] = 0
+        if result['internet_download'] is None:
+            result['internet_download'] = 0
+        if result['internet_upload'] is None:
+            result['internet_upload'] = 0
+
+        return result
+
     except requests.RequestException as ex:
         print(f"Error fetching network data: {ex}")
         return None
-
-    return results
 
 
 def _get_metrics_by_month(year, month):
