@@ -56,14 +56,22 @@ def _get_metrics_by_month(year, month):
             ''
         ))
 
+        # Calculate how many pages we need based on how far back the month is
+        # Assume ~144 records per day, 100 records per page
+        now = datetime.now(timezone.utc)
+        days_back = (now - start_dt).days
+        estimated_pages = int((days_back * 144) / 100) + 10  # Add 10 page buffer
+        max_pages = min(estimated_pages, 200)  # Cap at 200 pages for safety
+
+        print(f"[DEBUG] Selected month is ~{days_back} days back, fetching ~{max_pages} pages")
+
         # Fetch historical data using pagination (API max limit is 100)
-        # Fetch multiple pages to get enough historical data for the month
+        # Keep fetching until we have data covering the entire selected month
         network_items = []
-        max_pages = 10  # Fetch up to 10 pages (1000 records total) for faster performance
+        page = 0
 
         for page in range(1, max_pages + 1):
             params = {'page': page, 'limit': 100}
-            print(f"[DEBUG] Monthly Network GET call: {base_url} (page {page})")
             response = requests.get(base_url, params=params)
 
             if response.status_code != 200:
@@ -77,14 +85,23 @@ def _get_metrics_by_month(year, month):
 
             network_items.extend(page_data)
 
-            # Check if we have data from the start of the month, if so we can stop
+            # Check dates in this page to see if we've reached the start of the month
+            for item in page_data:
+                item_date = item.get('create_date', '').split('T')[0]
+                if item_date and item_date >= start_date and item_date < end_date:
+                    # We found data within our target month
+                    if item_date[:7] == start_date[:7]:  # Check if it's from the start of the month
+                        has_start_of_month = True
+
+            # Check the oldest date in this page
             if page_data:
                 oldest_date = page_data[-1].get('create_date', '').split('T')[0]
+                # If we've gone past the start of the month, we can stop
                 if oldest_date and oldest_date < start_date:
-                    print(f"[DEBUG] Reached data before month start ({oldest_date}), stopping")
+                    print(f"[DEBUG] Reached data before month start ({oldest_date}) at page {page}, stopping")
                     break
 
-        print(f"[DEBUG] Monthly Network total records fetched: {len(network_items)} items")
+        print(f"[DEBUG] Monthly Network total records fetched: {len(network_items)} items after {page} pages")
 
         # Group by date and calculate daily averages
         daily_data = {}
@@ -137,9 +154,12 @@ def _get_metrics_by_month(year, month):
                 "tcp_latency": avg_tcp_latency
             })
 
+        print(f"[DEBUG] Requested month: {year}-{month:02d} ({start_date} to {end_date})")
         print(f"[DEBUG] Aggregated daily data for {len(daily_data)} unique dates")
-        print(f"[DEBUG] Date range in results: {min(daily_data.keys()) if daily_data else 'N/A'} to {max(daily_data.keys()) if daily_data else 'N/A'}")
-        print(f"[DEBUG] Sample metrics: {metrics[:3] if metrics else 'No metrics'}")
+        if daily_data:
+            print(f"[DEBUG] Date range in results: {min(daily_data.keys())} to {max(daily_data.keys())}")
+        else:
+            print(f"[DEBUG] No data found for the selected month")
 
         return sorted(metrics, key=lambda x: x["date"])
 

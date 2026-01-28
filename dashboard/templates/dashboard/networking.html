@@ -148,9 +148,6 @@
 <script>
     const networkMonthlyMetrics = {{ network_monthly_metrics|safe }};
 
-    console.log('Network monthly metrics:', networkMonthlyMetrics);
-    console.log('Network monthly metrics length:', networkMonthlyMetrics.length);
-
     // Define chart rendering functions inline
     function renderNetworkSpeedChart(canvasId, metrics) {
         const labels = metrics.map(m => m.date);
@@ -323,18 +320,11 @@
     }
 
     // Render the charts
-    try {
+    if (networkMonthlyMetrics && networkMonthlyMetrics.length > 0) {
         renderNetworkSpeedChart("networkSpeedChart", networkMonthlyMetrics);
-        console.log('Speed chart rendered');
-    } catch (e) {
-        console.error('Error rendering speed chart:', e);
-    }
-
-    try {
         renderNetworkLatencyChart("networkLatencyChart", networkMonthlyMetrics);
-        console.log('Latency chart rendered');
-    } catch (e) {
-        console.error('Error rendering latency chart:', e);
+    } else {
+        console.log('No network data available for the selected month');
     }
 
     // Calculate and display averages

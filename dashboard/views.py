@@ -115,9 +115,6 @@ def networking(request):
     # Collect monthly historical metrics
     network_monthly_metrics = collect_network_monthly_summary(selected_year, selected_month)
 
-    print(f"[VIEW DEBUG] Network monthly metrics count: {len(network_monthly_metrics)}")
-    print(f"[VIEW DEBUG] Network monthly metrics sample: {network_monthly_metrics[:2] if network_monthly_metrics else 'Empty'}")
-
     context = {
         'selected_month': selected_month,
         'selected_year': selected_year,
