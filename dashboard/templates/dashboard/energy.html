@@ -71,84 +71,87 @@
         </div>
     </div>
 
-    <!-- Monthly Electricity Usage by Category Card -->
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold">Monthly Usage by Category</h3>
+    <!-- Monthly and Daily Usage Tables - Side by Side -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Monthly Electricity Usage by Category Card -->
+        <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold">Monthly Usage by Category</h3>
+            </div>
+
+            <h4 class="text-md font-semibold text-gray-200 mb-2">Category Totals for Selected Month</h4>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left table-auto">
+                    <thead>
+                        <tr class="text-gray-300 text-sm border-b border-gray-700">
+                            <th class="px-2 py-1">Name</th>
+                            <th class="px-2 py-1 text-right">Usage (kWh)</th>
+                            <th class="pl-5 pr-2 py-1 text-right">Cost</th>
+                            <th class="px-2 py-1 text-right">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in emporia_monthly_category_summary %}
+                        <tr class="text-gray-200 text-sm border-b border-gray-700">
+                            <td class="px-2 py-1">{{ item.name }}</td>
+                            <td class="px-2 py-1 text-right">{{ item.usage|floatformat:2 }}</td>
+                            <td class="pl-5 pr-2 py-1 text-right">${{ item.cost|floatformat:2 }}</td>
+                            <td class="px-2 py-1 text-right">{{ item.percentage|floatformat:1 }}%</td>
+                        </tr>
+                        {% empty %}
+                        <tr class="text-gray-200 text-sm border-b border-gray-700">
+                            <td class="px-2 py-1 col-span-4 text-center text-gray-400">No data available for this month</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <h4 class="text-md font-semibold text-gray-200 mb-2">Category Totals for Selected Month</h4>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left table-auto">
-                <thead>
-                    <tr class="text-gray-300 text-sm border-b border-gray-700">
-                        <th class="px-2 py-1">Name</th>
-                        <th class="px-2 py-1 text-right">Usage (kWh)</th>
-                        <th class="pl-5 pr-2 py-1 text-right">Cost</th>
-                        <th class="px-2 py-1 text-right">Percentage</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in emporia_monthly_category_summary %}
-                    <tr class="text-gray-200 text-sm border-b border-gray-700">
-                        <td class="px-2 py-1">{{ item.name }}</td>
-                        <td class="px-2 py-1 text-right">{{ item.usage|floatformat:2 }}</td>
-                        <td class="pl-5 pr-2 py-1 text-right">${{ item.cost|floatformat:2 }}</td>
-                        <td class="px-2 py-1 text-right">{{ item.percentage|floatformat:1 }}%</td>
-                    </tr>
-                    {% empty %}
-                    <tr class="text-gray-200 text-sm border-b border-gray-700">
-                        <td class="px-2 py-1 col-span-4 text-center text-gray-400">No data available for this month</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+        <!-- Daily Electricity Usage Card -->
+        <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold">Electricity Daily Usage</h3>
+            </div>
 
-    <!-- Daily Electricity Usage Card -->
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold">Electricity Daily Usage</h3>
-        </div>
+            <!-- Date Selector -->
+            <div class="mb-4 flex items-center gap-4">
+                <form id="dayForm" method="GET" class="flex items-center gap-2">
+                    <label for="day_select" class="text-gray-300">Select Date:</label>
+                    <input type="date" id="day_select" name="day" value="{{ selected_day }}"
+                           class="bg-gray-700 text-white px-3 py-2 rounded"
+                           max="{{ current_date }}"
+                           onchange="updateDaySelection()">
+                </form>
+            </div>
 
-        <!-- Date Selector -->
-        <div class="mb-4 flex items-center gap-4">
-            <form id="dayForm" method="GET" class="flex items-center gap-2">
-                <label for="day_select" class="text-gray-300">Select Date:</label>
-                <input type="date" id="day_select" name="day" value="{{ selected_day }}"
-                       class="bg-gray-700 text-white px-3 py-2 rounded"
-                       max="{{ current_date }}"
-                       onchange="updateDaySelection()">
-            </form>
-        </div>
-
-        <h4 class="text-md font-semibold text-gray-200 mb-2">Daily Usage Summary</h4>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left table-auto">
-                <thead>
-                    <tr class="text-gray-300 text-sm border-b border-gray-700">
-                        <th class="px-2 py-1">Name</th>
-                        <th class="px-2 py-1 text-right">Usage (kWh)</th>
-                        <th class="pl-5 pr-2 py-1 text-right">Cost</th>
-                        <th class="px-2 py-1 text-right">Percentage</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in emporia_daily_summary %}
-                    <tr class="text-gray-200 text-sm border-b border-gray-700">
-                        <td class="px-2 py-1">{{ item.name }}</td>
-                        <td class="px-2 py-1 text-right">{{ item.usage|floatformat:2 }}</td>
-                        <td class="pl-5 pr-2 py-1 text-right">${{ item.cost|floatformat:2 }}</td>
-                        <td class="px-2 py-1 text-right">{{ item.percentage|floatformat:1 }}%</td>
-                    </tr>
-                    {% empty %}
-                    <tr class="text-gray-200 text-sm border-b border-gray-700">
-                        <td class="px-2 py-1 col-span-4 text-center text-gray-400">No data available for this date</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <h4 class="text-md font-semibold text-gray-200 mb-2">Daily Usage Summary</h4>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left table-auto">
+                    <thead>
+                        <tr class="text-gray-300 text-sm border-b border-gray-700">
+                            <th class="px-2 py-1">Name</th>
+                            <th class="px-2 py-1 text-right">Usage (kWh)</th>
+                            <th class="pl-5 pr-2 py-1 text-right">Cost</th>
+                            <th class="px-2 py-1 text-right">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in emporia_daily_summary %}
+                        <tr class="text-gray-200 text-sm border-b border-gray-700">
+                            <td class="px-2 py-1">{{ item.name }}</td>
+                            <td class="px-2 py-1 text-right">{{ item.usage|floatformat:2 }}</td>
+                            <td class="pl-5 pr-2 py-1 text-right">${{ item.cost|floatformat:2 }}</td>
+                            <td class="px-2 py-1 text-right">{{ item.percentage|floatformat:1 }}%</td>
+                        </tr>
+                        {% empty %}
+                        <tr class="text-gray-200 text-sm border-b border-gray-700">
+                            <td class="px-2 py-1 col-span-4 text-center text-gray-400">No data available for this date</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

@@ -266,7 +266,9 @@ def collect_emporia_monthly_category_summary(year, month):
     # Build the result list
     result = []
     for name, usage in category_totals.items():
-        percentage = (usage / total_usage * 100) if total_usage > 0 else 0
+        # Multiply by 2 because "Electricity Monitor" is the total and other values
+        # are subcomponents, so the sum double-counts the usage
+        percentage = (usage / total_usage * 100 * 2) if total_usage > 0 else 0
         cost = usage * COST_PER_KWH
         result.append({
             "name": name,

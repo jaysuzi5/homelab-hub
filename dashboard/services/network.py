@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime, timezone
 from config.utils import get_config
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import urlparse, urlunparse
 
 NETWORK_URL = get_config("NETWORK_URL")
 
