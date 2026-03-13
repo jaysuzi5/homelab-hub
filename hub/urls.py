@@ -10,4 +10,5 @@ urlpatterns = [
     path("networking/", networking, name="networking"),
     path("accounts/", include("allauth.urls")),
     path('financial/', include('financial.urls')),
+    path('hobbies/', include('hobbies.urls')),
 ]

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">{{ action }} Account</h2>
+    <a href="{% url 'account_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+        Cancel
+    </a>
+</div>
+
+<div class="bg-gray-800 rounded-2xl shadow p-6 max-w-2xl">
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="space-y-4">
+            <div>
+                <label for="{{ form.name.id_for_label }}" class="block text-gray-300 mb-2">{{ form.name.label }}</label>
+                {{ form.name }}
+                {% if form.name.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.name.errors.0 }}</p>
+                {% endif %}
+                {% if form.name.help_text %}
+                <p class="text-gray-400 text-sm mt-1">{{ form.name.help_text }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.account_type.id_for_label }}" class="block text-gray-300 mb-2">{{ form.account_type.label }}</label>
+                {{ form.account_type }}
+                {% if form.account_type.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.account_type.errors.0 }}</p>
+                {% endif %}
+                {% if form.account_type.help_text %}
+                <p class="text-gray-400 text-sm mt-1">{{ form.account_type.help_text }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.institution.id_for_label }}" class="block text-gray-300 mb-2">{{ form.institution.label }}</label>
+                {{ form.institution }}
+                {% if form.institution.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.institution.errors.0 }}</p>
+                {% endif %}
+                {% if form.institution.help_text %}
+                <p class="text-gray-400 text-sm mt-1">{{ form.institution.help_text }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.tax_treatment.id_for_label }}" class="block text-gray-300 mb-2">{{ form.tax_treatment.label }}</label>
+                {{ form.tax_treatment }}
+                {% if form.tax_treatment.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.tax_treatment.errors.0 }}</p>
+                {% endif %}
+                {% if form.tax_treatment.help_text %}
+                <p class="text-gray-400 text-sm mt-1">{{ form.tax_treatment.help_text }}</p>
+                {% endif %}
+            </div>
+
+            <div class="flex items-center space-x-2">
+                {{ form.is_active }}
+                <label for="{{ form.is_active.id_for_label }}" class="text-gray-300">{{ form.is_active.label }}</label>
+            </div>
+            {% if form.is_active.help_text %}
+            <p class="text-gray-400 text-sm -mt-2 ml-6">{{ form.is_active.help_text }}</p>
+            {% endif %}
+
+            <div>
+                <label for="{{ form.notes.id_for_label }}" class="block text-gray-300 mb-2">{{ form.notes.label }}</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.notes.errors.0 }}</p>
+                {% endif %}
+                {% if form.notes.help_text %}
+                <p class="text-gray-400 text-sm mt-1">{{ form.notes.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mt-6 flex space-x-4">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition">
+                Save Account
+            </button>
+            <a href="{% url 'account_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition inline-block">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

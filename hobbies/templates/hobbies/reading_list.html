@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Header row -->
+<div class="flex items-center justify-between mb-4">
+    <div>
+        <h2 class="text-3xl font-semibold">
+            {% if is_own_list %}My Reading List{% else %}{{ reader.get_full_name|default:reader.username }}'s Reading List{% endif %}
+        </h2>
+        <!-- User switcher -->
+        <div class="flex items-center gap-3 mt-2">
+            <span class="text-sm px-3 py-1 rounded-full bg-blue-600 text-white font-medium">
+                {{ reader.get_full_name|default:reader.username }}
+            </span>
+            {% for other in other_readers %}
+            <a href="{% url 'reading_list' %}?reader={{ other.username }}"
+               class="text-sm px-3 py-1 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 transition">
+                {{ other.get_full_name|default:other.username }}
+            </a>
+            {% endfor %}
+            {% if not is_own_list %}
+            <a href="{% url 'reading_list' %}"
+               class="text-sm px-3 py-1 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-300 transition">
+                My List
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% if is_own_list %}
+    <a href="{% url 'book_add' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+        + Add Book
+    </a>
+    {% endif %}
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Total Books Read</p>
+        <p class="text-4xl font-bold text-blue-400">{{ total_books }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Books in {{ current_year }}</p>
+        <p class="text-4xl font-bold text-green-400">{{ books_this_year }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Total Pages Read</p>
+        <p class="text-4xl font-bold text-purple-400">{{ total_pages|default:"0" }}</p>
+    </div>
+</div>
+
+<!-- Book Grid -->
+{% if books %}
+<div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));">
+    {% for book in books %}
+    <div class="bg-gray-800 rounded-xl shadow hover:shadow-lg transition group flex flex-col" style="width: 100%;">
+        <!-- Cover Image -->
+        <div class="relative rounded-t-xl overflow-hidden bg-gray-700" style="height: 240px;">
+            {% if book.cover_url %}
+            <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="w-full h-full object-cover">
+            {% else %}
+            <div class="w-full h-full flex items-center justify-center text-gray-500">
+                <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253">
+                    </path>
+                </svg>
+            </div>
+            {% endif %}
+            <!-- Delete button overlay — only on own list -->
+            {% if is_own_list %}
+            <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition">
+                <a href="{% url 'book_delete' book.pk %}"
+                    class="bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow">
+                    &times;
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        <!-- Book Info -->
+        <div class="p-2 flex flex-col flex-1">
+            <p class="text-white font-semibold text-xs leading-tight line-clamp-2">{{ book.title }}</p>
+            {% if book.author %}
+            <p class="text-gray-400 text-xs mt-1 line-clamp-1">{{ book.author }}</p>
+            {% endif %}
+            <div class="mt-auto pt-2 flex flex-col text-xs text-gray-500 gap-0.5">
+                <span>{{ book.date_read|date:"M j, Y" }}</span>
+                {% if book.pages %}
+                <span>{{ book.pages }} pp</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-gray-800 rounded-2xl shadow p-12 text-center text-gray-400">
+    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253">
+        </path>
+    </svg>
+    <p class="text-lg">No books yet.</p>
+    {% if is_own_list %}
+    <a href="{% url 'book_add' %}" class="mt-4 inline-block text-blue-400 hover:underline">Add your first book</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

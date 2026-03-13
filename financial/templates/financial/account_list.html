@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Manage Accounts</h2>
+    <div class="flex items-center space-x-4">
+        <a href="{% url 'portfolio_overview' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+            ← Back to Portfolio
+        </a>
+        <a href="{% url 'account_create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+            + New Account
+        </a>
+    </div>
+</div>
+
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-4 py-2">Account Name</th>
+                    <th class="px-4 py-2">Type</th>
+                    <th class="px-4 py-2">Institution</th>
+                    <th class="px-4 py-2 text-right">Latest Balance</th>
+                    <th class="px-4 py-2">Tax Treatment</th>
+                    <th class="px-4 py-2">Status</th>
+                    <th class="px-4 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for account in accounts %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700">
+                    <td class="px-4 py-2">{{ account.name }}</td>
+                    <td class="px-4 py-2">{{ account.get_account_type_display }}</td>
+                    <td class="px-4 py-2">{{ account.institution|default:"—" }}</td>
+                    <td class="px-4 py-2 text-right font-semibold">${{ account.get_latest_balance|floatformat:0|intcomma }}</td>
+                    <td class="px-4 py-2">
+                        <span class="
+                            {% if account.tax_treatment == 'PRE_TAX' %}text-purple-400
+                            {% elif account.tax_treatment == 'ROTH' %}text-blue-400
+                            {% elif account.tax_treatment == 'PENSION' %}text-orange-400
+                            {% elif account.tax_treatment == 'HSA' %}text-green-400
+                            {% elif account.tax_treatment == 'TAXABLE' %}text-yellow-400
+                            {% else %}text-gray-300{% endif %}
+                        " title="{{ account.get_tax_treatment_display }}">
+                            {{ account.get_tax_treatment_display_short }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2">
+                        {% if account.is_active %}
+                        <span class="text-green-400">Active</span>
+                        {% else %}
+                        <span class="text-gray-500">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                        <a href="{% url 'account_snapshots' account.id %}" class="text-green-400 hover:underline mr-3">View History</a>
+                        <a href="{% url 'account_edit' account.id %}" class="text-blue-400 hover:underline mr-3">Edit</a>
+                        <a href="{% url 'account_delete' account.id %}" class="text-red-400 hover:underline">Delete</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="text-gray-400 text-sm">
+                    <td colspan="7" class="px-4 py-4 text-center">
+                        No accounts yet. <a href="{% url 'account_create' %}" class="text-blue-400 hover:underline">Create your first account</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

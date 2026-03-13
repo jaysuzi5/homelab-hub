@@ -21,15 +21,69 @@
     <!-- Sidebar -->
     <aside class="w-64 bg-gray-800 p-6 flex flex-col">
         <h1 class="text-2xl font-bold mb-6">🏠 HomeLab</h1>
-        <nav class="flex flex-col space-y-2">
+        <nav class="flex flex-col space-y-1">
             <a href="{% url 'home' %}" class="hover:bg-gray-700 p-2 rounded">Dashboard</a>
             <a href="{% url 'k8s' %}" class="hover:bg-gray-700 p-2 rounded">Kubernetes</a>
             <a href="{% url 'networking' %}" class="hover:bg-gray-700 p-2 rounded">Networking</a>
             <a href="{% url 'energy' %}" class="hover:bg-gray-700 p-2 rounded">Energy</a>
             <a href="#" class="hover:bg-gray-700 p-2 rounded">Media</a>
-            <a href="{% url 'retirement_dashboard' %}" class="hover:bg-gray-700 p-2 rounded">Financials</a>
+
+            <!-- Financial Section with Children -->
+            <div class="menu-group">
+                <button onclick="toggleSubmenu('financial-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
+                    <span>Financial</span>
+                    <svg id="financial-submenu-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="financial-submenu" class="ml-4 mt-1 space-y-1 hidden">
+                    <a href="{% url 'retirement_dashboard' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Retirement Calculator</a>
+                    <a href="{% url 'portfolio_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Portfolio</a>
+                    <a href="{% url 'networth_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Net Worth</a>
+                    <a href="{% url 'electricity_usage_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Electricity Usage</a>
+                </div>
+            </div>
+
+            <!-- Hobbies Section with Children -->
+            <div class="menu-group">
+                <button onclick="toggleSubmenu('hobbies-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
+                    <span>Hobbies</span>
+                    <svg id="hobbies-submenu-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="hobbies-submenu" class="ml-4 mt-1 space-y-1 hidden">
+                    <a href="{% url 'reading_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Reading List</a>
+                </div>
+            </div>
         </nav>
     </aside>
+
+    <script>
+        function toggleSubmenu(submenuId) {
+            const submenu = document.getElementById(submenuId);
+            const icon = document.getElementById(submenuId + '-icon');
+
+            if (submenu.classList.contains('hidden')) {
+                submenu.classList.remove('hidden');
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                submenu.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Auto-expand submenus based on current page
+        window.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            if (currentPath.includes('/financial/')) {
+                toggleSubmenu('financial-submenu');
+            }
+            if (currentPath.includes('/hobbies/')) {
+                toggleSubmenu('hobbies-submenu');
+            }
+        });
+    </script>
 
     <!-- Main Content -->
     <main class="flex-1 p-6">

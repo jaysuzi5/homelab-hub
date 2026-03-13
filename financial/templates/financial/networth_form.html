@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">{{ action }} Net Worth Record</h2>
+    <a href="{% url 'networth_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+        ← Back to List
+    </a>
+</div>
+
+<div class="bg-gray-800 rounded-2xl shadow p-6 max-w-2xl">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="bg-red-900 text-red-200 px-4 py-3 rounded mb-4">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <div class="space-y-6">
+            <!-- Date -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.date.label }}</label>
+                {{ form.date }}
+                {% if form.date.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.date.errors }}</p>
+                {% endif %}
+                <p class="text-gray-400 text-xs mt-1">First day of the month</p>
+            </div>
+
+            <!-- Net Worth -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.net_worth.label }}</label>
+                {{ form.net_worth }}
+                {% if form.net_worth.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.net_worth.errors }}</p>
+                {% endif %}
+                <p class="text-gray-400 text-xs mt-1">Total net worth (assets minus liabilities)</p>
+            </div>
+
+            <!-- Comments -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.comments.label }}</label>
+                {{ form.comments }}
+                {% if form.comments.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.comments.errors }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mt-6 flex space-x-4">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition">
+                Save Record
+            </button>
+            <a href="{% url 'networth_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition inline-block">
+                Cancel
+            </a>
+        </div>
+    </form>
+
+    {% if action == "Edit" %}
+    <div class="mt-6 p-4 bg-gray-700 rounded-lg">
+        <p class="text-gray-400 text-sm mb-2">Note:</p>
+        <p class="text-gray-300 text-sm">Change from previous month will be automatically calculated when you save.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

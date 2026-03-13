@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-3xl font-semibold">{{ account.name }}</h2>
+        <p class="text-gray-400 mt-1">{{ account.get_account_type_display }} at {{ account.institution|default:"—" }}</p>
+    </div>
+    <div class="flex items-center space-x-4">
+        <a href="{% url 'account_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+            ← Back to Accounts
+        </a>
+        <a href="{% url 'snapshot_create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+            + Add Snapshot
+        </a>
+    </div>
+</div>
+
+{% if snapshots %}
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Latest Balance</p>
+        <p class="text-4xl font-bold text-green-400">${{ snapshots.0.balance|floatformat:0|intcomma }}</p>
+        <p class="text-gray-400 text-xs mt-2">as of {{ snapshots.0.snapshot_date|date:"M d, Y" }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Total Snapshots</p>
+        <p class="text-4xl font-bold text-white">{{ snapshots.count }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Oldest Record</p>
+        <p class="text-2xl font-semibold text-white">{{ snapshots.last.snapshot_date|date:"M d, Y" }}</p>
+    </div>
+</div>
+
+<!-- Account Balance Chart -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6" style="min-height: 28rem;">
+    <h3 class="text-xl font-bold mb-4">Balance History</h3>
+    <div class="w-full h-96">
+        <canvas id="accountBalanceChart" class="w-full h-full"></canvas>
+    </div>
+</div>
+
+<!-- Balance Snapshots Table -->
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4">All Snapshots</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-4 py-2">Date</th>
+                    <th class="px-4 py-2 text-right">Balance</th>
+                    <th class="px-4 py-2">Notes</th>
+                    <th class="px-4 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for snapshot in snapshots %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700">
+                    <td class="px-4 py-2">{{ snapshot.snapshot_date|date:"M d, Y" }}</td>
+                    <td class="px-4 py-2 text-right font-semibold">${{ snapshot.balance|floatformat:0|intcomma }}</td>
+                    <td class="px-4 py-2 text-gray-400">
+                        {% if snapshot.notes %}
+                        {{ snapshot.notes|truncatewords:10 }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                        <a href="{% url 'snapshot_edit' snapshot.pk %}" class="text-blue-400 hover:underline mr-3">Edit</a>
+                        <a href="{% url 'snapshot_delete' snapshot.pk %}" class="text-red-400 hover:underline">Delete</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <div class="text-center py-10">
+        <p class="text-gray-400 mb-4">No balance snapshots recorded yet for this account.</p>
+        <a href="{% url 'snapshot_create' %}" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition inline-block">
+            Add First Snapshot
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const accountChartData = {{ chart_data|safe }};
+
+    if (accountChartData && accountChartData.length > 0) {
+        const ctx = document.getElementById('accountBalanceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: accountChartData.map(d => d.date),
+                datasets: [{
+                    label: 'Balance',
+                    data: accountChartData.map(d => d.balance),
+                    fill: true,
+                    borderColor: 'rgba(59,130,246,1)',
+                    backgroundColor: 'rgba(59,130,246,0.2)',
+                    tension: 0.2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date',
+                            color: 'white',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        ticks: {
+                            color: 'white',
+                            font: { size: 14 }
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,0.2)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Balance ($)',
+                            color: 'white',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        ticks: {
+                            color: 'white',
+                            font: { size: 14 },
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,0.2)'
+                        },
+                        beginAtZero: false
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return '$' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+
+{% endblock %}

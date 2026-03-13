@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">{{ action }} Electricity Usage Record</h2>
+    <a href="{% url 'electricity_usage_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+        ← Back to List
+    </a>
+</div>
+
+<div class="bg-gray-800 rounded-2xl shadow p-6 max-w-2xl">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="bg-red-900 text-red-200 px-4 py-3 rounded mb-4">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Date -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.date.label }}</label>
+                {{ form.date }}
+                {% if form.date.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.date.errors }}</p>
+                {% endif %}
+                <p class="text-gray-400 text-xs mt-1">First day of the month</p>
+            </div>
+
+            <!-- kWh Consumed -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.kwh_consumed.label }}</label>
+                {{ form.kwh_consumed }}
+                {% if form.kwh_consumed.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.kwh_consumed.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- kWh Sent -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.kwh_sent.label }}</label>
+                {{ form.kwh_sent }}
+                {% if form.kwh_sent.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.kwh_sent.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Net kWh -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.net_kwh.label }}</label>
+                {{ form.net_kwh }}
+                {% if form.net_kwh.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.net_kwh.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Total Cost -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.total_cost.label }}</label>
+                {{ form.total_cost }}
+                {% if form.total_cost.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.total_cost.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Solar Produced -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.produced_kwh.label }}</label>
+                {{ form.produced_kwh }}
+                {% if form.produced_kwh.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.produced_kwh.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Total Combined -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.kwh_combined.label }}</label>
+                {{ form.kwh_combined }}
+                {% if form.kwh_combined.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.kwh_combined.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- EV Mileage -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.ev_mileage.label }}</label>
+                {{ form.ev_mileage }}
+                {% if form.ev_mileage.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.ev_mileage.errors }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Comments -->
+        <div class="mt-6">
+            <label class="block text-gray-300 mb-2">{{ form.comments.label }}</label>
+            {{ form.comments }}
+            {% if form.comments.errors %}
+            <p class="text-red-400 text-sm mt-1">{{ form.comments.errors }}</p>
+            {% endif %}
+        </div>
+
+        <div class="mt-6 flex space-x-4">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition">
+                Save Record
+            </button>
+            <a href="{% url 'electricity_usage_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition inline-block">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

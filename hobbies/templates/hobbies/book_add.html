@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-semibold">Add Book</h2>
+        <a href="{% url 'reading_list' %}" class="text-gray-400 hover:text-white text-sm">&larr; Back to Reading List</a>
+    </div>
+
+    <!-- Step 1: Search -->
+    <div id="step-search" class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+        <h3 class="text-lg font-semibold mb-4">Search for a Book</h3>
+
+        <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-1">Date Read</label>
+            <input type="date" id="date_read_input" value="{{ today }}"
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500">
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-1">Book Title</label>
+            <div class="flex gap-2">
+                <input type="text" id="search_input" placeholder="Enter title or author..."
+                    class="bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 flex-1 focus:outline-none focus:border-blue-500"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();searchBooks();}">
+                <button onclick="searchBooks()"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition">
+                    Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="search-status" class="text-gray-400 text-sm hidden"></div>
+        <div id="search-results" class="mt-4 space-y-3 hidden"></div>
+    </div>
+
+    <!-- Step 2: Confirm & Save -->
+    <div id="step-confirm" class="bg-gray-800 rounded-2xl shadow p-6 hidden">
+        <h3 class="text-lg font-semibold mb-4">Confirm Book</h3>
+
+        <div class="flex gap-6 mb-6">
+            <div class="flex-shrink-0">
+                <img id="preview-cover" src="" alt="Cover"
+                    class="w-24 rounded-lg shadow hidden">
+                <div id="preview-no-cover"
+                    class="w-24 h-36 bg-gray-700 rounded-lg flex items-center justify-center hidden">
+                    <svg class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+            <div class="flex-1">
+                <p id="preview-title" class="text-white text-xl font-bold"></p>
+                <p id="preview-author" class="text-gray-400 mt-1"></p>
+                <p id="preview-pages" class="text-gray-500 text-sm mt-1"></p>
+                <button onclick="clearSelection()"
+                    class="mt-3 text-blue-400 hover:underline text-sm">Search again</button>
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'book_add' %}">
+            {% csrf_token %}
+            <input type="hidden" name="date_read" id="form_date_read">
+            <input type="hidden" name="title" id="form_title">
+            <input type="hidden" name="author" id="form_author">
+            <input type="hidden" name="pages" id="form_pages">
+            <input type="hidden" name="cover_url" id="form_cover_url">
+            <input type="hidden" name="open_library_key" id="form_key">
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Date Read</label>
+                <input type="date" id="confirm_date_display"
+                    class="bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                    onchange="document.getElementById('form_date_read').value=this.value">
+            </div>
+
+            <button type="submit"
+                class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition">
+                Save to Reading List
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const SEARCH_URL = "{% url 'book_search' %}";
+
+    async function searchBooks() {
+        const query = document.getElementById('search_input').value.trim();
+        if (!query) return;
+
+        const status = document.getElementById('search-status');
+        const results = document.getElementById('search-results');
+        status.textContent = 'Searching...';
+        status.classList.remove('hidden');
+        results.classList.add('hidden');
+        results.innerHTML = '';
+
+        try {
+            const resp = await fetch(`${SEARCH_URL}?q=${encodeURIComponent(query)}`);
+            const data = await resp.json();
+
+            if (!data.results || data.results.length === 0) {
+                status.textContent = 'No books found. Try a different search.';
+                return;
+            }
+
+            status.classList.add('hidden');
+            results.classList.remove('hidden');
+            results.innerHTML = data.results.map(b => `
+                <div class="flex items-center gap-4 bg-gray-700 hover:bg-gray-600 rounded-xl p-3 cursor-pointer transition"
+                     onclick="selectBook(${JSON.stringify(b).replace(/"/g, '&quot;')})">
+                    <div class="flex-shrink-0 w-12 h-16 bg-gray-600 rounded overflow-hidden">
+                        ${b.cover_url
+                            ? `<img src="${b.cover_url}" alt="Cover" class="w-full h-full object-cover">`
+                            : `<div class="w-full h-full flex items-center justify-center text-gray-400 text-xs">No cover</div>`
+                        }
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-white font-semibold text-sm truncate">${b.title}</p>
+                        <p class="text-gray-400 text-xs">${b.author || 'Unknown author'}</p>
+                        ${b.pages ? `<p class="text-gray-500 text-xs">${b.pages} pages</p>` : ''}
+                    </div>
+                    <div class="text-blue-400 text-sm flex-shrink-0">Select &rarr;</div>
+                </div>
+            `).join('');
+        } catch (e) {
+            status.textContent = 'Search failed. Please try again.';
+        }
+    }
+
+    function selectBook(book) {
+        // Populate hidden form fields
+        document.getElementById('form_date_read').value = document.getElementById('date_read_input').value;
+        document.getElementById('form_title').value = book.title;
+        document.getElementById('form_author').value = book.author || '';
+        document.getElementById('form_pages').value = book.pages || '';
+        document.getElementById('form_cover_url').value = book.cover_url || '';
+        document.getElementById('form_key').value = book.key || '';
+
+        // Set confirm date display
+        const confirmDate = document.getElementById('confirm_date_display');
+        confirmDate.value = document.getElementById('date_read_input').value;
+
+        // Populate preview
+        document.getElementById('preview-title').textContent = book.title;
+        document.getElementById('preview-author').textContent = book.author || 'Unknown author';
+        document.getElementById('preview-pages').textContent = book.pages ? `${book.pages} pages` : '';
+
+        const coverImg = document.getElementById('preview-cover');
+        const noCover = document.getElementById('preview-no-cover');
+        if (book.cover_url) {
+            coverImg.src = book.cover_url;
+            coverImg.classList.remove('hidden');
+            noCover.classList.add('hidden');
+        } else {
+            coverImg.classList.add('hidden');
+            noCover.classList.remove('hidden');
+        }
+
+        // Show confirm section, hide search results
+        document.getElementById('step-confirm').classList.remove('hidden');
+        document.getElementById('search-results').classList.add('hidden');
+        document.getElementById('search-status').classList.add('hidden');
+        document.getElementById('step-confirm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function clearSelection() {
+        document.getElementById('step-confirm').classList.add('hidden');
+        document.getElementById('search_input').focus();
+    }
+</script>
+{% endblock %}

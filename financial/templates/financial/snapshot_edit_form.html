@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Edit Snapshot</h2>
+    <a href="{% url 'account_snapshots' snapshot.account.pk %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+        Cancel
+    </a>
+</div>
+
+<div class="bg-gray-800 rounded-2xl shadow p-6 max-w-2xl">
+    <p class="text-gray-400 mb-6">
+        Editing snapshot for {{ snapshot.account.name }}
+    </p>
+
+    {% if form.non_field_errors %}
+    <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
+        {{ form.non_field_errors }}
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="space-y-4">
+            <div>
+                <label for="{{ form.account.id_for_label }}" class="block text-gray-300 mb-2">{{ form.account.label }}</label>
+                {{ form.account }}
+                {% if form.account.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.account.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.snapshot_date.id_for_label }}" class="block text-gray-300 mb-2">{{ form.snapshot_date.label }}</label>
+                {{ form.snapshot_date }}
+                {% if form.snapshot_date.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.snapshot_date.errors.0 }}</p>
+                {% endif %}
+                <p class="text-gray-400 text-sm mt-1">Note: You can only have one snapshot per account per day</p>
+            </div>
+
+            <div>
+                <label for="{{ form.balance.id_for_label }}" class="block text-gray-300 mb-2">{{ form.balance.label }} ($)</label>
+                {{ form.balance }}
+                {% if form.balance.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.balance.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.notes.id_for_label }}" class="block text-gray-300 mb-2">{{ form.notes.label }} (Optional)</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.notes.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mt-6 flex space-x-4">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition">
+                Update Snapshot
+            </button>
+            <a href="{% url 'account_snapshots' snapshot.account.pk %}" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition inline-block">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

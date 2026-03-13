@@ -1,5 +1,6 @@
 from django import forms
 from config.utils import get_config
+from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth
 
 SS_BENEFITS_62 = get_config("SS_BENEFITS_62",0)
 SS_BENEFITS_65 = get_config("SS_BENEFITS_65",0)
@@ -117,4 +118,80 @@ class RetirementForm(forms.Form):
                 self.add_error("withdrawal", "Withdrawal amount is required when using Fixed Withdrawal mode.")
             elif mode == "target" and target_success in [None, ""]:
                 self.add_error("target_success", "Target success rate is required when using Target Success mode.")
-            
+
+
+class PortfolioAccountForm(forms.ModelForm):
+    """Form for creating and editing portfolio accounts."""
+
+    class Meta:
+        model = PortfolioAccount
+        fields = ['name', 'account_type', 'institution', 'tax_treatment', 'is_active', 'notes']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
+            'account_type': forms.Select(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
+            'institution': forms.TextInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
+            'tax_treatment': forms.Select(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'bg-gray-700 text-white'}),
+            'notes': forms.Textarea(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'rows': 3}),
+        }
+
+
+class PortfolioSnapshotForm(forms.ModelForm):
+    """Form for adding balance snapshots."""
+
+    class Meta:
+        model = PortfolioSnapshot
+        fields = ['account', 'snapshot_date', 'balance', 'notes']
+        widgets = {
+            'account': forms.Select(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
+            'snapshot_date': forms.DateInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'type': 'date'}),
+            'balance': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'notes': forms.Textarea(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'rows': 2}),
+        }
+
+
+class ElectricityUsageForm(forms.ModelForm):
+    """Form for adding electricity usage records."""
+
+    class Meta:
+        model = ElectricityUsage
+        fields = [
+            'date', 'kwh_consumed', 'kwh_sent', 'net_kwh', 'total_cost',
+            'produced_kwh', 'kwh_combined', 'ev_mileage', 'comments'
+        ]
+        widgets = {
+            'date': forms.DateInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'type': 'date'}),
+            'kwh_consumed': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'kwh_sent': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'net_kwh': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'total_cost': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'produced_kwh': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'kwh_combined': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'ev_mileage': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'comments': forms.Textarea(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'rows': 2}),
+        }
+        labels = {
+            'kwh_consumed': 'kWh Consumed',
+            'kwh_sent': 'kWh Sent to Grid',
+            'net_kwh': 'Net kWh',
+            'total_cost': 'Total Cost ($)',
+            'produced_kwh': 'Solar Produced (kWh)',
+            'kwh_combined': 'Total Combined (kWh)',
+            'ev_mileage': 'EV Mileage (miles)',
+        }
+
+
+class NetWorthForm(forms.ModelForm):
+    """Form for adding net worth records."""
+
+    class Meta:
+        model = NetWorth
+        fields = ['date', 'net_worth', 'comments']
+        widgets = {
+            'date': forms.DateInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'type': 'date'}),
+            'net_worth': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'comments': forms.Textarea(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'rows': 2}),
+        }
+        labels = {
+            'net_worth': 'Net Worth ($)',
+        }

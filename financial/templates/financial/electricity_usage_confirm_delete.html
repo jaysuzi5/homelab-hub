@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Delete Electricity Usage Record</h2>
+    <a href="{% url 'electricity_usage_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+        ← Back to List
+    </a>
+</div>
+
+<div class="bg-gray-800 rounded-2xl shadow p-6 max-w-xl">
+    <p class="text-gray-300 mb-4">
+        Are you sure you want to delete the electricity usage record for <strong>{{ record.date|date:"F Y" }}</strong>?
+    </p>
+
+    <div class="bg-gray-700 rounded-lg p-4 mb-6">
+        <p class="text-gray-400 text-sm mb-2">Record Details:</p>
+        <ul class="text-gray-300 text-sm space-y-1">
+            <li>Date: {{ record.date|date:"F Y" }}</li>
+            <li>kWh Consumed: {{ record.kwh_consumed|floatformat:0|default:"—" }}</li>
+            <li>Total Cost: ${{ record.total_cost|floatformat:2|default:"—" }}</li>
+        </ul>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="flex space-x-4">
+            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition">
+                Yes, Delete
+            </button>
+            <a href="{% url 'electricity_usage_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition inline-block">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

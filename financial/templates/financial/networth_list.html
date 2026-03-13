@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Net Worth History</h2>
+    <a href="{% url 'networth_create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+        + Add Record
+    </a>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Current Net Worth</p>
+        {% if latest_record %}
+        <p class="text-4xl font-bold text-green-400">${{ latest_record.net_worth|floatformat:0|intcomma }}</p>
+        <p class="text-gray-400 text-xs mt-2">as of {{ latest_record.date|date:"M Y" }}</p>
+        {% else %}
+        <p class="text-4xl font-bold text-white">—</p>
+        {% endif %}
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">{{ current_year }} YTD Change</p>
+        <p class="text-4xl font-bold {% if ytd_change >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+            {% if ytd_change >= 0 %}+{% endif %}${{ ytd_change|floatformat:0|intcomma }}
+        </p>
+        <p class="text-gray-400 text-xs mt-2">
+            {% if ytd_change >= 0 %}+{% endif %}{{ ytd_percent|floatformat:1 }}%
+        </p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">All-Time Change</p>
+        <p class="text-4xl font-bold {% if total_change >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+            {% if total_change >= 0 %}+{% endif %}${{ total_change|floatformat:0|intcomma }}
+        </p>
+        <p class="text-gray-400 text-xs mt-2">
+            {% if total_change >= 0 %}+{% endif %}{{ total_percent|floatformat:1 }}%
+        </p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Total Records</p>
+        <p class="text-4xl font-bold text-white">{{ total_records }}</p>
+        {% if oldest_record %}
+        <p class="text-gray-400 text-xs mt-2">since {{ oldest_record.date|date:"M Y" }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Net Worth Chart -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6" style="min-height: 24rem;">
+        <h3 class="text-xl font-bold mb-4">Net Worth Over Time</h3>
+        <div class="w-full h-80">
+            <canvas id="netWorthChart" class="w-full h-full"></canvas>
+        </div>
+    </div>
+
+    <!-- Monthly Change Chart -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6" style="min-height: 24rem;">
+        <h3 class="text-xl font-bold mb-4">Monthly Change ($)</h3>
+        <div class="w-full h-80">
+            <canvas id="changeChart" class="w-full h-full"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4">All Records</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-4 py-2">Date</th>
+                    <th class="px-4 py-2 text-right">Net Worth</th>
+                    <th class="px-4 py-2 text-right">Change from Previous</th>
+                    <th class="px-4 py-2 text-right">% Change</th>
+                    <th class="px-4 py-2">Comments</th>
+                    <th class="px-4 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in records_with_percent %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700">
+                    <td class="px-4 py-2">{{ item.record.date|date:"M Y" }}</td>
+                    <td class="px-4 py-2 text-right font-semibold text-white">${{ item.record.net_worth|floatformat:0|intcomma }}</td>
+                    <td class="px-4 py-2 text-right font-semibold {% if item.record.change_from_previous %}{% if item.record.change_from_previous >= 0 %}text-green-400{% else %}text-red-400{% endif %}{% endif %}">
+                        {% if item.record.change_from_previous %}
+                        {% if item.record.change_from_previous >= 0 %}+{% endif %}${{ item.record.change_from_previous|floatformat:0|intcomma }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-right {% if item.percent_display %}{% if item.percent_display >= 0 %}text-green-400{% else %}text-red-400{% endif %}{% endif %}">
+                        {% if item.percent_display != None %}
+                        {% if item.percent_display >= 0 %}+{% endif %}{{ item.percent_display|floatformat:2 }}%
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-gray-400">
+                        {% if item.record.comments %}
+                        {{ item.record.comments|truncatewords:10 }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                        <a href="{% url 'networth_edit' item.record.pk %}" class="text-blue-400 hover:underline mr-3">Edit</a>
+                        <a href="{% url 'networth_delete' item.record.pk %}" class="text-red-400 hover:underline">Delete</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="text-gray-400 text-sm">
+                    <td colspan="6" class="px-4 py-4 text-center">
+                        No records yet. <a href="{% url 'networth_create' %}" class="text-blue-400 hover:underline">Add your first record</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const chartData = {{ chart_data|safe }};
+
+    if (chartData && chartData.length > 0) {
+        // Net Worth Chart
+        const netWorthCtx = document.getElementById('netWorthChart').getContext('2d');
+        new Chart(netWorthCtx, {
+            type: 'line',
+            data: {
+                labels: chartData.map(d => d.date),
+                datasets: [{
+                    label: 'Net Worth',
+                    data: chartData.map(d => d.net_worth),
+                    borderColor: 'rgba(34,197,94,1)',
+                    backgroundColor: 'rgba(34,197,94,0.2)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 2,
+                    pointHoverRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { color: 'white', font: { size: 11 } },
+                        grid: { color: 'rgba(255,255,255,0.2)' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Net Worth ($)', color: 'white', font: { size: 14, weight: 'bold' } },
+                        ticks: {
+                            color: 'white',
+                            font: { size: 12 },
+                            callback: function(value) {
+                                return '$' + (value / 1000000).toFixed(1) + 'M';
+                            }
+                        },
+                        grid: { color: 'rgba(255,255,255,0.2)' },
+                        beginAtZero: false
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return '$' + context.parsed.y.toLocaleString(undefined, {maximumFractionDigits: 0});
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Monthly Change Chart
+        const changeCtx = document.getElementById('changeChart').getContext('2d');
+        new Chart(changeCtx, {
+            type: 'bar',
+            data: {
+                labels: chartData.map(d => d.date),
+                datasets: [{
+                    label: 'Monthly Change',
+                    data: chartData.map(d => d.change),
+                    backgroundColor: chartData.map(d => d.change >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)'),
+                    borderColor: chartData.map(d => d.change >= 0 ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)'),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { color: 'white', font: { size: 11 } },
+                        grid: { color: 'rgba(255,255,255,0.2)' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Change ($)', color: 'white', font: { size: 14, weight: 'bold' } },
+                        ticks: {
+                            color: 'white',
+                            font: { size: 12 },
+                            callback: function(value) {
+                                return '$' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        },
+                        grid: { color: 'rgba(255,255,255,0.2)' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const val = context.parsed.y;
+                                return (val >= 0 ? '+' : '') + '$' + val.toLocaleString(undefined, {maximumFractionDigits: 0});
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+
+{% endblock %}
