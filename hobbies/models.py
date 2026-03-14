@@ -16,6 +16,9 @@ class Book(models.Model):
     pages = models.IntegerField(null=True, blank=True)
     cover_url = models.URLField(max_length=500, blank=True)
     open_library_key = models.CharField(max_length=100, blank=True)
+    summary = models.TextField(blank=True)
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)  # 0-5
+    comment = models.TextField(blank=True)
     created_date = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -68,12 +68,34 @@
             <input type="hidden" name="pages" id="form_pages">
             <input type="hidden" name="cover_url" id="form_cover_url">
             <input type="hidden" name="open_library_key" id="form_key">
+            <input type="hidden" name="summary" id="form_summary">
+            <input type="hidden" name="rating" id="form_rating" value="">
 
             <div class="mb-4">
                 <label class="block text-sm text-gray-400 mb-1">Date Read</label>
                 <input type="date" id="confirm_date_display"
                     class="bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
                     onchange="document.getElementById('form_date_read').value=this.value">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-2">Rating</label>
+                <div class="flex gap-2 items-center">
+                    <div id="add-star-picker" class="flex gap-1">
+                        <button type="button" data-value="1" class="add-star text-3xl text-gray-600 transition focus:outline-none" onclick="setAddRating(1)">&#9733;</button>
+                        <button type="button" data-value="2" class="add-star text-3xl text-gray-600 transition focus:outline-none" onclick="setAddRating(2)">&#9733;</button>
+                        <button type="button" data-value="3" class="add-star text-3xl text-gray-600 transition focus:outline-none" onclick="setAddRating(3)">&#9733;</button>
+                        <button type="button" data-value="4" class="add-star text-3xl text-gray-600 transition focus:outline-none" onclick="setAddRating(4)">&#9733;</button>
+                        <button type="button" data-value="5" class="add-star text-3xl text-gray-600 transition focus:outline-none" onclick="setAddRating(5)">&#9733;</button>
+                    </div>
+                    <button type="button" class="text-xs text-gray-500 hover:text-gray-300 ml-1" onclick="setAddRating(0)">Clear</button>
+                </div>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-sm text-gray-400 mb-1">Notes <span class="text-gray-600">(optional)</span></label>
+                <textarea name="comment" rows="3" placeholder="Your thoughts about this book..."
+                    class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500 resize-none"></textarea>
             </div>
 
             <button type="submit"
@@ -86,6 +108,7 @@
 
 <script>
     const SEARCH_URL = "{% url 'book_search' %}";
+    const WORKS_URL = "{% url 'book_works' %}";
 
     async function searchBooks() {
         const query = document.getElementById('search_input').value.trim();
@@ -131,7 +154,7 @@
         }
     }
 
-    function selectBook(book) {
+    async function selectBook(book) {
         // Populate hidden form fields
         document.getElementById('form_date_read').value = document.getElementById('date_read_input').value;
         document.getElementById('form_title').value = book.title;
@@ -139,10 +162,10 @@
         document.getElementById('form_pages').value = book.pages || '';
         document.getElementById('form_cover_url').value = book.cover_url || '';
         document.getElementById('form_key').value = book.key || '';
+        document.getElementById('form_summary').value = '';
 
         // Set confirm date display
-        const confirmDate = document.getElementById('confirm_date_display');
-        confirmDate.value = document.getElementById('date_read_input').value;
+        document.getElementById('confirm_date_display').value = document.getElementById('date_read_input').value;
 
         // Populate preview
         document.getElementById('preview-title').textContent = book.title;
@@ -160,16 +183,54 @@
             noCover.classList.remove('hidden');
         }
 
-        // Show confirm section, hide search results
+        // Show confirm section
         document.getElementById('step-confirm').classList.remove('hidden');
         document.getElementById('search-results').classList.add('hidden');
         document.getElementById('search-status').classList.add('hidden');
         document.getElementById('step-confirm').scrollIntoView({ behavior: 'smooth' });
+
+        // Fetch summary in background
+        if (book.key) {
+            try {
+                const resp = await fetch(`${WORKS_URL}?key=${encodeURIComponent(book.key)}`);
+                const data = await resp.json();
+                if (data.summary) {
+                    document.getElementById('form_summary').value = data.summary;
+                }
+            } catch (e) { /* summary stays empty */ }
+        }
     }
 
     function clearSelection() {
         document.getElementById('step-confirm').classList.add('hidden');
         document.getElementById('search_input').focus();
     }
+
+    function setAddRating(value) {
+        document.getElementById('form_rating').value = value || '';
+        document.querySelectorAll('.add-star').forEach(btn => {
+            const v = parseInt(btn.dataset.value);
+            btn.classList.toggle('text-yellow-400', v <= value);
+            btn.classList.toggle('text-gray-600', v > value);
+        });
+    }
+
+    document.querySelectorAll('.add-star').forEach(btn => {
+        btn.addEventListener('mouseenter', () => {
+            const v = parseInt(btn.dataset.value);
+            document.querySelectorAll('.add-star').forEach(b => {
+                b.classList.toggle('text-yellow-300', parseInt(b.dataset.value) <= v);
+            });
+        });
+        btn.addEventListener('mouseleave', () => {
+            const cur = parseInt(document.getElementById('form_rating').value) || 0;
+            document.querySelectorAll('.add-star').forEach(b => {
+                const bv = parseInt(b.dataset.value);
+                b.classList.remove('text-yellow-300');
+                b.classList.toggle('text-yellow-400', bv <= cur);
+                b.classList.toggle('text-gray-600', bv > cur);
+            });
+        });
+    });
 </script>
 {% endblock %}

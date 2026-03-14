@@ -51,10 +51,12 @@
 
 <!-- Book Grid -->
 {% if books %}
-<div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));">
+<div class="flex flex-wrap gap-4">
     {% for book in books %}
-    <div class="bg-gray-800 rounded-xl shadow hover:shadow-lg transition group flex flex-col" style="width: 100%;">
-        <!-- Cover Image -->
+    <a href="{% url 'book_detail' book.pk %}"
+       class="bg-gray-800 rounded-xl shadow hover:shadow-lg hover:ring-1 hover:ring-blue-500 transition group flex flex-col flex-shrink-0"
+       style="width: 160px;">
+        <!-- Cover Image — fixed height -->
         <div class="relative rounded-t-xl overflow-hidden bg-gray-700" style="height: 240px;">
             {% if book.cover_url %}
             <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="w-full h-full object-cover">
@@ -67,30 +69,32 @@
                 </svg>
             </div>
             {% endif %}
-            <!-- Delete button overlay — only on own list -->
             {% if is_own_list %}
-            <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition">
-                <a href="{% url 'book_delete' book.pk %}"
-                    class="bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow">
+            <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition"
+                 onclick="event.preventDefault(); event.stopPropagation(); window.location='{% url 'book_delete' book.pk %}';">
+                <span class="bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow cursor-pointer">
                     &times;
-                </a>
+                </span>
             </div>
             {% endif %}
         </div>
-        <!-- Book Info -->
-        <div class="p-2 flex flex-col flex-1">
-            <p class="text-white font-semibold text-xs leading-tight line-clamp-2">{{ book.title }}</p>
-            {% if book.author %}
-            <p class="text-gray-400 text-xs mt-1 line-clamp-1">{{ book.author }}</p>
-            {% endif %}
-            <div class="mt-auto pt-2 flex flex-col text-xs text-gray-500 gap-0.5">
-                <span>{{ book.date_read|date:"M j, Y" }}</span>
-                {% if book.pages %}
-                <span>{{ book.pages }} pp</span>
+        <!-- Fixed footer: stars · pages · date -->
+        <div class="px-2 py-2 flex flex-col gap-0.5 text-xs text-gray-500">
+            <div class="flex gap-0.5">
+                {% for i in "12345" %}
+                {% if book.rating and forloop.counter <= book.rating %}
+                <span class="text-yellow-400">&#9733;</span>
+                {% else %}
+                <span class="text-gray-600">&#9733;</span>
                 {% endif %}
+                {% endfor %}
+            </div>
+            <div class="flex justify-between">
+                <span>{{ book.date_read|date:"M j, Y" }}</span>
+                {% if book.pages %}<span>{{ book.pages }} pp</span>{% endif %}
             </div>
         </div>
-    </div>
+    </a>
     {% endfor %}
 </div>
 {% else %}

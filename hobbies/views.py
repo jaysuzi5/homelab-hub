@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from datetime import date
 from .models import Book
 
@@ -14,7 +14,6 @@ User = get_user_model()
 
 @login_required
 def reading_list(request):
-    # Allow viewing another user's list via ?reader=username
     reader_name = request.GET.get('reader', '').strip()
     if reader_name:
         reader = get_object_or_404(User, username=reader_name)
@@ -27,7 +26,6 @@ def reading_list(request):
     current_year = date.today().year
     books_this_year = books.filter(date_read__year=current_year).count()
 
-    # Build list of other readers to link to
     other_readers = (
         User.objects
         .filter(books__isnull=False)
@@ -49,6 +47,21 @@ def reading_list(request):
 
 
 @login_required
+def book_detail(request, pk):
+    book = get_object_or_404(Book, pk=pk)
+    is_owner = book.user == request.user
+
+    if request.method == 'POST' and is_owner:
+        rating_raw = request.POST.get('rating', '').strip()
+        book.rating = int(rating_raw) if rating_raw.isdigit() and 0 <= int(rating_raw) <= 5 else None
+        book.comment = request.POST.get('comment', '').strip()
+        book.save(update_fields=['rating', 'comment'])
+        return redirect('reading_list')
+
+    return render(request, 'hobbies/book_detail.html', {'book': book, 'is_owner': is_owner, 'star_range': range(1, 6)})
+
+
+@login_required
 def book_add(request):
     if request.method == 'POST':
         date_read = request.POST.get('date_read')
@@ -57,8 +70,12 @@ def book_add(request):
         pages_raw = request.POST.get('pages', '').strip()
         cover_url = request.POST.get('cover_url', '').strip()
         open_library_key = request.POST.get('open_library_key', '').strip()
+        summary = request.POST.get('summary', '').strip()
 
         pages = int(pages_raw) if pages_raw.isdigit() else None
+        rating_raw = request.POST.get('rating', '').strip()
+        rating = int(rating_raw) if rating_raw.isdigit() and 0 <= int(rating_raw) <= 5 else None
+        comment = request.POST.get('comment', '').strip()
 
         Book.objects.create(
             user=request.user,
@@ -68,6 +85,9 @@ def book_add(request):
             pages=pages,
             cover_url=cover_url,
             open_library_key=open_library_key,
+            summary=summary,
+            rating=rating,
+            comment=comment,
         )
         return redirect('reading_list')
 
@@ -110,8 +130,30 @@ def book_search(request):
 
 
 @login_required
+@require_GET
+def book_works(request):
+    """Proxy Open Library Works API to fetch a book's description/summary."""
+    key = request.GET.get('key', '').strip()
+    if not key or not key.startswith('/works/'):
+        return JsonResponse({'summary': ''})
+
+    url = f"https://openlibrary.org{key}.json"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'HomeLab-Hub/1.0'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception:
+        return JsonResponse({'summary': ''})
+
+    description = data.get('description', '')
+    if isinstance(description, dict):
+        description = description.get('value', '')
+
+    return JsonResponse({'summary': description[:2000]})
+
+
+@login_required
 def book_delete(request, pk):
-    # Only allow deleting your own books
     book = get_object_or_404(Book, pk=pk, user=request.user)
 
     if request.method == 'POST':
