@@ -78,6 +78,27 @@
                 <input type="hidden" name="rating" id="rating-input" value="{{ book.rating|default:'' }}">
             </div>
 
+            <!-- Description / Summary -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Description</label>
+                <textarea name="summary" rows="5" placeholder="Book description or summary..."
+                    class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500 resize-none">{{ book.summary }}</textarea>
+            </div>
+
+            <!-- Cover Image URL -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Cover Image URL</label>
+                <div class="flex gap-3 items-start">
+                    <input type="url" name="cover_url" id="cover-url-input" value="{{ book.cover_url }}"
+                        placeholder="https://covers.openlibrary.org/b/id/…"
+                        class="flex-1 bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
+                        oninput="updateCoverPreview(this.value)">
+                    <img id="cover-preview" src="{{ book.cover_url }}" alt="Cover preview"
+                        class="w-16 rounded-lg shadow {% if not book.cover_url %}hidden{% endif %}"
+                        onerror="this.classList.add('hidden')">
+                </div>
+            </div>
+
             <!-- Comment -->
             <div>
                 <label class="block text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Your Notes</label>
@@ -101,6 +122,16 @@
 </div>
 
 <script>
+    function updateCoverPreview(url) {
+        const img = document.getElementById('cover-preview');
+        if (url) {
+            img.src = url;
+            img.classList.remove('hidden');
+        } else {
+            img.classList.add('hidden');
+        }
+    }
+
     function setRating(value) {
         document.getElementById('rating-input').value = value;
         document.querySelectorAll('.star-btn').forEach(btn => {

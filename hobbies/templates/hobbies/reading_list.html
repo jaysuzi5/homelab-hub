@@ -26,11 +26,30 @@
             {% endif %}
         </div>
     </div>
-    {% if is_own_list %}
-    <a href="{% url 'book_add' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
-        + Add Book
-    </a>
-    {% endif %}
+    <div class="flex items-center gap-3">
+        <!-- View toggle -->
+        <div class="flex rounded-lg overflow-hidden border border-gray-700">
+            <button id="btn-card" onclick="setView('card')"
+                class="px-3 py-2 text-sm transition" title="Card view">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+            </button>
+            <button id="btn-list" onclick="setView('list')"
+                class="px-3 py-2 text-sm transition border-l border-gray-700" title="List view">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        {% if is_own_list %}
+        <a href="{% url 'book_add' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+            + Add Book
+        </a>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Summary Stats -->
@@ -49,14 +68,14 @@
     </div>
 </div>
 
-<!-- Book Grid -->
 {% if books %}
-<div class="flex flex-wrap gap-4">
+
+<!-- ── CARD VIEW ── -->
+<div id="view-card" class="flex flex-wrap gap-4">
     {% for book in books %}
     <a href="{% url 'book_detail' book.pk %}"
        class="bg-gray-800 rounded-xl shadow hover:shadow-lg hover:ring-1 hover:ring-blue-500 transition group flex flex-col flex-shrink-0"
        style="width: 160px;">
-        <!-- Cover Image — fixed height -->
         <div class="relative rounded-t-xl overflow-hidden bg-gray-700" style="height: 240px;">
             {% if book.cover_url %}
             <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="w-full h-full object-cover">
@@ -78,7 +97,6 @@
             </div>
             {% endif %}
         </div>
-        <!-- Fixed footer: stars · pages · date -->
         <div class="px-2 py-2 flex flex-col gap-0.5 text-xs text-gray-500">
             <div class="flex gap-0.5">
                 {% for i in "12345" %}
@@ -97,6 +115,51 @@
     </a>
     {% endfor %}
 </div>
+
+<!-- ── LIST VIEW ── -->
+<div id="view-list" class="hidden bg-gray-800 rounded-2xl shadow overflow-hidden">
+    <table class="w-full text-left table-auto">
+        <thead>
+            <tr class="text-gray-400 text-sm border-b border-gray-700 bg-gray-900">
+                <th class="px-4 py-3">Date Read</th>
+                <th class="px-4 py-3">Title</th>
+                <th class="px-4 py-3">Author</th>
+                <th class="px-4 py-3 text-right">Pages</th>
+                <th class="px-4 py-3">Rating</th>
+                {% if is_own_list %}<th class="px-4 py-3"></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for book in books %}
+            <tr class="border-b border-gray-700 hover:bg-gray-700 transition cursor-pointer"
+                onclick="window.location='{% url 'book_detail' book.pk %}';">
+                <td class="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">{{ book.date_read|date:"M j, Y" }}</td>
+                <td class="px-4 py-3 text-sm text-white font-medium">{{ book.title }}</td>
+                <td class="px-4 py-3 text-sm text-gray-400">{{ book.author|default:"—" }}</td>
+                <td class="px-4 py-3 text-sm text-gray-400 text-right">{{ book.pages|default:"—" }}</td>
+                <td class="px-4 py-3">
+                    <div class="flex gap-0.5">
+                        {% for i in "12345" %}
+                        {% if book.rating and forloop.counter <= book.rating %}
+                        <span class="text-yellow-400 text-sm">&#9733;</span>
+                        {% else %}
+                        <span class="text-gray-600 text-sm">&#9733;</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </td>
+                {% if is_own_list %}
+                <td class="px-4 py-3 text-right"
+                    onclick="event.stopPropagation();">
+                    <a href="{% url 'book_delete' book.pk %}" class="text-red-400 hover:text-red-300 text-xs">Delete</a>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
 {% else %}
 <div class="bg-gray-800 rounded-2xl shadow p-12 text-center text-gray-400">
     <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,5 +173,35 @@
     {% endif %}
 </div>
 {% endif %}
+
+<script>
+    function setView(mode) {
+        const cardView = document.getElementById('view-card');
+        const listView = document.getElementById('view-list');
+        const btnCard  = document.getElementById('btn-card');
+        const btnList  = document.getElementById('btn-list');
+
+        if (mode === 'card') {
+            cardView && cardView.classList.remove('hidden');
+            listView && listView.classList.add('hidden');
+            btnCard.classList.add('bg-gray-700', 'text-white');
+            btnCard.classList.remove('text-gray-500');
+            btnList.classList.remove('bg-gray-700', 'text-white');
+            btnList.classList.add('text-gray-500');
+        } else {
+            listView && listView.classList.remove('hidden');
+            cardView && cardView.classList.add('hidden');
+            btnList.classList.add('bg-gray-700', 'text-white');
+            btnList.classList.remove('text-gray-500');
+            btnCard.classList.remove('bg-gray-700', 'text-white');
+            btnCard.classList.add('text-gray-500');
+        }
+        localStorage.setItem('readingView', mode);
+    }
+
+    // Restore saved preference
+    const saved = localStorage.getItem('readingView') || 'card';
+    setView(saved);
+</script>
 
 {% endblock %}

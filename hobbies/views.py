@@ -55,7 +55,9 @@ def book_detail(request, pk):
         rating_raw = request.POST.get('rating', '').strip()
         book.rating = int(rating_raw) if rating_raw.isdigit() and 0 <= int(rating_raw) <= 5 else None
         book.comment = request.POST.get('comment', '').strip()
-        book.save(update_fields=['rating', 'comment'])
+        book.summary = request.POST.get('summary', '').strip()
+        book.cover_url = request.POST.get('cover_url', '').strip()
+        book.save(update_fields=['rating', 'comment', 'summary', 'cover_url'])
         return redirect('reading_list')
 
     return render(request, 'hobbies/book_detail.html', {'book': book, 'is_owner': is_owner, 'star_range': range(1, 6)})
