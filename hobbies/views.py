@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from datetime import date
 from .models import Book
+from .utils import download_cover
 
 User = get_user_model()
 
@@ -56,8 +57,12 @@ def book_detail(request, pk):
         book.rating = int(rating_raw) if rating_raw.isdigit() and 0 <= int(rating_raw) <= 5 else None
         book.comment = request.POST.get('comment', '').strip()
         book.summary = request.POST.get('summary', '').strip()
-        book.cover_url = request.POST.get('cover_url', '').strip()
-        book.save(update_fields=['rating', 'comment', 'summary', 'cover_url'])
+        new_cover_url = request.POST.get('cover_url', '').strip()
+        update_fields = ['rating', 'comment', 'summary', 'cover_url', 'cover_local']
+        if new_cover_url != book.cover_url:
+            book.cover_url = new_cover_url
+            book.cover_local = download_cover(new_cover_url, book.pk) if new_cover_url else ''
+        book.save(update_fields=update_fields)
         return redirect('reading_list')
 
     return render(request, 'hobbies/book_detail.html', {'book': book, 'is_owner': is_owner, 'star_range': range(1, 6)})
@@ -79,7 +84,7 @@ def book_add(request):
         rating = int(rating_raw) if rating_raw.isdigit() and 0 <= int(rating_raw) <= 5 else None
         comment = request.POST.get('comment', '').strip()
 
-        Book.objects.create(
+        book = Book.objects.create(
             user=request.user,
             date_read=date_read,
             title=title,
@@ -91,6 +96,11 @@ def book_add(request):
             rating=rating,
             comment=comment,
         )
+        if cover_url:
+            local = download_cover(cover_url, book.pk)
+            if local:
+                book.cover_local = local
+                book.save(update_fields=['cover_local'])
         return redirect('reading_list')
 
     return render(request, 'hobbies/book_add.html', {'today': date.today().isoformat()})

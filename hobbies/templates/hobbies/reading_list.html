@@ -77,7 +77,9 @@
        class="bg-gray-800 rounded-xl shadow hover:shadow-lg hover:ring-1 hover:ring-blue-500 transition group flex flex-col flex-shrink-0"
        style="width: 160px;">
         <div class="relative rounded-t-xl overflow-hidden bg-gray-700" style="height: 240px;">
-            {% if book.cover_url %}
+            {% if book.cover_local %}
+            <img src="/media/{{ book.cover_local }}" alt="{{ book.title }}" class="w-full h-full object-cover">
+            {% elif book.cover_url %}
             <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="w-full h-full object-cover">
             {% else %}
             <div class="w-full h-full flex items-center justify-center text-gray-500">

@@ -12,7 +12,9 @@
         <div class="flex gap-6">
             <!-- Cover -->
             <div class="flex-shrink-0">
-                {% if book.cover_url %}
+                {% if book.cover_local %}
+                <img src="/media/{{ book.cover_local }}" alt="{{ book.title }}" class="w-36 rounded-xl shadow-lg">
+                {% elif book.cover_url %}
                 <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="w-36 rounded-xl shadow-lg">
                 {% else %}
                 <div class="w-36 h-52 bg-gray-700 rounded-xl flex items-center justify-center text-gray-500">
@@ -93,8 +95,10 @@
                         placeholder="https://covers.openlibrary.org/b/id/…"
                         class="flex-1 bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
                         oninput="updateCoverPreview(this.value)">
-                    <img id="cover-preview" src="{{ book.cover_url }}" alt="Cover preview"
-                        class="w-16 rounded-lg shadow {% if not book.cover_url %}hidden{% endif %}"
+                    <img id="cover-preview"
+                        src="{% if book.cover_local %}/media/{{ book.cover_local }}{% else %}{{ book.cover_url }}{% endif %}"
+                        alt="Cover preview"
+                        class="w-16 rounded-lg shadow {% if not book.cover_local and not book.cover_url %}hidden{% endif %}"
                         onerror="this.classList.add('hidden')">
                 </div>
             </div>

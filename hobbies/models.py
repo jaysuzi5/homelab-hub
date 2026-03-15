@@ -15,6 +15,8 @@ class Book(models.Model):
     author = models.CharField(max_length=500, blank=True)
     pages = models.IntegerField(null=True, blank=True)
     cover_url = models.URLField(max_length=500, blank=True)
+    cover_local = models.CharField(max_length=500, blank=True,
+                                   help_text="Relative path under MEDIA_ROOT to locally cached cover image")
     open_library_key = models.CharField(max_length=100, blank=True)
     summary = models.TextField(blank=True)
     rating = models.PositiveSmallIntegerField(null=True, blank=True)  # 0-5
