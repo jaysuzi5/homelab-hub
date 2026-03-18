@@ -11,3 +11,6 @@ wheels/
 .env
 
 LOCAL.md
+
+# Claude Code local settings (may contain secrets)
+.claude/settings.local.json

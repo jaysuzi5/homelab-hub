@@ -19,8 +19,11 @@ RUN uv pip install -r requirements.txt --system --no-cache-dir
 # Copy the Django project
 COPY . /app/
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Collect static files (dummy SECRET_KEY only used at build time for collectstatic)
+RUN SECRET_KEY=build-only-dummy-key DJANGO_DEBUG=False DJANGO_ALLOWED_HOSTS=* \
+    DB_NAME=x DB_USER=x DB_PASSWORD=x DB_HOST=localhost DB_PORT=5432 \
+    COST_PER_KWH=0 \
+    python manage.py collectstatic --noinput
 
 # Expose the port Gunicorn will run on
 EXPOSE 8000

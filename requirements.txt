@@ -38,6 +38,8 @@ durationpy==0.10
     # via kubernetes
 google-auth==2.40.3
     # via kubernetes
+gunicorn==25.1.0
+    # via homelab-hub (pyproject.toml)
 idna==3.10
     # via requests
 j-utilities-toolkit==0.0.2
@@ -51,7 +53,9 @@ oauthlib==3.3.1
     #   kubernetes
     #   requests-oauthlib
 packaging==25.0
-    # via deprecation
+    # via
+    #   deprecation
+    #   gunicorn
 psutil==7.1.0
     # via homelab-hub (pyproject.toml)
 psycopg2-binary==2.9.10
@@ -105,7 +109,5 @@ urllib3==2.5.0
     #   requests
 websocket-client==1.8.0
     # via kubernetes
-gunicorn==23.0.0
-    # adding for running on k8s
 whitenoise==6.11.0
-    # adding for running on k8s
+    # via homelab-hub (pyproject.toml)

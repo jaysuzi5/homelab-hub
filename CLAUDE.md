@@ -194,6 +194,48 @@ The retirement calculator uses Geometric Brownian Motion (GBM) for portfolio mod
 
 6. **Social Security Configuration:** Benefits are stored in database/env and referenced by claiming age (62, 65, 67, 70). The form has quick-select buttons for these ages.
 
+7. **Monthly PostgreSQL Password Reset (CNPG):** The `jcurtis` database user password is managed by the CloudNativePG (CNPG) operator, which periodically rotates it. The authoritative password is always in the CNPG-managed secret `postgresql-homelab-hub-app` in the `postgresql-homelab-hub` namespace — NOT in the `homelab-hub-secrets` secret. When the site throws `FATAL: password authentication failed for user "jcurtis"`, follow these steps:
+
+   **Step 1 — Get the current CNPG password:**
+   ```bash
+   kubectl get secret postgresql-homelab-hub-app -n postgresql-homelab-hub \
+     -o jsonpath='{.data.password}' | base64 -d && echo
+   ```
+
+   **Step 2 — Reset the PostgreSQL user password to match:**
+   ```bash
+   CNPG_PASS=$(kubectl get secret postgresql-homelab-hub-app -n postgresql-homelab-hub \
+     -o jsonpath='{.data.password}' | base64 -d)
+   kubectl exec -n postgresql-homelab-hub postgresql-homelab-hub-3 -- \
+     psql -U postgres -c "ALTER USER jcurtis WITH PASSWORD '$CNPG_PASS';"
+   ```
+   > If pod `-3` is no longer the primary, find the current primary first:
+   > ```bash
+   > for pod in postgresql-homelab-hub-1 postgresql-homelab-hub-2 postgresql-homelab-hub-3; do
+   >   result=$(kubectl exec -n postgresql-homelab-hub $pod -- psql -U postgres \
+   >     -c "SELECT pg_is_in_recovery();" 2>/dev/null | grep -E "^ t| f" | tr -d ' ')
+   >   echo "$pod: $result"
+   > done
+   > ```
+   > The pod with `recovery=f` is the primary.
+
+   **Step 3 — Update the homelab-hub K8s secret:**
+   ```bash
+   CNPG_PASS=$(kubectl get secret postgresql-homelab-hub-app -n postgresql-homelab-hub \
+     -o jsonpath='{.data.password}' | base64 -d)
+   DB_PASS_B64=$(echo -n "$CNPG_PASS" | base64)
+   kubectl patch secret homelab-hub-secrets -n homelab-hub --type='json' \
+     -p="[{\"op\": \"replace\", \"path\": \"/data/DB_PASSWORD\", \"value\": \"${DB_PASS_B64}\"}]"
+   ```
+
+   **Step 4 — Restart the deployment:**
+   ```bash
+   kubectl rollout restart deployment homelab-hub -n homelab-hub
+   kubectl rollout status deployment homelab-hub -n homelab-hub
+   ```
+
+   **Important:** Never manually `ALTER USER` to a hardcoded custom password — CNPG will detect the drift and rotate again immediately, causing a mismatch. Always sync to whatever the CNPG secret currently holds.
+
 ## File Navigation Reference
 
 - **Dashboard configuration:** `hub/settings.py` (INSTALLED_APPS, MIDDLEWARE, database)
