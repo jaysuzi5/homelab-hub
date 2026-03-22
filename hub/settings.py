@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "dashboard",
     'financial',
     'hobbies',
+    'health',
 ]
 
 

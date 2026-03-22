@@ -236,6 +236,28 @@ The retirement calculator uses Geometric Brownian Motion (GBM) for portfolio mod
 
    **Important:** Never manually `ALTER USER` to a hardcoded custom password — CNPG will detect the drift and rotate again immediately, causing a mismatch. Always sync to whatever the CNPG secret currently holds.
 
+8. **"This site can't be reached" after pod restarts/redeploys:** If the site becomes unreachable in Chrome after multiple pod restarts or CrashLoopBackOff cycles (but `curl http://homelab-hub.com/` from the terminal still returns HTTP 302), the issue is Chrome's socket pool caching a bad connection state from when the pod was unavailable. The server is fine — Chrome just needs to be reset.
+
+   **Diagnosis — confirm server is healthy:**
+   ```bash
+   curl -s -o /dev/null -w "HTTP %{http_code}" http://homelab-hub.com/
+   # Should return: HTTP 302
+   ```
+
+   **Fix — quit and reopen Chrome:**
+   ```bash
+   osascript -e 'quit app "Google Chrome"'
+   sleep 2
+   open -a "Google Chrome" "http://homelab-hub.com/"
+   ```
+
+   If quitting Chrome is not an option, clear its socket pool and DNS cache instead:
+   1. Go to `chrome://net-internals/#sockets` → click **Flush socket pools**
+   2. Go to `chrome://net-internals/#dns` → click **Clear host cache**
+   3. Reload `http://homelab-hub.com/`
+
+   **Root cause:** During CrashLoopBackOff or rapid rolling restarts, Chrome receives TCP resets from nginx. Chrome caches this failed connection state in its socket pool and won't retry until the pool is flushed or the browser is restarted. curl is unaffected because it creates a fresh connection each time.
+
 ## File Navigation Reference
 
 - **Dashboard configuration:** `hub/settings.py` (INSTALLED_APPS, MIDDLEWARE, database)

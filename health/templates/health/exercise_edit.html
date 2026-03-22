@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-lg mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-semibold">Edit Exercise Entry</h2>
+        <a href="{% url 'exercise' %}{% if week_str %}?week={{ week_str }}{% endif %}"
+            class="text-gray-400 hover:text-white text-sm">← Back</a>
+    </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="mb-4 text-sm text-red-400 bg-red-900/30 rounded-lg px-4 py-2">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-4">
+                <label class="block text-gray-400 text-sm mb-1">Date</label>
+                <input type="date" name="date" value="{{ entry.date|date:'Y-m-d' }}" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-400 text-sm mb-1">Time</label>
+                <input type="time" name="time" value="{{ entry.time|time:'H:i' }}" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-400 text-sm mb-1">Activity</label>
+                <select name="activity" id="activitySelect" onchange="updateDistanceLabel()" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {% for val, label in activity_choices %}
+                    <option value="{{ val }}" {% if entry.activity == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-400 text-sm mb-1">Duration (minutes)</label>
+                <input type="number" name="duration" min="1" max="999" value="{{ entry.duration }}" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-400 text-sm mb-1" id="distanceLabel">
+                    {% if entry.activity == 'swim' %}Distance (yards){% else %}Distance (miles){% endif %}
+                </label>
+                <input type="number" name="distance" id="distanceInput"
+                    step="{% if entry.activity == 'swim' %}1{% else %}0.1{% endif %}"
+                    min="0.1" value="{{ display_distance }}" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex gap-3">
+                <button type="submit"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition">
+                    Save Changes
+                </button>
+                <a href="{% url 'exercise' %}{% if week_str %}?week={{ week_str }}{% endif %}"
+                    class="flex-1 text-center bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 rounded-lg transition">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function updateDistanceLabel() {
+    const act = document.getElementById('activitySelect').value;
+    const label = document.getElementById('distanceLabel');
+    const input = document.getElementById('distanceInput');
+    if (act === 'swim') {
+        label.textContent = 'Distance (yards)';
+        input.step = '1';
+    } else {
+        label.textContent = 'Distance (miles)';
+        input.step = '0.1';
+    }
+}
+</script>
+{% endblock %}

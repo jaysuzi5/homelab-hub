@@ -56,6 +56,20 @@
                     <a href="{% url 'reading_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Reading List</a>
                 </div>
             </div>
+
+            <!-- Health Section with Children -->
+            <div class="menu-group">
+                <button onclick="toggleSubmenu('health-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
+                    <span>Health</span>
+                    <svg id="health-submenu-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="health-submenu" class="ml-4 mt-1 space-y-1 hidden">
+                    <a href="{% url 'weight_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Weight</a>
+                    <a href="{% url 'exercise' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Exercise</a>
+                </div>
+            </div>
         </nav>
     </aside>
 
@@ -81,6 +95,9 @@
             }
             if (currentPath.includes('/hobbies/')) {
                 toggleSubmenu('hobbies-submenu');
+            }
+            if (currentPath.includes('/health/')) {
+                toggleSubmenu('health-submenu');
             }
         });
     </script>

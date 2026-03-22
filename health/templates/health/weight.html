@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Weight Tracker</h2>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Current Weight</p>
+        {% if latest %}
+        <p class="text-4xl font-bold text-blue-400">{{ latest.weight }} <span class="text-xl">lbs</span></p>
+        <p class="text-gray-400 text-xs mt-2">as of {{ latest.date|date:"M d, Y" }}</p>
+        {% else %}
+        <p class="text-4xl font-bold text-white">—</p>
+        {% endif %}
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Lowest Recorded</p>
+        {% if lowest %}
+        <p class="text-4xl font-bold text-green-400">{{ lowest.weight }} <span class="text-xl">lbs</span></p>
+        <p class="text-gray-400 text-xs mt-2">{{ lowest.date|date:"M d, Y" }}</p>
+        {% else %}
+        <p class="text-4xl font-bold text-white">—</p>
+        {% endif %}
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Highest Recorded</p>
+        {% if highest %}
+        <p class="text-4xl font-bold text-red-400">{{ highest.weight }} <span class="text-xl">lbs</span></p>
+        <p class="text-gray-400 text-xs mt-2">{{ highest.date|date:"M d, Y" }}</p>
+        {% else %}
+        <p class="text-4xl font-bold text-white">—</p>
+        {% endif %}
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <p class="text-gray-400 text-sm">Total Entries</p>
+        <p class="text-4xl font-bold text-white">{{ total_entries }}</p>
+    </div>
+</div>
+
+<!-- Chart -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6" style="min-height: 22rem;">
+    <h3 class="text-xl font-bold mb-4">Weight Over Time</h3>
+    <div class="w-full h-72">
+        <canvas id="weightChart" class="w-full h-full"></canvas>
+    </div>
+</div>
+
+<!-- Add Entry Form + Table side by side on large screens -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Add Entry Form -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-xl font-bold mb-4">Log Weight</h3>
+        {% if messages %}
+        {% for message in messages %}
+        <div class="mb-3 text-sm text-red-400">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-4">
+                <label class="block text-gray-400 text-sm mb-1" for="date">Date</label>
+                <input type="date" id="date" name="date" value="{{ today }}" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-400 text-sm mb-1" for="weight">Weight (lbs)</label>
+                <input type="number" id="weight" name="weight" step="0.1" min="1" max="999" placeholder="e.g. 185.5" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button type="submit"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition">
+                Save Entry
+            </button>
+        </form>
+    </div>
+
+    <!-- Data Table -->
+    <div class="lg:col-span-2 bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-xl font-bold mb-4">All Records</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left table-auto">
+                <thead>
+                    <tr class="text-gray-300 text-sm border-b border-gray-700">
+                        <th class="px-4 py-2">Date</th>
+                        <th class="px-4 py-2 text-right">Weight (lbs)</th>
+                        <th class="px-4 py-2 text-right">Change</th>
+                        <th class="px-4 py-2 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in entries_with_change %}
+                    <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700">
+                        <td class="px-4 py-2">{{ row.entry.date|date:"M d, Y" }}</td>
+                        <td class="px-4 py-2 text-right font-semibold text-white">{{ row.entry.weight }}</td>
+                        <td class="px-4 py-2 text-right font-semibold
+                            {% if row.change is not None %}{% if row.change < 0 %}text-green-400{% elif row.change > 0 %}text-red-400{% else %}text-gray-400{% endif %}{% endif %}">
+                            {% if row.change is not None %}
+                                {% if row.change > 0 %}+{% endif %}{{ row.change|floatformat:1 }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2 text-center">
+                            <form method="post" action="{% url 'weight_delete' row.entry.pk %}" onsubmit="return confirm('Delete this entry?');" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="text-red-400 hover:underline text-sm">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr class="text-gray-400 text-sm">
+                        <td colspan="4" class="px-4 py-4 text-center">No entries yet. Log your first weight using the form.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const chartData = {{ chart_data|safe }};
+
+    if (chartData && chartData.length > 0) {
+        const ctx = document.getElementById('weightChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.map(d => d.date),
+                datasets: [{
+                    label: 'Weight (lbs)',
+                    data: chartData.map(d => d.weight),
+                    borderColor: 'rgba(59,130,246,1)',
+                    backgroundColor: 'rgba(59,130,246,0.15)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { color: 'white', font: { size: 11 } },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Weight (lbs)', color: 'white', font: { size: 13, weight: 'bold' } },
+                        ticks: { color: 'white', font: { size: 12 } },
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        beginAtZero: false,
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.parsed.y + ' lbs';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+
+{% endblock %}
