@@ -9,6 +9,7 @@ from django.views.decorators.http import require_GET, require_POST
 from datetime import date
 from .models import Book
 from .utils import download_cover
+from dashboard.services.darts import collect_dart_summary
 
 User = get_user_model()
 
@@ -162,6 +163,16 @@ def book_works(request):
         description = description.get('value', '')
 
     return JsonResponse({'summary': description[:2000]})
+
+
+@login_required
+def darts(request):
+    dart_avg_scores_501, dart_avg_scores_score_training = collect_dart_summary()
+    context = {
+        'dart_avg_scores_501': dart_avg_scores_501,
+        'dart_avg_scores_score_training': dart_avg_scores_score_training,
+    }
+    return render(request, 'hobbies/darts.html', context)
 
 
 @login_required

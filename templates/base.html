@@ -25,8 +25,19 @@
             <a href="{% url 'home' %}" class="hover:bg-gray-700 p-2 rounded">Dashboard</a>
             <a href="{% url 'k8s' %}" class="hover:bg-gray-700 p-2 rounded">Kubernetes</a>
             <a href="{% url 'networking' %}" class="hover:bg-gray-700 p-2 rounded">Networking</a>
-            <a href="{% url 'energy' %}" class="hover:bg-gray-700 p-2 rounded">Energy</a>
-            <a href="#" class="hover:bg-gray-700 p-2 rounded">Media</a>
+            <!-- Energy Section with Children -->
+            <div class="menu-group">
+                <button onclick="toggleSubmenu('energy-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
+                    <span>Energy</span>
+                    <svg id="energy-submenu-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="energy-submenu" class="ml-4 mt-1 space-y-1 hidden">
+                    <a href="{% url 'energy' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Overview</a>
+                    <a href="{% url 'electricity_usage_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Electricity Usage</a>
+                </div>
+            </div>
 
             <!-- Financial Section with Children -->
             <div class="menu-group">
@@ -40,7 +51,6 @@
                     <a href="{% url 'retirement_dashboard' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Retirement Calculator</a>
                     <a href="{% url 'portfolio_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Portfolio</a>
                     <a href="{% url 'networth_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Net Worth</a>
-                    <a href="{% url 'electricity_usage_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Electricity Usage</a>
                 </div>
             </div>
 
@@ -54,6 +64,7 @@
                 </button>
                 <div id="hobbies-submenu" class="ml-4 mt-1 space-y-1 hidden">
                     <a href="{% url 'reading_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Reading List</a>
+                    <a href="{% url 'darts' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Darts</a>
                 </div>
             </div>
 
@@ -90,6 +101,9 @@
         // Auto-expand submenus based on current page
         window.addEventListener('DOMContentLoaded', function() {
             const currentPath = window.location.pathname;
+            if (currentPath.includes('/energy/') || currentPath.includes('/electricity/')) {
+                toggleSubmenu('energy-submenu');
+            }
             if (currentPath.includes('/financial/')) {
                 toggleSubmenu('financial-submenu');
             }

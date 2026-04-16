@@ -453,13 +453,6 @@
     </div>
 
 
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition col-span-1 sm:col-span-2 lg:col-span-2" style="min-height: 24rem;">
-        <h3 class="text-xl font-bold mb-4">501 Single Out - Average 3 Dart Score</h3>
-        <div class="w-full h-72">
-            <canvas id="dartChart501" class="w-full h-full"></canvas>
-        </div>
-    </div>
-
     <!-- Emporia Daily Summary Table -->
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
         {% with emporia_daily_summary|first as first_item %}
@@ -493,13 +486,7 @@
     </div>
 
     
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition col-span-1 sm:col-span-2 lg:col-span-2" style="min-height: 24rem;">
-        <h3 class="text-xl font-bold mb-4">Score Training - Average 3 Dart Score</h3>
-        <div class="w-full h-72">
-            <canvas id="dartChartScoreTraining" class="h-50 relative"></canvas>
-        </div>
-    </div>
-      
+
 </div>
 
 
@@ -507,12 +494,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
 <script src="{% static 'dashboard/dashboard.js' %}"></script>
 <script>
-    const avgScores501 = {{ dart_avg_scores_501|safe }};
-    const avgScoreScoreTraining = {{ dart_avg_scores_score_training|safe }};
     const emporiaMetrics = {{ emporia_metrics|safe }};
     const enphaseMetrics = {{ enphase_metrics|safe }};
-    renderDartChart('dartChart501', avgScores501);
-    renderDartChart('dartChartScoreTraining', avgScoreScoreTraining);
     renderEmporiaUsageChart("emporiaUsageChart", emporiaMetrics);
     renderEnphaseChart("enphaseChart", enphaseMetrics);
 </script>

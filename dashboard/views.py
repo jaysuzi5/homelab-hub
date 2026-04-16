@@ -5,7 +5,6 @@ from django.shortcuts import render
 from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.decorators import login_required
 from dashboard.services.k8s import collect_k8s_metrics_summary, collect_k8s_metrics_detailed
-from dashboard.services.darts import collect_dart_summary
 from dashboard.services.synology import collect_synology_summary
 from dashboard.services.network import collect_network_summary, collect_network_monthly_summary
 from dashboard.services.emporia import collect_emporia_summary, collect_emporia_daily_summary, collect_emporia_monthly_summary, collect_emporia_monthly_category_summary
@@ -19,7 +18,6 @@ async def home(request):
     async def wrap(func):
         return func()  # call sync function inside small coroutine
     (
-        (dart_avg_scores_501, dart_avg_scores_score_training),
         (pods_status, nodes, total_pods, cluster_cpu, cluster_mem),
         synology_metrics,
         network_metrics,
@@ -29,7 +27,6 @@ async def home(request):
         splunk_summary,
         weather_summary,
     ) = await asyncio.gather(
-        wrap(collect_dart_summary),
         wrap(collect_k8s_metrics_summary),
         wrap(collect_synology_summary),
         wrap(collect_network_summary),
@@ -41,8 +38,6 @@ async def home(request):
     )
 
     context = {
-        "dart_avg_scores_501": dart_avg_scores_501,
-        "dart_avg_scores_score_training": dart_avg_scores_score_training,
         "pods": pods_status,
         "total_pods": total_pods,
         "nodes": nodes,
