@@ -11,6 +11,9 @@ from dashboard.services.emporia import collect_emporia_summary, collect_emporia_
 from dashboard.services.enphase import collect_enhase_summary
 from dashboard.services.splunk import splunk_collector_summary
 from dashboard.services.weather import collect_weather_summary
+from claude_usage.services import collect_claude_dashboard_summary
+from monitoring.services import collect_host_status
+from asgiref.sync import sync_to_async
 from datetime import datetime
 
 @login_required
@@ -26,6 +29,8 @@ async def home(request):
         enhase_summary,
         splunk_summary,
         weather_summary,
+        claude_summary,
+        host_status,
     ) = await asyncio.gather(
         wrap(collect_k8s_metrics_summary),
         wrap(collect_synology_summary),
@@ -35,6 +40,8 @@ async def home(request):
         wrap(collect_enhase_summary),
         wrap(splunk_collector_summary),
         wrap(collect_weather_summary),
+        sync_to_async(collect_claude_dashboard_summary)(),
+        sync_to_async(collect_host_status)(),
     )
 
     context = {
@@ -50,6 +57,8 @@ async def home(request):
         "emporia_daily_summary": emporia_daily_summary,
         "splunk_summary": splunk_summary,
         "weather_summary": weather_summary,
+        "claude_summary": claude_summary,
+        "host_status": host_status,
     }
     return render(request, "dashboard/home.html", context)
 

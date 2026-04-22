@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: homelab-hub-ping-hosts
+  namespace: homelab-hub
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ping-hosts
+              image: jaysuzi5/homelab-hub:latest
+              imagePullPolicy: Always
+              command: ["python", "manage.py", "ping_hosts"]
+              env:
+                - name: SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: homelab-hub-secrets
+                      key: SECRET_KEY
+                - name: DJANGO_DEBUG
+                  value: "False"
+                - name: DB_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: homelab-hub-secrets
+                      key: DB_NAME
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: homelab-hub-secrets
+                      key: DB_USER
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: homelab-hub-secrets
+                      key: DB_PASSWORD
+                - name: DB_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: homelab-hub-secrets
+                      key: DB_HOST
+                - name: DB_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: homelab-hub-secrets
+                      key: DB_PORT
+                - name: COST_PER_KWH
+                  value: "0"

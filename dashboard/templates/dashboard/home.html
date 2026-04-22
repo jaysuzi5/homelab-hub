@@ -3,7 +3,7 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
     <h2 class="text-3xl font-semibold">HomeLab Overview</h2>
-    
+
     {% if user.is_authenticated %}
         <div class="flex items-center space-x-4">
             <span class="text-gray-300">
@@ -19,7 +19,7 @@
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
     <!-- Kubernetes Overview Card -->
-    <div class="bg-gray-800 rounded-2xl shadow p-6 row-span-1 sm:row-span-2 lg:row-span-2">
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
         <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
             <span>Kubernetes Overview</span>
             <span class="text-lg text-gray-300 font-semibold">
@@ -41,7 +41,7 @@
                     <span class="text-gray-300 text-sm">Pending</span>
                 </div>
                 {% endif %}
-        
+
                 {% if pods.failed > 0 %}
                 <div class="bg-red-700 rounded p-2">
                     <span class="font-bold">{{ pods.failed }}</span><br>
@@ -104,7 +104,7 @@
     </div>
 
     <!-- Synology NAS Overview Card -->
-    <div class="bg-gray-800 rounded-2xl shadow p-6 row-span-1 sm:row-span-2 lg:row-span-2">
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
         <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
             <span>Synology NAS Overview</span>
             <span class="text-lg text-gray-300 font-semibold">
@@ -164,7 +164,7 @@
                     {% else %}
                     <span class="text-red-400 font-semibold">{{ vol.status }}</span>
                     {% endif %}
-                </td>                
+                </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -195,12 +195,12 @@
                     {% else %}
                     <span class="text-red-400 font-semibold">{{ disk.smart_status }}</span>
                     {% endif %}
-                </td>                
+                </td>
                 </tr>
                 {% endfor %}
             </tbody>
             </table>
-        </div>      
+        </div>
 
         <!--  Network Info and Uptime -->
         <div class="mt-4 flex gap-4 justify-around">
@@ -221,141 +221,130 @@
 
     </div>
 
-    <!-- Network Overview Card -->
-    <div class="bg-gray-800 rounded-2xl shadow p-6 row-span-1 sm:row-span-2 lg:row-span-2">
-        <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
-            <span>Network Overview</span>
-        </h3>
-
-        <!-- Devices / Metrics -->
-        <div class="mb-4">
-            <div class="grid grid-cols-4 gap-2 text-center">
-                <div class="rounded p-2 {% if network_metrics.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
-                    <span class="font-bold">
-                        {{ network_metrics.tcp_latency|floatformat:1 }} ms
-                    </span><br>
-                    <span class="text-gray-300 text-sm">TCP Latency</span>
-                </div>
-                <div class="rounded p-2 {% if network_metrics.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
-                    <span class="font-bold">
-                        {{ network_metrics.internet_ping|floatformat:1 }} ms
-                    </span><br>
-                    <span class="text-gray-300 text-sm">Ping</span>
-                </div>
-                <div class="rounded p-2 {% if network_metrics.internet_download < 250 %}bg-red-700{% else %}bg-green-700{% endif %}">
-                    <span class="font-bold">
-                        {{ network_metrics.internet_download|floatformat:1 }} Mbps
-                    </span><br>
-                    <span class="text-gray-300 text-sm">Download</span>
-                </div>
-                <div class="rounded p-2 {% if network_metrics.internet_upload < 20 %}bg-red-700{% else %}bg-green-700{% endif %}">
-                    <span class="font-bold">
-                        {{ network_metrics.internet_upload|floatformat:1 }} Mbps
-                    </span><br>
-                    <span class="text-gray-300 text-sm">Upload</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Status Grid -->
-        <div class="grid grid-cols-1 gap-4 text-sm text-gray-300 mb-4">
-            <div>
-                <span class="font-semibold text-gray-200">Online:</span>
-                {% if network_metrics.online %}
-                    <span class="text-green-400 font-semibold">✅ Yes</span>
-                {% else %}
-                    <span class="text-red-400 font-semibold">❌ No</span>
+    <!-- Claude Usage Card -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold">Claude Usage</h3>
+            <div class="flex items-center gap-3">
+                {% if claude_summary.session_pct is not None %}
+                <span class="text-sm font-semibold
+                    {% if claude_summary.session_pct >= 80 %}text-red-400
+                    {% elif claude_summary.session_pct >= 50 %}text-yellow-400
+                    {% else %}text-blue-400{% endif %}">
+                    {{ claude_summary.session_pct|floatformat:0 }}<span class="font-normal text-gray-400">% session</span>
+                </span>
                 {% endif %}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">Ethernet Link:</span>
-                {% if network_metrics.ethernet_link %}
-                    <span class="text-green-400 font-semibold">✅ Up</span>
-                {% else %}
-                    <span class="text-red-400 font-semibold">❌ Down</span>
-                {% endif %}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">LED Status:</span>
-                {{ network_metrics.led_status }}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">IP Method:</span>
-                {{ network_metrics.ip_method }}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">IP Address:</span>
-                {{ network_metrics.ip_address }}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">Local IP Address:</span>
-                {{ network_metrics.local_ip_address }}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">Gateway:</span>
-                {{ network_metrics.gateway }}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">DNS Servers:</span>
-                {{ network_metrics.dns_servers }}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">DNS Resolution:</span>
-                {{ network_metrics.dns }}
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">Lease Duration:</span>
-                {{ network_metrics.lease_days }}d {{ network_metrics.lease_hours }}h {{ network_metrics.lease_minutes }}m
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">Uptime:</span>
-                {{ network_metrics.uptime_days }}d {{ network_metrics.uptime_hours }}h {{ network_metrics.uptime_minutes }}m
-            </div>
-            <div>
-                <span class="font-semibold text-gray-200">Update Required:</span>
-                {% if network_metrics.update_required %}
-                    <span class="text-red-400 font-semibold">Yes</span>
-                {% else %}
-                    <span class="text-green-400 font-semibold">No</span>
+                {% if claude_summary.weekly_pct is not None %}
+                <span class="text-lg font-bold
+                    {% if claude_summary.weekly_pct >= 80 %}text-red-400
+                    {% elif claude_summary.weekly_pct >= 60 %}text-yellow-400
+                    {% else %}text-green-400{% endif %}">
+                    {{ claude_summary.weekly_pct|floatformat:0 }}<span class="text-sm font-normal text-gray-400">% weekly</span>
+                </span>
                 {% endif %}
             </div>
         </div>
+
+        <div class="flex items-baseline justify-between mb-2">
+            <p class="text-sm text-gray-400">Tool calls by day
+                <span class="text-gray-300 font-semibold ml-1">({{ claude_summary.total_7d }} total)</span>
+            </p>
+            <div class="text-right">
+                {% if claude_summary.weekly_resets_at %}
+                <p class="text-xs text-gray-500">
+                    Week resets {{ claude_summary.weekly_resets_at|date:"D M j" }}
+                    <span class="text-gray-400 font-semibold">({{ claude_summary.days_until_reset }}d)</span>
+                </p>
+                {% endif %}
+                {% if claude_summary.session_resets_at %}
+                <p class="text-xs text-gray-500">
+                    Session resets {{ claude_summary.session_resets_at|date:"g:i A" }} ET
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        <div style="position:relative;height:144px;" class="mb-6"><canvas id="claudeDayChart"></canvas></div>
+
+        <p class="text-sm text-gray-400 mb-2">By tool type</p>
+        <div id="claudeToolWrap" style="position:relative;height:320px;"><canvas id="claudeToolChart"></canvas></div>
+        <p id="claudeToolNone" class="hidden text-gray-500 text-sm">No tool breakdown — run <code class="text-blue-400">sync_local_counts</code> locally.</p>
     </div>
 
+    <!-- Network & Host Status Card -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+            <span>Network Overview</span>
+            {% if network_metrics.online %}
+                <span class="text-green-400 text-sm font-semibold">Online</span>
+            {% else %}
+                <span class="text-red-400 text-sm font-semibold">Offline</span>
+            {% endif %}
+        </h3>
 
-    <!-- Collector Job Summary Table -->
-    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
-        <h3 class="text-xl font-bold mb-4">Collector Job Summary: Last 24 hours</h3>
+        <!-- Internet metrics -->
+        <div class="grid grid-cols-4 gap-2 text-center mb-4">
+            <div class="rounded p-2 {% if network_metrics.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                <span class="font-bold">{{ network_metrics.tcp_latency|floatformat:1 }} ms</span><br>
+                <span class="text-gray-300 text-sm">TCP Latency</span>
+            </div>
+            <div class="rounded p-2 {% if network_metrics.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                <span class="font-bold">{{ network_metrics.internet_ping|floatformat:1 }} ms</span><br>
+                <span class="text-gray-300 text-sm">Ping</span>
+            </div>
+            <div class="rounded p-2 {% if network_metrics.internet_download < 250 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                <span class="font-bold">{{ network_metrics.internet_download|floatformat:1 }} Mbps</span><br>
+                <span class="text-gray-300 text-sm">Download</span>
+            </div>
+            <div class="rounded p-2 {% if network_metrics.internet_upload < 20 %}bg-red-700{% else %}bg-green-700{% endif %}">
+                <span class="font-bold">{{ network_metrics.internet_upload|floatformat:1 }} Mbps</span><br>
+                <span class="text-gray-300 text-sm">Upload</span>
+            </div>
+        </div>
+
+        <!-- Host status -->
+        <h4 class="text-md font-semibold text-gray-200 mb-2">Host Status</h4>
+        {% if host_status %}
         <div class="overflow-x-auto">
             <table class="w-full text-left table-auto">
                 <thead>
                     <tr class="text-gray-300 text-sm border-b border-gray-700">
-                        <th class="px-2 py-1">Component</th>
-                        <th class="px-2 py-1">Return Code</th>
-                        <th class="px-2 py-1 text-right">Count</th>
-                        <th class="px-2 py-1 text-right">Duration (s)</th>
-                        <th class="px-2 py-1">Last Run (EST)</th>
+                        <th class="px-2 py-1">Host</th>
+                        <th class="px-2 py-1">Address</th>
+                        <th class="px-2 py-1 text-center">Status</th>
+                        <th class="px-2 py-1 text-right">Latency</th>
+                        <th class="px-2 py-1 text-right">Last Check</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in splunk_summary %}
-                    <tr class="text-sm border-b border-gray-700">
-                        <td class="px-2 py-1 font-semibold text-gray-200">{{ item.component }}</td>
-                        <td class="px-2 py-1">
-                            {% if item.is_bad_return_code %}
-                                <span class="text-red-400 font-semibold">❌ {{ item.return_code }}</span>
+                    {% for h in host_status %}
+                    <tr class="text-gray-200 text-sm border-b border-gray-700">
+                        <td class="px-2 py-1 font-semibold">{{ h.name }}</td>
+                        <td class="px-2 py-1 text-gray-400">{{ h.address }}</td>
+                        <td class="px-2 py-1 text-center">
+                            {% if h.is_up is None %}
+                                <span class="text-gray-400">No data</span>
+                            {% elif h.is_up %}
+                                <span class="text-green-400 font-semibold">UP</span>
                             {% else %}
-                                <span class="text-green-400 font-semibold">✅ {{ item.return_code }}</span>
+                                <span class="text-red-400 font-semibold">DOWN</span>
                             {% endif %}
-                        </td>                        
-                    </td>
-                        <td class="px-2 py-1 text-right">{{ item.count }}</td>
-                        <td class="px-2 py-1 text-center">{{ item.duration }}</td>
-                        <td class="px-2 py-1">
-                            {% if item.is_stale %}
-                                <span class="text-red-400 font-semibold">❌ {{ item.last_run_est }}</span>
+                        </td>
+                        <td class="px-2 py-1 text-right">
+                            {% if h.latency_ms is not None %}
+                                <span class="{% if h.latency_ms > 50 %}text-yellow-400{% else %}text-gray-200{% endif %}">
+                                    {{ h.latency_ms|floatformat:1 }} ms
+                                </span>
                             {% else %}
-                                <span class="text-green-400 font-semibold">✅ {{ item.last_run_est }}</span>
+                                <span class="text-gray-500">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-2 py-1 text-right text-gray-400 text-xs">
+                            {% if h.checked_at %}
+                                {% if h.stale %}<span class="text-yellow-400">{% endif %}
+                                {{ h.checked_at|date:"H:i" }}
+                                {% if h.stale %}</span>{% endif %}
+                            {% else %}
+                                <span class="text-gray-500">—</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -363,86 +352,86 @@
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <p class="text-gray-400 text-sm">No hosts configured. Add hosts via Django admin under <span class="text-blue-400">Monitoring → Monitored Hosts</span>.</p>
+        {% endif %}
     </div>
-    
 
-            <!-- Weather Card -->
-            <div class="bg-gray-800 rounded-2xl shadow p-6">
-            
-            <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
-                <span>Weather Overview</span>
-                {% if weather_summary %}
-                    <span class="text-lg text-gray-300 font-semibold">
-                        {{ weather_summary.weather.collection_time|date:"M d, Y H:i" }}
-                    </span>
-                {% else %}
-                <span class="text-lg text-gray-300 font-semibold">
-                    There were no weather results found
-                </span>
-            {% endif %}
-            </h3>
-        
+        <!-- Weather Card -->
+        <div class="bg-gray-800 rounded-2xl shadow p-6">
+
+        <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+            <span>Weather Overview</span>
             {% if weather_summary %}
-                <!-- Current Weather -->
-                <div class="mb-6 grid grid-cols-3 gap-4 text-center">
-                    <div class="bg-blue-700 rounded p-4">
-                        <span class="block font-bold text-2xl">{{ weather_summary.weather.temperature }}°F</span>
-                        <span class="text-gray-300 text-sm">Current Temp</span>
-                    </div>
-                    <div class="bg-green-700 rounded p-4">
-                        <span class="block font-bold text-lg">{{ weather_summary.weather.temperature_min }}°F / {{ weather_summary.weather.temperature_max }}°F</span>
-                        <span class="text-gray-300 text-sm">Low / High</span>
-                    </div>
-                    <div class="bg-purple-700 rounded p-4">
-                        <span class="block font-bold text-lg">{{ weather_summary.weather.humidity }}%</span>
-                        <span class="text-gray-300 text-sm">Humidity</span>
-                    </div>
+                <span class="text-lg text-gray-300 font-semibold">
+                    {{ weather_summary.weather.collection_time|date:"M d, Y H:i" }}
+                </span>
+            {% else %}
+            <span class="text-lg text-gray-300 font-semibold">
+                There were no weather results found
+            </span>
+        {% endif %}
+        </h3>
+
+        {% if weather_summary %}
+            <!-- Current Weather -->
+            <div class="mb-6 grid grid-cols-3 gap-4 text-center">
+                <div class="bg-blue-700 rounded p-4">
+                    <span class="block font-bold text-2xl">{{ weather_summary.weather.temperature }}°F</span>
+                    <span class="text-gray-300 text-sm">Current Temp</span>
                 </div>
-            
-                <!-- Extra Weather Details -->
-                <div class="grid grid-cols-3 gap-4 text-center mb-6">
-                    <div class="bg-gray-700 rounded p-2">
-                        <span class="block font-bold">{{ weather_summary.weather.feels_like }}°F</span>
-                        <span class="text-gray-300 text-sm">Feels Like</span>
-                    </div>
-                    <div class="bg-gray-700 rounded p-2">
-                        <span class="block font-bold">{{ weather_summary.weather.wind_speed }} mph</span>
-                        <span class="text-gray-300 text-sm">Wind Speed</span>
-                    </div>
-                    <div class="bg-gray-700 rounded p-2">
-                        <span class="block font-bold">{{ weather_summary.weather.wind_direction }}°</span>
-                        <span class="text-gray-300 text-sm">Wind Dir</span>
-                    </div>
+                <div class="bg-green-700 rounded p-4">
+                    <span class="block font-bold text-lg">{{ weather_summary.weather.temperature_min }}°F / {{ weather_summary.weather.temperature_max }}°F</span>
+                    <span class="text-gray-300 text-sm">Low / High</span>
                 </div>
-            
-                <!-- Forecast Table -->
-                <h4 class="text-md font-semibold text-gray-200 mb-2">Forecast</h4>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left table-auto">
-                        <thead>
-                            <tr class="text-gray-300 text-sm border-b border-gray-700">
-                                <th class="px-2 py-1">Date</th>
-                                <th class="px-2 py-1 text-center">Temperature</th>
-                                <th class="px-2 py-1 text-center">Humidity</th>
-                                <th class="px-2 py-1">Description</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for f in weather_summary.forecast %}
-                            <tr class="text-gray-200 text-sm border-b border-gray-700">
-                                <td class="px-2 py-1">{{ f.forecast_date }}</td>
-                                <td class="px-2 py-1 text-center">{{ f.temperature_max }}°F</td>
-                                <td class="px-2 py-1 text-center">{{ f.humidity_max }}%</td>
-                                <td class="px-2 py-1 capitalize">{{ f.description }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="bg-purple-700 rounded p-4">
+                    <span class="block font-bold text-lg">{{ weather_summary.weather.humidity }}%</span>
+                    <span class="text-gray-300 text-sm">Humidity</span>
                 </div>
-            {% endif %}
-        </div>
-  
-    
+            </div>
+
+            <!-- Extra Weather Details -->
+            <div class="grid grid-cols-3 gap-4 text-center mb-6">
+                <div class="bg-gray-700 rounded p-2">
+                    <span class="block font-bold">{{ weather_summary.weather.feels_like }}°F</span>
+                    <span class="text-gray-300 text-sm">Feels Like</span>
+                </div>
+                <div class="bg-gray-700 rounded p-2">
+                    <span class="block font-bold">{{ weather_summary.weather.wind_speed }} mph</span>
+                    <span class="text-gray-300 text-sm">Wind Speed</span>
+                </div>
+                <div class="bg-gray-700 rounded p-2">
+                    <span class="block font-bold">{{ weather_summary.weather.wind_direction }}°</span>
+                    <span class="text-gray-300 text-sm">Wind Dir</span>
+                </div>
+            </div>
+
+            <!-- Forecast Table -->
+            <h4 class="text-md font-semibold text-gray-200 mb-2">Forecast</h4>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left table-auto">
+                    <thead>
+                        <tr class="text-gray-300 text-sm border-b border-gray-700">
+                            <th class="px-2 py-1">Date</th>
+                            <th class="px-2 py-1 text-center">Temperature</th>
+                            <th class="px-2 py-1 text-center">Humidity</th>
+                            <th class="px-2 py-1">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in weather_summary.forecast %}
+                        <tr class="text-gray-200 text-sm border-b border-gray-700">
+                            <td class="px-2 py-1">{{ f.forecast_date }}</td>
+                            <td class="px-2 py-1 text-center">{{ f.temperature_max }}°F</td>
+                            <td class="px-2 py-1 text-center">{{ f.humidity_max }}%</td>
+                            <td class="px-2 py-1 capitalize">{{ f.description }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
 
 
     <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition" style="min-height: 24rem;">
@@ -485,7 +474,47 @@
         </div>
     </div>
 
-    
+    <!-- Collector Job Summary Table -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+        <h3 class="text-xl font-bold mb-4">Collector Job Summary: Last 24 hours</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left table-auto">
+                <thead>
+                    <tr class="text-gray-300 text-sm border-b border-gray-700">
+                        <th class="px-2 py-1">Component</th>
+                        <th class="px-2 py-1">Return Code</th>
+                        <th class="px-2 py-1 text-right">Count</th>
+                        <th class="px-2 py-1 text-right">Duration (s)</th>
+                        <th class="px-2 py-1">Last Run (EST)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in splunk_summary %}
+                    <tr class="text-sm border-b border-gray-700">
+                        <td class="px-2 py-1 font-semibold text-gray-200">{{ item.component }}</td>
+                        <td class="px-2 py-1">
+                            {% if item.is_bad_return_code %}
+                                <span class="text-red-400 font-semibold">❌ {{ item.return_code }}</span>
+                            {% else %}
+                                <span class="text-green-400 font-semibold">✅ {{ item.return_code }}</span>
+                            {% endif %}
+                        </td>
+                    </td>
+                        <td class="px-2 py-1 text-right">{{ item.count }}</td>
+                        <td class="px-2 py-1 text-center">{{ item.duration }}</td>
+                        <td class="px-2 py-1">
+                            {% if item.is_stale %}
+                                <span class="text-red-400 font-semibold">❌ {{ item.last_run_est }}</span>
+                            {% else %}
+                                <span class="text-green-400 font-semibold">✅ {{ item.last_run_est }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
 </div>
 
@@ -500,9 +529,57 @@
     renderEnphaseChart("enphaseChart", enphaseMetrics);
 </script>
 <script>
+    new Chart(document.getElementById('claudeDayChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: {{ claude_summary.labels_json|safe }},
+            datasets: [{ label: 'Tool Calls', data: {{ claude_summary.counts_json|safe }},
+                backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 3 }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+            },
+            plugins: { legend: { display: false }, datalabels: { display: false } },
+        },
+    });
+
+    (function() {
+        const byTool = {{ claude_summary.by_tool_json|safe }};
+        const toolNames = Object.keys(byTool).sort((a, b) => byTool[b] - byTool[a]);
+        const COLORS = [
+            'rgba(139,92,246,0.8)','rgba(59,130,246,0.8)','rgba(16,185,129,0.8)',
+            'rgba(245,158,11,0.8)','rgba(239,68,68,0.8)','rgba(236,72,153,0.8)',
+            'rgba(20,184,166,0.8)','rgba(249,115,22,0.8)',
+        ];
+        if (toolNames.length === 0) {
+            document.getElementById('claudeToolWrap').classList.add('hidden');
+            document.getElementById('claudeToolNone').classList.remove('hidden');
+        } else {
+            new Chart(document.getElementById('claudeToolChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: toolNames,
+                    datasets: [{ data: toolNames.map(t => byTool[t]), backgroundColor: COLORS, borderRadius: 3 }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                        y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    },
+                    plugins: { legend: { display: false }, datalabels: { display: false } },
+                },
+            });
+        }
+    })();
+</script>
+<script>
     setInterval(function() {
       window.location.reload();
     }, 120000); // 120000 ms = 2 minutes
   </script>
 {% endblock %}
-

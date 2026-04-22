@@ -81,6 +81,21 @@
                     <a href="{% url 'exercise' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Exercise</a>
                 </div>
             </div>
+
+            <!-- Claude Usage Section with Children -->
+            <div class="menu-group">
+                <button onclick="toggleSubmenu('claude-usage-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
+                    <span>Claude Usage</span>
+                    <svg id="claude-usage-submenu-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="claude-usage-submenu" class="ml-4 mt-1 space-y-1 hidden">
+                    <a href="{% url 'claude_usage_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Overview</a>
+                    <a href="{% url 'claude_usage_history' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">History</a>
+                    <a href="{% url 'claude_usage_by_project' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">By Project</a>
+                </div>
+            </div>
         </nav>
     </aside>
 
@@ -112,6 +127,9 @@
             }
             if (currentPath.includes('/health/')) {
                 toggleSubmenu('health-submenu');
+            }
+            if (currentPath.includes('/claude-usage/')) {
+                toggleSubmenu('claude-usage-submenu');
             }
         });
     </script>

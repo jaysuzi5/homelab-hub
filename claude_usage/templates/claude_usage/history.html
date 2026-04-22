@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Usage History</h2>
+    <a href="{% url 'claude_usage_overview' %}" class="text-sm text-blue-400 hover:underline">← Overview</a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+<!-- ── Left Column: chart + calendar ─────────────────────────────────── -->
+<div class="lg:col-span-2 space-y-6">
+
+    <!-- Weekly Tool Call Bar Chart -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-1">Weekly Tool Calls — Trailing 8 Weeks</h3>
+        <p class="text-gray-500 text-xs mb-4">Click a bar to see the week breakdown.</p>
+        <div class="w-full h-56">
+            <canvas id="weeklyChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Drill-down panel (hidden until a bar is clicked) -->
+    <div id="drilldown" class="hidden bg-gray-800 rounded-2xl shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold">Week of <span id="drilldown-label" class="text-blue-400"></span></h3>
+            <button onclick="closeDrilldown()" class="text-gray-500 hover:text-gray-300 text-sm">&#x2715; Close</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <p class="text-sm text-gray-400 mb-2">Tool calls by day</p>
+                <div class="h-44"><canvas id="drillDayChart"></canvas></div>
+            </div>
+            <div>
+                <p class="text-sm text-gray-400 mb-2">By tool type</p>
+                <div id="drillToolWrap" class="h-44"><canvas id="drillToolChart"></canvas></div>
+                <p id="drillToolNone" class="hidden text-gray-500 text-sm pt-4">No tool breakdown yet — run <code class="text-blue-400">sync_local_counts</code> locally.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Calendar -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-1">Activity Calendar</h3>
+        <p class="text-gray-400 text-xs mb-4">Click any day to see its tool breakdown. Tracked since Track A hooks were enabled.</p>
+
+        {% if heatmap_months %}
+        <div class="overflow-x-auto pb-2">
+            <div class="flex gap-6" style="min-width: max-content;">
+                {% for month in heatmap_months %}
+                <div class="flex-shrink-0">
+                    <p class="text-xs text-gray-400 mb-1 font-medium">{{ month.label }}</p>
+                    <!-- Day-of-week headers: horizontal -->
+                    <div class="grid grid-cols-7 gap-1 mb-1">
+                        <div class="w-5 h-4 text-gray-600 text-xs text-center leading-4">M</div>
+                        <div class="w-5 h-4 text-gray-600 text-xs text-center leading-4">T</div>
+                        <div class="w-5 h-4 text-gray-600 text-xs text-center leading-4">W</div>
+                        <div class="w-5 h-4 text-gray-600 text-xs text-center leading-4">T</div>
+                        <div class="w-5 h-4 text-gray-600 text-xs text-center leading-4">F</div>
+                        <div class="w-5 h-4 text-gray-600 text-xs text-center leading-4">S</div>
+                        <div class="w-5 h-4 text-gray-600 text-xs text-center leading-4">S</div>
+                    </div>
+                    <!-- Weeks as rows -->
+                    {% for week in month.weeks %}
+                    <div class="grid grid-cols-7 gap-1 mb-1">
+                        {% for cell in week %}
+                        {% if cell %}
+                        <div class="w-5 h-5 rounded-sm cursor-pointer
+                            {% if cell.intensity == 0 %}bg-gray-700 hover:bg-gray-600
+                            {% elif cell.intensity == 1 %}bg-purple-950 hover:bg-purple-900
+                            {% elif cell.intensity == 2 %}bg-purple-700 hover:bg-purple-600
+                            {% elif cell.intensity == 3 %}bg-purple-500 hover:bg-purple-400
+                            {% else %}bg-purple-300 hover:bg-purple-200{% endif %}"
+                            onclick="showDayDetail('{{ cell.date }}', {{ cell.count }})"
+                            title="{{ cell.date }}: {{ cell.count }} tool calls">
+                        </div>
+                        {% else %}
+                        <div class="w-5 h-5"></div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex items-center gap-2 mt-3">
+            <span class="text-gray-500 text-xs">Less</span>
+            <div class="w-4 h-4 rounded-sm bg-gray-700"></div>
+            <div class="w-4 h-4 rounded-sm bg-purple-950"></div>
+            <div class="w-4 h-4 rounded-sm bg-purple-700"></div>
+            <div class="w-4 h-4 rounded-sm bg-purple-500"></div>
+            <div class="w-4 h-4 rounded-sm bg-purple-300"></div>
+            <span class="text-gray-500 text-xs">More (peak: {{ max_tools }} tool calls)</span>
+        </div>
+        {% else %}
+        <div class="text-gray-500 text-sm py-8 text-center">No data yet. Tool call tracking starts after the PostToolUse hook fires.</div>
+        {% endif %}
+    </div>
+
+</div><!-- end left column -->
+
+<!-- ── Right Column: day detail + tool glossary ───────────────────────── -->
+<div class="lg:col-span-1 space-y-6">
+
+    <!-- Day Detail card -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-1">Day Detail</h3>
+        <p id="detail-date" class="text-blue-400 text-sm mb-1">{{ today_str }}</p>
+        <p id="detail-count" class="text-2xl font-bold text-purple-400 mb-4">{{ today_count }} tool calls</p>
+        <div id="detail-breakdown" class="space-y-4"></div>
+        <p id="detail-no-data" class="hidden text-gray-500 text-sm text-center pt-4">
+            No tool breakdown for this day.<br>
+            <span class="text-xs">Run <code class="text-blue-400">sync_local_counts</code> locally to populate.</span>
+        </p>
+    </div>
+
+    <!-- Tool Glossary card -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-3">Tool Glossary</h3>
+        <div class="space-y-3 text-sm">
+
+            <div>
+                <p class="font-semibold text-purple-400">File Operations</p>
+                <dl class="mt-1 space-y-1">
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Read</dt>
+                        <dd class="text-gray-400 text-xs">Reads a file from the filesystem. Used to inspect code, configs, or any text file.</dd>
+                    </div>
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Edit</dt>
+                        <dd class="text-gray-400 text-xs">Makes a precise string replacement inside an existing file. Preferred over Write for partial changes.</dd>
+                    </div>
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Write</dt>
+                        <dd class="text-gray-400 text-xs">Creates a new file or completely overwrites an existing one.</dd>
+                    </div>
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Glob</dt>
+                        <dd class="text-gray-400 text-xs">Finds files by name pattern (e.g. <code class="text-gray-300">**/*.py</code>). Returns paths sorted by modification time.</dd>
+                    </div>
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Grep</dt>
+                        <dd class="text-gray-400 text-xs">Searches file contents using regex (ripgrep). Used to find symbols, strings, or patterns across the codebase.</dd>
+                    </div>
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Notebook<br>Edit</dt>
+                        <dd class="text-gray-400 text-xs">Edits cells in a Jupyter notebook (.ipynb file).</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div>
+                <p class="font-semibold text-blue-400">Execution</p>
+                <dl class="mt-1 space-y-1">
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Bash</dt>
+                        <dd class="text-gray-400 text-xs">Runs a shell command. Used for builds, tests, git, package managers, and anything CLI.</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div>
+                <p class="font-semibold text-green-400">Research</p>
+                <dl class="mt-1 space-y-1">
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Web<br>Fetch</dt>
+                        <dd class="text-gray-400 text-xs">Fetches and reads a web page or URL content.</dd>
+                    </div>
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Web<br>Search</dt>
+                        <dd class="text-gray-400 text-xs">Performs a web search and returns results.</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div>
+                <p class="font-semibold text-yellow-400">Agents &amp; Tasks</p>
+                <dl class="mt-1 space-y-1">
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Agent</dt>
+                        <dd class="text-gray-400 text-xs">Spawns a sub-agent (Explore, Plan, general-purpose, etc.) to handle a task in an isolated context.</dd>
+                    </div>
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Todo<br>Write</dt>
+                        <dd class="text-gray-400 text-xs">Manages the session task checklist — creates, updates, or completes to-do items.</dd>
+                    </div>
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">Task<br>Create</dt>
+                        <dd class="text-gray-400 text-xs">Creates a tracked task. Part of the extended task-management tool family (TaskGet, TaskUpdate, TaskStop, etc.).</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div>
+                <p class="font-semibold text-pink-400">MCP Servers</p>
+                <dl class="mt-1">
+                    <div class="flex gap-2">
+                        <dt class="w-10 flex-shrink-0 font-mono text-xs text-gray-300 pt-0.5">mcp__*</dt>
+                        <dd class="text-gray-400 text-xs">Calls a tool on an MCP (Model Context Protocol) server. The suffix identifies the server and tool, e.g. <code class="text-gray-300">mcp__ide__getDiagnostics</code>.</dd>
+                    </div>
+                </dl>
+            </div>
+
+        </div>
+    </div>
+
+</div><!-- end right column -->
+
+</div><!-- end grid -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const weeklyData = {{ weekly_chart_json|safe }};
+const drilldownData = {{ drilldown_json|safe }};
+const dailyToolsData = {{ daily_tools_json|safe }};
+const todayStr = "{{ today_str }}";
+
+const COLORS = [
+    'rgba(139,92,246,0.8)','rgba(59,130,246,0.8)','rgba(16,185,129,0.8)',
+    'rgba(245,158,11,0.8)','rgba(239,68,68,0.8)','rgba(236,72,153,0.8)',
+    'rgba(20,184,166,0.8)','rgba(249,115,22,0.8)',
+];
+
+// ── Weekly bar chart ──────────────────────────────────────────────────
+const weeklyCtx = document.getElementById('weeklyChart').getContext('2d');
+const weeklyChart = new Chart(weeklyCtx, {
+    type: 'bar',
+    data: {
+        labels: weeklyData.labels,
+        datasets: [{
+            label: 'Tool Calls',
+            data: weeklyData.tools,
+            backgroundColor: weeklyData.tools.map(() => 'rgba(139,92,246,0.7)'),
+            borderRadius: 4,
+        }],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        onClick(evt, elements) {
+            if (elements.length > 0) openDrilldown(elements[0].index);
+        },
+        scales: {
+            x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} tool calls` } },
+        },
+    },
+});
+
+weeklyChart.options.onHover = (evt, elements) => {
+    evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+};
+
+// ── Weekly drill-down ─────────────────────────────────────────────────
+let dayChart = null;
+let toolChart = null;
+
+function openDrilldown(weekIdx, scroll = true) {
+    const label = weeklyData.labels[weekIdx];
+    const weekStart = weeklyData.week_starts[weekIdx];
+    document.getElementById('drilldown-label').textContent = label;
+    document.getElementById('drilldown').classList.remove('hidden');
+
+    weeklyChart.data.datasets[0].backgroundColor = weeklyData.tools.map((_, i) =>
+        i === weekIdx ? 'rgba(139,92,246,1)' : 'rgba(139,92,246,0.4)'
+    );
+    weeklyChart.update();
+
+    const dd = drilldownData[weekIdx] || {};
+    const byDay = dd.by_day || {};
+    const byTool = dd.by_tool || {};
+
+    const dayLabels = [];
+    const dayCounts = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + i);
+        const ds = d.toISOString().slice(0, 10);
+        const dow = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i];
+        dayLabels.push(dow + ' ' + ds.slice(5));
+        dayCounts.push(byDay[ds] || 0);
+    }
+
+    if (dayChart) dayChart.destroy();
+    dayChart = new Chart(document.getElementById('drillDayChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: dayLabels,
+            datasets: [{ label: 'Tool Calls', data: dayCounts, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 3 }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+            },
+            plugins: { legend: { display: false } },
+        },
+    });
+
+    const toolNames = Object.keys(byTool).sort((a, b) => byTool[b] - byTool[a]);
+    const toolCounts = toolNames.map(t => byTool[t]);
+    if (toolChart) toolChart.destroy();
+
+    if (toolNames.length === 0) {
+        document.getElementById('drillToolWrap').classList.add('hidden');
+        document.getElementById('drillToolNone').classList.remove('hidden');
+    } else {
+        document.getElementById('drillToolWrap').classList.remove('hidden');
+        document.getElementById('drillToolNone').classList.add('hidden');
+        toolChart = new Chart(document.getElementById('drillToolChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: toolNames,
+                datasets: [{ data: toolCounts, backgroundColor: COLORS, borderRadius: 3 }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                    y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                },
+                plugins: { legend: { display: false } },
+            },
+        });
+    }
+
+    if (scroll) document.getElementById('drilldown').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeDrilldown() {
+    document.getElementById('drilldown').classList.add('hidden');
+    weeklyChart.data.datasets[0].backgroundColor = weeklyData.tools.map(() => 'rgba(139,92,246,0.7)');
+    weeklyChart.update();
+    if (dayChart) { dayChart.destroy(); dayChart = null; }
+    if (toolChart) { toolChart.destroy(); toolChart = null; }
+}
+
+// ── Day detail panel ──────────────────────────────────────────────────
+const DETAIL_CATEGORIES = [
+    {
+        name: 'File Operations',
+        textColor: 'text-purple-400',
+        barColor: 'bg-purple-500',
+        tools: ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit'],
+    },
+    {
+        name: 'Execution',
+        textColor: 'text-blue-400',
+        barColor: 'bg-blue-500',
+        tools: ['Bash'],
+    },
+    {
+        name: 'Research',
+        textColor: 'text-green-400',
+        barColor: 'bg-green-500',
+        tools: ['WebFetch', 'WebSearch'],
+    },
+    {
+        name: 'Agents & Tasks',
+        textColor: 'text-yellow-400',
+        barColor: 'bg-yellow-500',
+        tools: ['Agent', 'TodoWrite', 'TaskCreate', 'TaskGet', 'TaskUpdate', 'TaskStop', 'TaskList', 'TaskOutput', 'AskUserQuestion', 'Skill'],
+    },
+    {
+        name: 'MCP Servers',
+        textColor: 'text-pink-400',
+        barColor: 'bg-pink-500',
+        tools: [],  // catch-all for anything not matched above
+    },
+];
+
+function showDayDetail(dateStr, count) {
+    const detail = dailyToolsData[dateStr] || { count: count, by_tool: {} };
+    const actualCount = detail.count || count;
+
+    document.getElementById('detail-date').textContent = dateStr;
+    document.getElementById('detail-count').textContent = actualCount + ' tool calls';
+
+    const byTool = detail.by_tool || {};
+    const maxCount = Math.max(...Object.values(byTool), 1);
+    const seenTools = new Set();
+    let html = '';
+
+    for (const cat of DETAIL_CATEGORIES) {
+        let entries = [];
+
+        if (cat.tools.length === 0) {
+            // MCP catch-all: any tool not already categorised
+            for (const [tool, cnt] of Object.entries(byTool)) {
+                if (!seenTools.has(tool)) entries.push([tool, cnt]);
+            }
+        } else {
+            for (const tool of cat.tools) {
+                if (byTool[tool] !== undefined) {
+                    entries.push([tool, byTool[tool]]);
+                    seenTools.add(tool);
+                }
+            }
+        }
+
+        if (entries.length === 0) continue;
+
+        entries.sort((a, b) => b[1] - a[1]);
+        html += `<div>
+            <p class="text-xs font-semibold ${cat.textColor} mb-1.5">${cat.name}</p>
+            <div class="space-y-1.5">`;
+        for (const [tool, cnt] of entries) {
+            const pct = Math.round(cnt / maxCount * 100);
+            html += `<div class="flex items-center gap-2">
+                <span class="w-20 text-xs text-gray-300 truncate flex-shrink-0">${tool}</span>
+                <div class="flex-1 bg-gray-700 rounded-full h-1.5">
+                    <div class="${cat.barColor} h-1.5 rounded-full" style="width:${pct}%"></div>
+                </div>
+                <span class="w-5 text-xs text-gray-400 text-right flex-shrink-0">${cnt}</span>
+            </div>`;
+        }
+        html += `</div></div>`;
+    }
+
+    const breakdown = document.getElementById('detail-breakdown');
+    const noData = document.getElementById('detail-no-data');
+    if (html) {
+        breakdown.innerHTML = html;
+        noData.classList.add('hidden');
+    } else {
+        breakdown.innerHTML = '';
+        noData.classList.remove('hidden');
+    }
+}
+
+// Initialize right panel with today
+showDayDetail(todayStr, {{ today_count }});
+
+// Auto-open current week (last index) without scrolling
+openDrilldown(weeklyData.week_starts.length - 1, false);
+</script>
+
+{% endblock %}

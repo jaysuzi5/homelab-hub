@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Claude Usage</h2>
+    {% if snapshot %}
+    <span class="text-sm text-gray-400">Live data as of {{ snapshot.fetched_at|date:"M d, g:i A" }} ET</span>
+    {% endif %}
+</div>
+
+{% if snapshot %}
+<!-- ── Live Plan Usage (from claude.ai API) ─────────────────────────── -->
+<h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Live Plan Usage</h3>
+
+<!-- Alert banner based on real weekly % -->
+{% if snapshot.weekly_pct >= 80 %}
+<div class="mb-4 bg-red-900 border border-red-600 rounded-2xl px-6 py-3 text-red-200 text-sm">
+    <span class="font-bold text-red-400">Limit Warning:</span>
+    Weekly usage is at {{ snapshot.weekly_pct|floatformat:0 }}% of your Pro plan limit.
+    {% if snapshot.weekly_resets_at %}Resets {{ snapshot.weekly_resets_at|date:"D M d \\a\\t g:i A" }} ET.{% endif %}
+</div>
+{% elif snapshot.weekly_pct >= 60 %}
+<div class="mb-4 bg-yellow-900 border border-yellow-600 rounded-2xl px-6 py-3 text-yellow-200 text-sm">
+    <span class="font-bold text-yellow-400">Heads up:</span>
+    Weekly usage is at {{ snapshot.weekly_pct|floatformat:0 }}% of your Pro plan limit.
+</div>
+{% endif %}
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+
+    <!-- Weekly Usage -->
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-xs mb-1">Weekly Usage</p>
+        <p class="text-3xl font-bold
+            {% if snapshot.weekly_pct >= 80 %}text-red-400
+            {% elif snapshot.weekly_pct >= 60 %}text-yellow-400
+            {% else %}text-green-400{% endif %}">
+            {{ snapshot.weekly_pct|floatformat:0 }}<span class="text-lg">%</span>
+        </p>
+        <div class="mt-2 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+            <div class="h-full rounded-full
+                {% if snapshot.weekly_pct >= 80 %}bg-red-500
+                {% elif snapshot.weekly_pct >= 60 %}bg-yellow-500
+                {% else %}bg-green-500{% endif %}"
+                style="width: {{ snapshot.weekly_pct|floatformat:0 }}%"></div>
+        </div>
+        {% if snapshot.weekly_resets_at %}
+        <p class="text-gray-500 text-xs mt-2">Resets {{ snapshot.weekly_resets_at|date:"D M d" }}</p>
+        {% endif %}
+    </div>
+
+    <!-- Current Session -->
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-xs mb-1">Current Session</p>
+        {% if snapshot.session_pct %}
+        <p class="text-3xl font-bold
+            {% if snapshot.session_pct >= 80 %}text-red-400
+            {% elif snapshot.session_pct >= 50 %}text-yellow-400
+            {% else %}text-blue-400{% endif %}">
+            {{ snapshot.session_pct|floatformat:0 }}<span class="text-lg">%</span>
+        </p>
+        <div class="mt-2 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+            <div class="h-full bg-blue-500 rounded-full"
+                style="width: {{ snapshot.session_pct|floatformat:0 }}%"></div>
+        </div>
+        {% if snapshot.session_resets_at %}
+        <p class="text-gray-500 text-xs mt-2">Resets {{ snapshot.session_resets_at|date:"g:i A" }} ET</p>
+        {% endif %}
+        {% else %}
+        <p class="text-3xl font-bold text-gray-500">—</p>
+        <p class="text-gray-500 text-xs mt-2">no active session limit</p>
+        {% endif %}
+    </div>
+
+    <!-- Weekly Resets In -->
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-xs mb-1">Week Resets</p>
+        {% if snapshot.weekly_resets_at %}
+        <p class="text-xl font-bold text-gray-200">{{ snapshot.weekly_resets_at|date:"D M d" }}</p>
+        <p class="text-gray-500 text-xs mt-1">{{ snapshot.weekly_resets_at|date:"g:i A" }} ET</p>
+        {% else %}
+        <p class="text-xl font-bold text-gray-500">—</p>
+        {% endif %}
+    </div>
+
+    <!-- Extra Usage -->
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-xs mb-1">Extra Usage</p>
+        {% if snapshot.extra_usage_enabled %}
+        <p class="text-xl font-bold text-green-400">On</p>
+        <p class="text-gray-500 text-xs mt-1">${{ snapshot.extra_usage_credits_used|floatformat:2 }} used</p>
+        {% else %}
+        <p class="text-xl font-bold text-gray-500">Off</p>
+        {% endif %}
+    </div>
+</div>
+
+{% else %}
+<div class="mb-6 bg-gray-800 rounded-2xl p-6 text-gray-400 text-sm">
+    No live snapshot yet. Run <code class="text-blue-400">sync_web_usage</code> to fetch current plan usage.
+</div>
+{% endif %}
+
+<!-- ── Tool Call Activity ─────────────────────────────────────────────── -->
+<h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3 mt-2">Tool Call Activity</h3>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+
+    <!-- This Week -->
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-xs mb-1">This Week</p>
+        <p class="text-2xl font-bold
+            {% if prediction.alert_level == 'red' %}text-red-400
+            {% elif prediction.alert_level == 'yellow' %}text-yellow-400
+            {% else %}text-blue-400{% endif %}">
+            {{ prediction.tool_calls_this_week }}
+        </p>
+        <p class="text-gray-500 text-xs mt-1">tool calls</p>
+    </div>
+
+    <!-- Today's Pace -->
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-xs mb-1">Today's Pace</p>
+        <p class="text-2xl font-bold text-blue-400">{{ prediction.projected_today_tools }}</p>
+        <p class="text-gray-500 text-xs mt-1">proj. tool calls today</p>
+        <p class="text-gray-500 text-xs mt-1">{{ prediction.today_tools }} so far</p>
+    </div>
+
+    <!-- Days to Reset -->
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-xs mb-1">Week Resets In</p>
+        <p class="text-2xl font-bold text-gray-200">{{ days_until_reset|default:"—" }}</p>
+        <p class="text-gray-500 text-xs mt-1">day(s)</p>
+    </div>
+
+    <!-- API Equiv Cost -->
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-xs mb-1">API Equiv (ref)</p>
+        <p class="text-2xl font-bold text-purple-400">${{ weekly_cost }}</p>
+        <p class="text-gray-500 text-xs mt-1">this week, est.</p>
+        <p class="text-gray-500 text-xs mt-1">not actual billing</p>
+    </div>
+</div>
+
+<!-- Trailing 14 days + Today cards -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+    <!-- Trailing 14 days (2/3 width) -->
+    <div class="lg:col-span-2 bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-4">Trailing 14 Days <span class="text-blue-400 font-normal text-sm">{{ trailing_start_str }} – {{ trailing_end_str }}</span></h3>
+        <div class="mb-6">
+            <p class="text-sm text-gray-400 mb-2">Tool calls by day</p>
+            <div class="h-44"><canvas id="weekDayChart"></canvas></div>
+        </div>
+        <div>
+            <p class="text-sm text-gray-400 mb-2">By tool type</p>
+            <div id="weekToolWrap" class="h-44"><canvas id="weekToolChart"></canvas></div>
+            <p id="weekToolNone" class="hidden text-gray-500 text-sm pt-4">No tool breakdown yet — run <code class="text-blue-400">sync_local_counts</code> locally.</p>
+        </div>
+    </div>
+
+    <!-- Today (1/3 width) -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-1">Today</h3>
+        <p class="text-blue-400 text-sm mb-1">{{ today_str }}</p>
+        <p class="text-2xl font-bold text-purple-400 mb-4">{{ today_count }} tool calls</p>
+        <div id="today-breakdown" class="space-y-4"></div>
+        <p id="today-no-data" class="hidden text-gray-500 text-sm text-center pt-4">
+            No tool breakdown for today.<br>
+            <span class="text-xs">Run <code class="text-blue-400">sync_local_counts</code> locally to populate.</span>
+        </p>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const weekDayLabels = {{ week_day_labels_json|safe }};
+const weekDayCounts = {{ week_day_counts_json|safe }};
+const weekByTool = {{ week_by_tool_json|safe }};
+const todayByTool = {{ today_by_tool_json|safe }};
+
+const COLORS = [
+    'rgba(139,92,246,0.8)','rgba(59,130,246,0.8)','rgba(16,185,129,0.8)',
+    'rgba(245,158,11,0.8)','rgba(239,68,68,0.8)','rgba(236,72,153,0.8)',
+    'rgba(20,184,166,0.8)','rgba(249,115,22,0.8)',
+];
+
+// ── Week by-day chart ─────────────────────────────────────────────────
+new Chart(document.getElementById('weekDayChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: weekDayLabels,
+        datasets: [{ label: 'Tool Calls', data: weekDayCounts, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 3 }],
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+            x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+        },
+        plugins: { legend: { display: false } },
+    },
+});
+
+// ── Week by-tool chart ────────────────────────────────────────────────
+const toolNames = Object.keys(weekByTool).sort((a, b) => weekByTool[b] - weekByTool[a]);
+const toolCounts = toolNames.map(t => weekByTool[t]);
+
+if (toolNames.length === 0) {
+    document.getElementById('weekToolWrap').classList.add('hidden');
+    document.getElementById('weekToolNone').classList.remove('hidden');
+} else {
+    new Chart(document.getElementById('weekToolChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: toolNames,
+            datasets: [{ data: toolCounts, backgroundColor: COLORS, borderRadius: 3 }],
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            },
+            plugins: { legend: { display: false } },
+        },
+    });
+}
+
+// ── Today breakdown ───────────────────────────────────────────────────
+const DETAIL_CATEGORIES = [
+    { name: 'File Operations', textColor: 'text-purple-400', barColor: 'bg-purple-500',
+      tools: ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit'] },
+    { name: 'Execution', textColor: 'text-blue-400', barColor: 'bg-blue-500', tools: ['Bash'] },
+    { name: 'Research', textColor: 'text-green-400', barColor: 'bg-green-500', tools: ['WebFetch', 'WebSearch'] },
+    { name: 'Agents & Tasks', textColor: 'text-yellow-400', barColor: 'bg-yellow-500',
+      tools: ['Agent', 'TodoWrite', 'TaskCreate', 'TaskGet', 'TaskUpdate', 'TaskStop', 'TaskList', 'TaskOutput', 'AskUserQuestion', 'Skill'] },
+    { name: 'MCP Servers', textColor: 'text-pink-400', barColor: 'bg-pink-500', tools: [] },
+];
+
+const maxToday = Math.max(...Object.values(todayByTool), 1);
+const seenTools = new Set();
+let html = '';
+
+for (const cat of DETAIL_CATEGORIES) {
+    let entries = [];
+    if (cat.tools.length === 0) {
+        for (const [tool, cnt] of Object.entries(todayByTool)) {
+            if (!seenTools.has(tool)) entries.push([tool, cnt]);
+        }
+    } else {
+        for (const tool of cat.tools) {
+            if (todayByTool[tool] !== undefined) {
+                entries.push([tool, todayByTool[tool]]);
+                seenTools.add(tool);
+            }
+        }
+    }
+    if (entries.length === 0) continue;
+    entries.sort((a, b) => b[1] - a[1]);
+    html += `<div>
+        <p class="text-xs font-semibold ${cat.textColor} mb-1.5">${cat.name}</p>
+        <div class="space-y-1.5">`;
+    for (const [tool, cnt] of entries) {
+        const pct = Math.round(cnt / maxToday * 100);
+        html += `<div class="flex items-center gap-2">
+            <span class="w-20 text-xs text-gray-300 truncate flex-shrink-0">${tool}</span>
+            <div class="flex-1 bg-gray-700 rounded-full h-1.5">
+                <div class="${cat.barColor} h-1.5 rounded-full" style="width:${pct}%"></div>
+            </div>
+            <span class="w-5 text-xs text-gray-400 text-right flex-shrink-0">${cnt}</span>
+        </div>`;
+    }
+    html += `</div></div>`;
+}
+
+const breakdown = document.getElementById('today-breakdown');
+const noData = document.getElementById('today-no-data');
+if (html) {
+    breakdown.innerHTML = html;
+    noData.classList.add('hidden');
+} else {
+    breakdown.innerHTML = '';
+    noData.classList.remove('hidden');
+}
+</script>
+
+{% endblock %}
