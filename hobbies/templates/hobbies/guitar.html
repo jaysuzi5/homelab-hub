@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Guitar Tracker</h2>
+    <a href="{% url 'guitar_history' %}" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition">
+        Full History →
+    </a>
+</div>
+
+{% if messages %}
+{% for message in messages %}
+<div class="mb-4 text-sm text-red-400 bg-red-900/30 rounded-lg px-4 py-2">{{ message }}</div>
+{% endfor %}
+{% endif %}
+
+<!-- Log Form -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">Log Session</h3>
+    <form method="post">
+        {% csrf_token %}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div>
+                <label class="block text-gray-400 text-sm mb-1">Date</label>
+                <input type="date" name="date" value="{{ today }}" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-400 text-sm mb-1">Time</label>
+                <input type="time" name="time" value="{{ now_time }}" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-400 text-sm mb-1">Category</label>
+                <select name="category" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {% for val, label in category_choices %}
+                    <option value="{{ val }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-gray-400 text-sm mb-1">Duration (min)</label>
+                <input type="number" name="duration" min="1" max="999" placeholder="e.g. 30" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+        <div class="mb-4">
+            <label class="block text-gray-400 text-sm mb-1">Description <span class="text-gray-500">(optional)</span></label>
+            <input type="text" name="description" maxlength="500" placeholder="e.g. Worked on fingerpicking pattern in E minor"
+                class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="mb-4">
+            <label class="block text-gray-400 text-sm mb-2">Skills <span class="text-gray-500">(optional)</span></label>
+            <div class="flex flex-wrap gap-4">
+                {% for field, label in skill_fields %}
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="{{ field }}"
+                        class="w-4 h-4 rounded accent-blue-500">
+                    <span class="text-gray-200 text-sm">{{ label }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        <button type="submit"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition">
+            Save Session
+        </button>
+    </form>
+</div>
+
+<!-- Today's Sessions -->
+{% if today_sessions %}
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <h3 class="text-lg font-bold mb-3 text-green-400">
+        Today
+        <span class="text-gray-400 text-sm font-normal ml-2">{{ today_total_fmt }} total</span>
+    </h3>
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="text-gray-400 border-b border-gray-700">
+                <th class="text-left py-1">Time</th>
+                <th class="text-left py-1">Category</th>
+                <th class="text-right py-1">Duration</th>
+                <th class="text-left py-1 pl-4">Skills</th>
+                <th class="text-left py-1 pl-4">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in today_sessions %}
+            <tr class="border-b border-gray-700/50 text-gray-200">
+                <td class="py-1">{{ s.time|time:"g:i A" }}</td>
+                <td class="py-1">{{ s.get_category_display }}</td>
+                <td class="py-1 text-right">{{ s.duration }} min</td>
+                <td class="py-1 pl-4 text-gray-400 text-xs">
+                    {% for label in s.skill_labels %}
+                    <span class="inline-block bg-gray-700 rounded px-1 mr-1">{{ label }}</span>
+                    {% endfor %}
+                </td>
+                <td class="py-1 pl-4 text-gray-400">{{ s.description }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- This Week / Last Week -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-3 text-blue-400">This Week
+            <span class="text-gray-400 text-sm font-normal">{{ current_week_label }}</span>
+        </h3>
+        {% if this_week.total %}
+        <p class="text-2xl font-bold text-white mb-3">{{ this_week.total_fmt }}</p>
+        <table class="w-full text-sm">
+            <tbody>
+                {% for cat in this_week.by_category %}
+                <tr class="border-b border-gray-700/50">
+                    <td class="py-1 text-gray-300">{{ cat.label }}</td>
+                    <td class="py-1 text-right text-white">{{ cat.fmt }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-gray-400 text-sm">No sessions logged this week.</p>
+        {% endif %}
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-3 text-purple-400">Last Week
+            <span class="text-gray-400 text-sm font-normal">{{ past_week_label }}</span>
+        </h3>
+        {% if last_week.total %}
+        <p class="text-2xl font-bold text-white mb-3">{{ last_week.total_fmt }}</p>
+        <table class="w-full text-sm">
+            <tbody>
+                {% for cat in last_week.by_category %}
+                <tr class="border-b border-gray-700/50">
+                    <td class="py-1 text-gray-300">{{ cat.label }}</td>
+                    <td class="py-1 text-right text-white">{{ cat.fmt }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-gray-400 text-sm">No sessions logged last week.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- All-Time Totals -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-3">All-Time by Category
+            <span class="text-gray-400 text-sm font-normal ml-2">{{ total_all_fmt }} total</span>
+        </h3>
+        {% if by_category %}
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-gray-400 border-b border-gray-700">
+                    <th class="text-left py-1">Category</th>
+                    <th class="text-right py-1">Sessions</th>
+                    <th class="text-right py-1">Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in by_category %}
+                <tr class="border-b border-gray-700/50">
+                    <td class="py-1 text-gray-200">{{ cat.label }}</td>
+                    <td class="py-1 text-right text-gray-400">{{ cat.count }}</td>
+                    <td class="py-1 text-right text-white font-semibold">{{ cat.fmt }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-gray-400 text-sm">No sessions yet.</p>
+        {% endif %}
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-lg font-bold mb-3">All-Time by Skill</h3>
+        {% if by_skill %}
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-gray-400 border-b border-gray-700">
+                    <th class="text-left py-1">Skill</th>
+                    <th class="text-right py-1">Sessions</th>
+                    <th class="text-right py-1">Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sk in by_skill %}
+                <tr class="border-b border-gray-700/50">
+                    <td class="py-1 text-gray-200">{{ sk.label }}</td>
+                    <td class="py-1 text-right text-gray-400">{{ sk.count }}</td>
+                    <td class="py-1 text-right text-white font-semibold">{{ sk.fmt }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-gray-400 text-sm">No skill data yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-6" style="min-height: 22rem;">
+        <h3 class="text-lg font-bold mb-4">Minutes per Day <span class="text-gray-400 text-sm font-normal">(last 14 days)</span></h3>
+        <div class="w-full h-64">
+            <canvas id="dailyChart"></canvas>
+        </div>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6" style="min-height: 22rem;">
+        <h3 class="text-lg font-bold mb-4">Minutes per Week <span class="text-gray-400 text-sm font-normal">(last 26 weeks)</span></h3>
+        <div class="w-full h-64">
+            <canvas id="weeklyChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const CHART_DEFAULTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+        x: {
+            ticks: { color: '#9ca3af', font: { size: 11 } },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+        },
+        y: {
+            beginAtZero: true,
+            ticks: { color: '#9ca3af', font: { size: 11 } },
+            grid: { color: 'rgba(255,255,255,0.08)' },
+            title: { display: true, text: 'Minutes', color: '#9ca3af', font: { size: 11 } },
+        },
+    },
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            callbacks: {
+                label: ctx => ctx.parsed.y + ' min',
+            },
+        },
+    },
+};
+
+const dailyData = {{ daily_chart|safe }};
+new Chart(document.getElementById('dailyChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: dailyData.map(d => d.label),
+        datasets: [{
+            data: dailyData.map(d => d.minutes),
+            backgroundColor: dailyData.map(d => d.minutes > 0 ? 'rgba(59,130,246,0.7)' : 'rgba(75,85,99,0.3)'),
+            borderRadius: 4,
+        }],
+    },
+    options: CHART_DEFAULTS,
+});
+
+const weeklyData = {{ weekly_chart|safe }};
+new Chart(document.getElementById('weeklyChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: weeklyData.map(d => d.label),
+        datasets: [{
+            data: weeklyData.map(d => d.minutes),
+            backgroundColor: weeklyData.map(d => d.minutes > 0 ? 'rgba(139,92,246,0.7)' : 'rgba(75,85,99,0.3)'),
+            borderRadius: 4,
+        }],
+    },
+    options: CHART_DEFAULTS,
+});
+</script>
+
+{% endblock %}

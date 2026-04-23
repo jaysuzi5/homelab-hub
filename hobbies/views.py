@@ -1,15 +1,57 @@
 import urllib.request
 import urllib.parse
 import json
+from datetime import date, timedelta
 from django.contrib.auth import get_user_model
+from django.contrib import messages
+from django.db.models import Sum
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET, require_POST
-from datetime import date
-from .models import Book
+from django.views.decorators.http import require_GET
+from .models import Book, GuitarSession, GUITAR_CATEGORY_CHOICES, GUITAR_SKILL_FIELDS
 from .utils import download_cover
 from dashboard.services.darts import collect_dart_summary
+
+
+def _fmt_duration(minutes):
+    if not minutes:
+        return '—'
+    h, m = divmod(int(minutes), 60)
+    return f"{h}h {m:02d}m" if h else f"{m}m"
+
+
+def _week_start(d):
+    return d - timedelta(days=d.weekday())
+
+
+def _week_label(ws):
+    return f"{ws.strftime('%b %d')} – {(ws + timedelta(days=6)).strftime('%b %d, %Y')}"
+
+
+def _week_summary(user, ws):
+    we = ws + timedelta(days=6)
+    qs = GuitarSession.objects.filter(user=user, date__gte=ws, date__lte=we)
+    total = qs.aggregate(t=Sum('duration'))['t'] or 0
+    by_cat = []
+    for val, label in GUITAR_CATEGORY_CHOICES:
+        mins = qs.filter(category=val).aggregate(t=Sum('duration'))['t'] or 0
+        if mins:
+            by_cat.append({'label': label, 'minutes': mins, 'fmt': _fmt_duration(mins)})
+    return {'total': total, 'total_fmt': _fmt_duration(total), 'by_category': by_cat}
+
+
+def _parse_session_post(request):
+    entry_date = request.POST.get('date', '').strip()
+    entry_time = request.POST.get('time', '').strip()
+    category = request.POST.get('category', '').strip()
+    duration_raw = request.POST.get('duration', '').strip()
+    description = request.POST.get('description', '').strip()
+    skills = {field: field in request.POST for field, _ in GUITAR_SKILL_FIELDS}
+    duration = int(duration_raw)
+    if duration <= 0:
+        raise ValueError
+    return entry_date, entry_time, category, duration, description, skills
 
 User = get_user_model()
 
@@ -173,6 +215,153 @@ def darts(request):
         'dart_avg_scores_score_training': dart_avg_scores_score_training,
     }
     return render(request, 'hobbies/darts.html', context)
+
+
+@login_required
+def guitar(request):
+    today = date.today()
+
+    if request.method == 'POST':
+        try:
+            d, t, cat, dur, desc, skills = _parse_session_post(request)
+            GuitarSession.objects.create(
+                user=request.user, date=d, time=t, category=cat,
+                duration=dur, description=desc, **skills,
+            )
+        except (ValueError, TypeError):
+            messages.error(request, 'Please check your inputs and try again.')
+        return redirect('guitar')
+
+    current_ws = _week_start(today)
+    past_ws = current_ws - timedelta(weeks=1)
+
+    all_qs = GuitarSession.objects.filter(user=request.user)
+    total_all = all_qs.aggregate(t=Sum('duration'))['t'] or 0
+
+    by_category = []
+    for val, label in GUITAR_CATEGORY_CHOICES:
+        mins = all_qs.filter(category=val).aggregate(t=Sum('duration'))['t'] or 0
+        count = all_qs.filter(category=val).count()
+        if count:
+            by_category.append({'label': label, 'minutes': mins, 'fmt': _fmt_duration(mins), 'count': count})
+
+    by_skill = []
+    for field, label in GUITAR_SKILL_FIELDS:
+        mins = all_qs.filter(**{field: True}).aggregate(t=Sum('duration'))['t'] or 0
+        count = all_qs.filter(**{field: True}).count()
+        if count:
+            by_skill.append({'label': label, 'minutes': mins, 'fmt': _fmt_duration(mins), 'count': count})
+
+    today_sessions = all_qs.filter(date=today)
+    today_total = today_sessions.aggregate(t=Sum('duration'))['t'] or 0
+
+    # Daily chart — last 14 days (2 queries total for both charts)
+    day_start = today - timedelta(days=13)
+    week_start_26 = current_ws - timedelta(weeks=25)
+
+    range_qs = (
+        GuitarSession.objects
+        .filter(user=request.user, date__gte=week_start_26)
+        .values('date')
+        .annotate(total=Sum('duration'))
+    )
+    date_totals = {row['date']: row['total'] for row in range_qs}
+
+    daily_chart = json.dumps([
+        {'label': (today - timedelta(days=13 - i)).strftime('%b %d'),
+         'minutes': date_totals.get(today - timedelta(days=13 - i), 0)}
+        for i in range(14)
+    ])
+
+    weekly_dict = {}
+    for d, mins in date_totals.items():
+        ws = _week_start(d)
+        weekly_dict[ws] = weekly_dict.get(ws, 0) + mins
+
+    weekly_chart = json.dumps([
+        {'label': (current_ws - timedelta(weeks=25 - i)).strftime('%b %d'),
+         'minutes': weekly_dict.get(current_ws - timedelta(weeks=25 - i), 0)}
+        for i in range(26)
+    ])
+
+    return render(request, 'hobbies/guitar.html', {
+        'today': today.isoformat(),
+        'now_time': today.strftime('%H:%M'),
+        'category_choices': GUITAR_CATEGORY_CHOICES,
+        'skill_fields': GUITAR_SKILL_FIELDS,
+        'today_sessions': today_sessions,
+        'today_total_fmt': _fmt_duration(today_total),
+        'this_week': _week_summary(request.user, current_ws),
+        'last_week': _week_summary(request.user, past_ws),
+        'current_week_label': _week_label(current_ws),
+        'past_week_label': _week_label(past_ws),
+        'total_all_fmt': _fmt_duration(total_all),
+        'by_category': by_category,
+        'by_skill': by_skill,
+        'daily_chart': daily_chart,
+        'weekly_chart': weekly_chart,
+    })
+
+
+@login_required
+def guitar_history(request):
+    selected_category = request.GET.get('category', '')
+    selected_skill = request.GET.get('skill', '')
+
+    qs = GuitarSession.objects.filter(user=request.user)
+    if selected_category:
+        qs = qs.filter(category=selected_category)
+    if selected_skill and any(selected_skill == f for f, _ in GUITAR_SKILL_FIELDS):
+        qs = qs.filter(**{selected_skill: True})
+
+    total_mins = qs.aggregate(t=Sum('duration'))['t'] or 0
+
+    return render(request, 'hobbies/guitar_history.html', {
+        'sessions': qs,
+        'category_choices': GUITAR_CATEGORY_CHOICES,
+        'skill_fields': GUITAR_SKILL_FIELDS,
+        'selected_category': selected_category,
+        'selected_skill': selected_skill,
+        'total_fmt': _fmt_duration(total_mins),
+        'total_count': qs.count(),
+    })
+
+
+@login_required
+def guitar_edit(request, pk):
+    entry = get_object_or_404(GuitarSession, pk=pk, user=request.user)
+
+    if request.method == 'POST':
+        try:
+            d, t, cat, dur, desc, skills = _parse_session_post(request)
+            entry.date = d
+            entry.time = t
+            entry.category = cat
+            entry.duration = dur
+            entry.description = desc
+            for field, checked in skills.items():
+                setattr(entry, field, checked)
+            entry.save()
+            return redirect('guitar_history')
+        except (ValueError, TypeError):
+            messages.error(request, 'Please check your inputs and try again.')
+
+    skill_fields_with_state = [
+        (field, label, getattr(entry, field)) for field, label in GUITAR_SKILL_FIELDS
+    ]
+    return render(request, 'hobbies/guitar_edit.html', {
+        'entry': entry,
+        'category_choices': GUITAR_CATEGORY_CHOICES,
+        'skill_fields_with_state': skill_fields_with_state,
+    })
+
+
+@login_required
+def guitar_delete(request, pk):
+    entry = get_object_or_404(GuitarSession, pk=pk, user=request.user)
+    if request.method == 'POST':
+        entry.delete()
+    return redirect('guitar_history')
 
 
 @login_required
