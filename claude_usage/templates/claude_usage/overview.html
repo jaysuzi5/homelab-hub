@@ -181,11 +181,32 @@ const weekDayCounts = {{ week_day_counts_json|safe }};
 const weekByTool = {{ week_by_tool_json|safe }};
 const todayByTool = {{ today_by_tool_json|safe }};
 
-const COLORS = [
-    'rgba(139,92,246,0.8)','rgba(59,130,246,0.8)','rgba(16,185,129,0.8)',
-    'rgba(245,158,11,0.8)','rgba(239,68,68,0.8)','rgba(236,72,153,0.8)',
-    'rgba(20,184,166,0.8)','rgba(249,115,22,0.8)',
+const CATEGORY_DEFS = [
+    { name: 'File Operations', color: 'rgba(139,92,246,0.8)', tools: ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit'] },
+    { name: 'Execution',       color: 'rgba(59,130,246,0.8)',  tools: ['Bash'] },
+    { name: 'Research',        color: 'rgba(16,185,129,0.8)',  tools: ['WebFetch', 'WebSearch'] },
+    { name: 'Agents & Tasks',  color: 'rgba(245,158,11,0.8)',  tools: ['Agent', 'TodoWrite', 'TaskCreate', 'TaskGet', 'TaskUpdate', 'TaskStop', 'TaskList', 'TaskOutput', 'AskUserQuestion', 'Skill'] },
+    { name: 'MCP Servers',     color: 'rgba(236,72,153,0.8)',  tools: [] },
 ];
+
+function aggregateByCategory(byTool) {
+    const seen = new Set();
+    const result = [];
+    for (const cat of CATEGORY_DEFS) {
+        let total = 0;
+        if (cat.tools.length > 0) {
+            for (const tool of cat.tools) {
+                if (byTool[tool]) { total += byTool[tool]; seen.add(tool); }
+            }
+        } else {
+            for (const [tool, cnt] of Object.entries(byTool)) {
+                if (!seen.has(tool)) total += cnt;
+            }
+        }
+        if (total > 0) result.push({ name: cat.name, color: cat.color, count: total });
+    }
+    return result;
+}
 
 // ── Week by-day chart ─────────────────────────────────────────────────
 new Chart(document.getElementById('weekDayChart').getContext('2d'), {
@@ -204,26 +225,25 @@ new Chart(document.getElementById('weekDayChart').getContext('2d'), {
     },
 });
 
-// ── Week by-tool chart ────────────────────────────────────────────────
-const toolNames = Object.keys(weekByTool).sort((a, b) => weekByTool[b] - weekByTool[a]);
-const toolCounts = toolNames.map(t => weekByTool[t]);
+// ── Week by-tool chart (grouped by category) ─────────────────────────
+const weekCategories = aggregateByCategory(weekByTool);
 
-if (toolNames.length === 0) {
+if (weekCategories.length === 0) {
     document.getElementById('weekToolWrap').classList.add('hidden');
     document.getElementById('weekToolNone').classList.remove('hidden');
 } else {
     new Chart(document.getElementById('weekToolChart').getContext('2d'), {
         type: 'bar',
         data: {
-            labels: toolNames,
-            datasets: [{ data: toolCounts, backgroundColor: COLORS, borderRadius: 3 }],
+            labels: weekCategories.map(c => c.name),
+            datasets: [{ data: weekCategories.map(c => c.count), backgroundColor: weekCategories.map(c => c.color), borderRadius: 3 }],
         },
         options: {
             indexAxis: 'y',
             responsive: true, maintainAspectRatio: false,
             scales: {
                 x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
-                y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#9ca3af', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
             },
             plugins: { legend: { display: false } },
         },
@@ -267,11 +287,11 @@ for (const cat of DETAIL_CATEGORIES) {
     for (const [tool, cnt] of entries) {
         const pct = Math.round(cnt / maxToday * 100);
         html += `<div class="flex items-center gap-2">
-            <span class="w-20 text-xs text-gray-300 truncate flex-shrink-0">${tool}</span>
+            <span class="flex-shrink-0 text-xs text-gray-300 truncate" style="width:250px" title="${tool}">${tool}</span>
             <div class="flex-1 bg-gray-700 rounded-full h-1.5">
                 <div class="${cat.barColor} h-1.5 rounded-full" style="width:${pct}%"></div>
             </div>
-            <span class="w-5 text-xs text-gray-400 text-right flex-shrink-0">${cnt}</span>
+            <span class="w-6 text-xs text-gray-400 text-right flex-shrink-0">${cnt}</span>
         </div>`;
     }
     html += `</div></div>`;

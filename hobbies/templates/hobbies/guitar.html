@@ -62,6 +62,26 @@
                 {% endfor %}
             </div>
         </div>
+        <!-- Session Timer -->
+        <div class="mb-4 flex items-center gap-4 p-3 bg-gray-750 border border-gray-700 rounded-xl">
+            <div id="timer-idle" class="flex items-center gap-3">
+                <button type="button" onclick="startSession()"
+                    class="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-lg transition text-sm">
+                    ▶ Start Session
+                </button>
+                <span class="text-gray-500 text-xs">Date, time, and duration fill automatically when you end the session.</span>
+            </div>
+            <div id="timer-active" class="hidden flex items-center gap-4 w-full">
+                <span class="text-green-400 text-sm font-semibold">● In progress</span>
+                <span class="text-gray-400 text-xs">Started <span id="timer-start-label"></span></span>
+                <span id="timer-elapsed" class="text-xl font-mono font-bold text-white">0:00</span>
+                <button type="button" onclick="endSession()"
+                    class="ml-auto bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-lg transition text-sm">
+                    ■ End Session
+                </button>
+            </div>
+        </div>
+
         <button type="submit"
             class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition">
             Save Session
@@ -220,6 +240,64 @@
         </div>
     </div>
 </div>
+
+<script>
+// ── Session Timer ─────────────────────────────────────────────────────
+const TIMER_KEY = 'guitar_session_start';
+
+function startSession() {
+    localStorage.setItem(TIMER_KEY, new Date().toISOString());
+    updateTimerUI();
+}
+
+function endSession() {
+    const startStr = localStorage.getItem(TIMER_KEY);
+    if (!startStr) return;
+    const start = new Date(startStr);
+    const end = new Date();
+    const durationMin = Math.max(1, Math.round((end - start) / 60000));
+
+    document.querySelector('[name=date]').value = start.toLocaleDateString('en-CA'); // YYYY-MM-DD
+    document.querySelector('[name=time]').value =
+        String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0');
+    document.querySelector('[name=duration]').value = durationMin;
+
+    localStorage.removeItem(TIMER_KEY);
+    updateTimerUI();
+    document.querySelector('[name=duration]').focus();
+}
+
+function updateTimerUI() {
+    const startStr = localStorage.getItem(TIMER_KEY);
+    const idle   = document.getElementById('timer-idle');
+    const active = document.getElementById('timer-active');
+    if (startStr) {
+        idle.classList.add('hidden');
+        active.classList.remove('hidden');
+        document.getElementById('timer-start-label').textContent =
+            new Date(startStr).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        tickTimer();
+    } else {
+        idle.classList.remove('hidden');
+        active.classList.add('hidden');
+    }
+}
+
+function tickTimer() {
+    const startStr = localStorage.getItem(TIMER_KEY);
+    if (!startStr) return;
+    const elapsed = Math.floor((Date.now() - new Date(startStr)) / 1000);
+    const h = Math.floor(elapsed / 3600);
+    const m = Math.floor((elapsed % 3600) / 60);
+    const s = elapsed % 60;
+    document.getElementById('timer-elapsed').textContent = h > 0
+        ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+        : `${m}:${String(s).padStart(2,'0')}`;
+}
+
+updateTimerUI();
+setInterval(tickTimer, 1000);
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

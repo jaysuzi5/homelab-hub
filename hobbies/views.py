@@ -245,12 +245,22 @@ def guitar(request):
         if count:
             by_category.append({'label': label, 'minutes': mins, 'fmt': _fmt_duration(mins), 'count': count})
 
+    skill_minutes = {field: 0.0 for field, _ in GUITAR_SKILL_FIELDS}
+    skill_counts = {field: 0 for field, _ in GUITAR_SKILL_FIELDS}
+    for session in all_qs:
+        active = [f for f, _ in GUITAR_SKILL_FIELDS if getattr(session, f)]
+        if not active:
+            continue
+        share = session.duration / len(active)
+        for f in active:
+            skill_minutes[f] += share
+            skill_counts[f] += 1
+
     by_skill = []
     for field, label in GUITAR_SKILL_FIELDS:
-        mins = all_qs.filter(**{field: True}).aggregate(t=Sum('duration'))['t'] or 0
-        count = all_qs.filter(**{field: True}).count()
-        if count:
-            by_skill.append({'label': label, 'minutes': mins, 'fmt': _fmt_duration(mins), 'count': count})
+        if skill_counts[field]:
+            mins = round(skill_minutes[field])
+            by_skill.append({'label': label, 'minutes': mins, 'fmt': _fmt_duration(mins), 'count': skill_counts[field]})
 
     today_sessions = all_qs.filter(date=today)
     today_total = today_sessions.aggregate(t=Sum('duration'))['t'] or 0
