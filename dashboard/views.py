@@ -1,7 +1,10 @@
 import asyncio
 import json
+import requests as http_requests
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.decorators import login_required
 from dashboard.services.k8s import collect_k8s_metrics_summary, collect_k8s_metrics_detailed
@@ -13,8 +16,16 @@ from dashboard.services.splunk import splunk_collector_summary
 from dashboard.services.weather import collect_weather_summary
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
+from config.utils import get_config
 from asgiref.sync import sync_to_async
 from datetime import datetime
+
+_TODO_BASE = 'https://todo.jaycurtis.org/api/v1'
+_TODO_LIST_ID = 3
+
+def _todo_headers():
+    token = get_config('TODO_API_TOKEN', '')
+    return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
 
 @login_required
 async def home(request):
@@ -127,3 +138,36 @@ def networking(request):
     }
 
     return render(request, "dashboard/networking.html", context)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def todo_tasks(request):
+    try:
+        if request.method == 'GET':
+            resp = http_requests.get(
+                f'{_TODO_BASE}/lists/{_TODO_LIST_ID}/tasks/',
+                headers=_todo_headers(), timeout=5,
+            )
+            return JsonResponse(resp.json(), safe=False, status=resp.status_code)
+        data = json.loads(request.body)
+        resp = http_requests.post(
+            f'{_TODO_BASE}/lists/{_TODO_LIST_ID}/tasks/',
+            headers=_todo_headers(), json=data, timeout=5,
+        )
+        return JsonResponse(resp.json(), status=resp.status_code)
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def todo_task_complete(request, task_id):
+    try:
+        resp = http_requests.post(
+            f'{_TODO_BASE}/tasks/{task_id}/complete/',
+            headers=_todo_headers(), timeout=5,
+        )
+        return JsonResponse(resp.json(), status=resp.status_code)
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)

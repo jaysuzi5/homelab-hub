@@ -1,0 +1,350 @@
+---
+# Local backup - pg_dump to PVC every 6 hours
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: homelab-hub-backup-local
+  namespace: homelab-hub
+  labels:
+    app: homelab-hub
+    component: backup
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: homelab-hub
+            component: backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: postgres:17-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              BACKUP_DIR="/backups"
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="${BACKUP_DIR}/homelab-hub_${TIMESTAMP}.dump"
+              RETENTION_DAYS=7
+
+              echo "Starting PostgreSQL backup at $(date)"
+              mkdir -p ${BACKUP_DIR}
+
+              PGPASSWORD="${POSTGRES_PASSWORD}" pg_dump \
+                -h postgresql-homelab-hub-rw.postgresql-homelab-hub.svc.cluster.local \
+                -U "${POSTGRES_USER}" \
+                -d "${POSTGRES_DB}" \
+                --verbose \
+                --format=custom \
+                --compress=9 \
+                > "${BACKUP_FILE}"
+
+              if [ -s "${BACKUP_FILE}" ]; then
+                BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
+                echo "Backup completed: ${BACKUP_FILE} (${BACKUP_SIZE})"
+              else
+                echo "ERROR: Backup file is empty or not created!"
+                exit 1
+              fi
+
+              echo "Cleaning up backups older than ${RETENTION_DAYS} days..."
+              find ${BACKUP_DIR} -name "homelab-hub_*.dump" -type f -mtime +${RETENTION_DAYS} -delete
+
+              echo "Current backups:"
+              ls -lah ${BACKUP_DIR}/homelab-hub_*.dump 2>/dev/null || echo "No backups found"
+              echo "Backup job completed at $(date)"
+            env:
+            - name: POSTGRES_DB
+              value: "homelab-hub"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: homelab-hub-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: homelab-hub-secrets
+                  key: POSTGRES_PASSWORD
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: homelab-hub-postgres-backup-pvc
+
+---
+# Cloud backup - Daily upload to S3 at 2 AM
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: homelab-hub-backup-cloud-daily
+  namespace: homelab-hub
+  labels:
+    app: homelab-hub
+    component: backup
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: homelab-hub
+            component: backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup-cloud-daily
+            image: amazon/aws-cli:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              BACKUP_DIR="/backups"
+              echo "Starting daily cloud backup upload at $(date)"
+
+              LATEST_BACKUP=$(ls -t ${BACKUP_DIR}/homelab-hub_*.dump 2>/dev/null | head -1)
+
+              if [ -z "${LATEST_BACKUP}" ]; then
+                echo "ERROR: No local backup found to upload!"
+                exit 1
+              fi
+
+              echo "Uploading: ${LATEST_BACKUP} ($(du -h "${LATEST_BACKUP}" | cut -f1))"
+
+              S3_PATH="s3://${S3_BUCKET}/homelab-hub/backups/daily/$(date +%Y/%m/%d)/$(basename ${LATEST_BACKUP})"
+
+              aws s3 cp "${LATEST_BACKUP}" "${S3_PATH}" --storage-class STANDARD_IA
+
+              echo "Uploaded to: ${S3_PATH}"
+
+              echo "Recent daily backups:"
+              aws s3 ls "s3://${S3_BUCKET}/homelab-hub/backups/daily/" --recursive | tail -10
+              echo "Daily cloud backup completed at $(date)"
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: homelab-hub-secrets
+                  key: backup_access_key_id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: homelab-hub-secrets
+                  key: backup_secret_access_key
+            - name: S3_BUCKET
+              value: "jay-curtis-backup"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+              readOnly: true
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "250m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: homelab-hub-postgres-backup-pvc
+
+---
+# Cloud backup - Monthly upload to S3 on 1st of month at 3 AM
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: homelab-hub-backup-cloud-monthly
+  namespace: homelab-hub
+  labels:
+    app: homelab-hub
+    component: backup
+spec:
+  schedule: "0 3 1 * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: homelab-hub
+            component: backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup-cloud-monthly
+            image: amazon/aws-cli:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              BACKUP_DIR="/backups"
+              echo "Starting monthly cloud backup upload at $(date)"
+
+              LATEST_BACKUP=$(ls -t ${BACKUP_DIR}/homelab-hub_*.dump 2>/dev/null | head -1)
+
+              if [ -z "${LATEST_BACKUP}" ]; then
+                echo "ERROR: No local backup found to upload!"
+                exit 1
+              fi
+
+              echo "Uploading: ${LATEST_BACKUP} ($(du -h "${LATEST_BACKUP}" | cut -f1))"
+
+              S3_PATH="s3://${S3_BUCKET}/homelab-hub/backups/monthly/$(date +%Y/%m)/$(basename ${LATEST_BACKUP})"
+
+              aws s3 cp "${LATEST_BACKUP}" "${S3_PATH}" --storage-class STANDARD_IA
+
+              echo "Uploaded to: ${S3_PATH}"
+
+              echo "Monthly backups:"
+              aws s3 ls "s3://${S3_BUCKET}/homelab-hub/backups/monthly/" --recursive | tail -10
+              echo "Monthly cloud backup completed at $(date)"
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: homelab-hub-secrets
+                  key: backup_access_key_id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: homelab-hub-secrets
+                  key: backup_secret_access_key
+            - name: S3_BUCKET
+              value: "jay-curtis-backup"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+              readOnly: true
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "250m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: homelab-hub-postgres-backup-pvc
+
+---
+# Cloud backup - Yearly upload to S3 on Jan 1st at 4 AM
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: homelab-hub-backup-cloud-yearly
+  namespace: homelab-hub
+  labels:
+    app: homelab-hub
+    component: backup
+spec:
+  schedule: "0 4 1 1 *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: homelab-hub
+            component: backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup-cloud-yearly
+            image: amazon/aws-cli:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              BACKUP_DIR="/backups"
+              echo "Starting yearly cloud backup upload at $(date)"
+
+              LATEST_BACKUP=$(ls -t ${BACKUP_DIR}/homelab-hub_*.dump 2>/dev/null | head -1)
+
+              if [ -z "${LATEST_BACKUP}" ]; then
+                echo "ERROR: No local backup found to upload!"
+                exit 1
+              fi
+
+              echo "Uploading: ${LATEST_BACKUP} ($(du -h "${LATEST_BACKUP}" | cut -f1))"
+
+              S3_PATH="s3://${S3_BUCKET}/homelab-hub/backups/yearly/$(date +%Y)/$(basename ${LATEST_BACKUP})"
+
+              aws s3 cp "${LATEST_BACKUP}" "${S3_PATH}" --storage-class STANDARD_IA
+
+              echo "Uploaded to: ${S3_PATH}"
+
+              echo "Yearly backups:"
+              aws s3 ls "s3://${S3_BUCKET}/homelab-hub/backups/yearly/" --recursive
+              echo "Yearly cloud backup completed at $(date)"
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: homelab-hub-secrets
+                  key: backup_access_key_id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: homelab-hub-secrets
+                  key: backup_secret_access_key
+            - name: S3_BUCKET
+              value: "jay-curtis-backup"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+              readOnly: true
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "250m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: homelab-hub-postgres-backup-pvc
