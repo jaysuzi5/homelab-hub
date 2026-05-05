@@ -100,8 +100,11 @@ def book_detail(request, pk):
         book.rating = int(rating_raw) if rating_raw.isdigit() and 0 <= int(rating_raw) <= 5 else None
         book.comment = request.POST.get('comment', '').strip()
         book.summary = request.POST.get('summary', '').strip()
+        book.author = request.POST.get('author', '').strip()
+        pages_raw = request.POST.get('pages', '').strip()
+        book.pages = int(pages_raw) if pages_raw.isdigit() else None
         new_cover_url = request.POST.get('cover_url', '').strip()
-        update_fields = ['rating', 'comment', 'summary', 'cover_url', 'cover_local']
+        update_fields = ['rating', 'comment', 'summary', 'author', 'pages', 'cover_url', 'cover_local']
         if new_cover_url != book.cover_url:
             book.cover_url = new_cover_url
             book.cover_local = download_cover(new_cover_url, book.pk) if new_cover_url else ''
