@@ -32,6 +32,11 @@ def setup_otel():
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
         from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
         from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+        from opentelemetry.sdk._logs import LoggerProvider
+        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+        from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+        from opentelemetry._logs import set_logger_provider
+        from opentelemetry.sdk._logs import LoggingHandler
 
         resource = Resource({SERVICE_NAME: SERVICE, "host.name": HOSTNAME})
         otlp_endpoint = os.getenv("OTLP_ENDPOINT", "")
@@ -52,6 +57,14 @@ def setup_otel():
                 ],
             )
             metrics.set_meter_provider(mp)
+
+            lp = LoggerProvider(resource=resource)
+            lp.add_log_record_processor(
+                BatchLogRecordProcessor(OTLPLogExporter(endpoint=f"{otlp_endpoint}/v1/logs"))
+            )
+            set_logger_provider(lp)
+            handler = LoggingHandler(level=logging.INFO, logger_provider=lp)
+            logging.getLogger("page").addHandler(handler)
 
         meter = metrics.get_meter(SERVICE)
         _page_visits = meter.create_counter(
