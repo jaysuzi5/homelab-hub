@@ -12,7 +12,7 @@ from dashboard.services.synology import collect_synology_summary
 from dashboard.services.network import collect_network_summary, collect_network_monthly_summary
 from dashboard.services.emporia import collect_emporia_summary, collect_emporia_daily_summary, collect_emporia_monthly_summary, collect_emporia_monthly_category_summary
 from dashboard.services.enphase import collect_enhase_summary
-from dashboard.services.splunk import splunk_collector_summary
+from dashboard.services.splunk import splunk_collector_summary, otel_response_summary
 from dashboard.services.weather import collect_weather_summary
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
@@ -71,11 +71,24 @@ async def home(request):
         "claude_summary": claude_summary,
         "host_status": host_status,
     }
+    request.otel_page_summary = {
+        "page": "home",
+        "total_pods": total_pods,
+        "nodes": len(nodes) if nodes else 0,
+        "cluster_cpu_percent": cluster_cpu,
+        "cluster_mem_percent": cluster_mem,
+        "online": network_metrics.get("online") if network_metrics else False,
+    }
     return render(request, "dashboard/home.html", context)
 
 @login_required
 def k8s(request):
     data = collect_k8s_metrics_detailed()
+    request.otel_page_summary = {
+        "page": "k8s",
+        "pod_count": len(data.get("pods", [])) if data else 0,
+        "node_count": len(data.get("nodes", [])) if data else 0,
+    }
     return render(request, "dashboard/k8s.html", data)
 
 @login_required
@@ -106,7 +119,13 @@ def energy(request):
         'emporia_monthly_category_summary': emporia_monthly_category_summary,
         'emporia_daily_summary': emporia_daily_summary,
     }
-
+    request.otel_page_summary = {
+        "page": "energy",
+        "selected_month": selected_month,
+        "selected_year": selected_year,
+        "selected_day": selected_day,
+        "daily_usage_kwh": emporia_daily_summary.get("usage") if emporia_daily_summary else None,
+    }
     return render(request, "dashboard/energy.html", context)
 
 @login_required
@@ -136,7 +155,14 @@ def networking(request):
         'network_metrics': network_metrics,
         'network_monthly_metrics': json.dumps(network_monthly_metrics, cls=DjangoJSONEncoder),
     }
-
+    request.otel_page_summary = {
+        "page": "networking",
+        "selected_month": selected_month,
+        "selected_year": selected_year,
+        "online": network_metrics.get("online"),
+        "internet_download": network_metrics.get("internet_download"),
+        "internet_upload": network_metrics.get("internet_upload"),
+    }
     return render(request, "dashboard/networking.html", context)
 
 
@@ -171,3 +197,28 @@ def todo_task_complete(request, task_id):
         return JsonResponse(resp.json(), status=resp.status_code)
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=500)
+
+
+_OTEL_TIME_RANGES = [
+    ("-1h",  "Last 1 Hour"),
+    ("-6h",  "Last 6 Hours"),
+    ("-24h", "Last 24 Hours"),
+    ("-7d",  "Last 7 Days"),
+    ("-30d", "Last 30 Days"),
+]
+
+@login_required
+def otel_overview(request):
+    earliest = request.GET.get("earliest", "-1h")
+    result = otel_response_summary(earliest)
+    request.otel_page_summary = {
+        "page": "otel",
+        "earliest": earliest,
+        "row_count": len(result.get("data", [])),
+        "success": result.get("success"),
+    }
+    return render(request, "dashboard/otel.html", {
+        "result": result,
+        "earliest": earliest,
+        "time_ranges": _OTEL_TIME_RANGES,
+    })

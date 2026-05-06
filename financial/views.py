@@ -82,6 +82,13 @@ def retirement(request):
         "ss_benefits_67": SS_BENEFITS_67,
         "ss_benefits_70": SS_BENEFITS_70,
     }
+    request.otel_page_summary = {
+        "page": "retirement",
+        "method": request.method,
+        "mode": result.get("mode") if result else None,
+        "success_rate": result.get("success_rate") if result else None,
+        "max_withdrawal": result.get("withdrawal") if result else None,
+    }
     return render(request, "financial/retirement.html", {"form": form, "result": result, "presets": presets})
 
 
@@ -171,7 +178,11 @@ def portfolio_overview(request):
         'accounts': account_data,
         'chart_data': json.dumps(chart_data, cls=DjangoJSONEncoder),
     }
-
+    request.otel_page_summary = {
+        "page": "portfolio",
+        "account_count": len(account_data),
+        "total_portfolio": float(total_portfolio),
+    }
     return render(request, "financial/portfolio.html", context)
 
 
