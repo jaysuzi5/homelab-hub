@@ -12,7 +12,7 @@ from dashboard.services.synology import collect_synology_summary
 from dashboard.services.network import collect_network_summary, collect_network_monthly_summary
 from dashboard.services.emporia import collect_emporia_summary, collect_emporia_daily_summary, collect_emporia_monthly_summary, collect_emporia_monthly_category_summary
 from dashboard.services.enphase import collect_enhase_summary
-from dashboard.services.splunk import splunk_collector_summary, otel_response_summary
+from dashboard.services.splunk import splunk_collector_summary, otel_response_summary, otel_service_status_summary, otel_endpoint_summary, otel_transaction_list, otel_recent_transactions
 from dashboard.services.weather import collect_weather_summary
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
@@ -124,7 +124,7 @@ def energy(request):
         "selected_month": selected_month,
         "selected_year": selected_year,
         "selected_day": selected_day,
-        "daily_usage_kwh": emporia_daily_summary.get("usage") if emporia_daily_summary else None,
+        "daily_usage_kwh": next((item["usage"] for item in emporia_daily_summary if item.get("name") == "Electricity Monitor"), None) if emporia_daily_summary else None,
     }
     return render(request, "dashboard/energy.html", context)
 
@@ -210,7 +210,17 @@ _OTEL_TIME_RANGES = [
 @login_required
 def otel_overview(request):
     earliest = request.GET.get("earliest", "-1h")
-    result = otel_response_summary(earliest)
+    result = otel_service_status_summary(earliest)
+    # Pre-process rows into lists for template (avoids custom template filter for dict key lookup)
+    status_columns = result.get("status_columns", [])
+    if result.get("success"):
+        result["rows"] = [
+            {
+                "service": row.get("service", ""),
+                "cells": [{"col": col, "count": row.get(col)} for col in status_columns],
+            }
+            for row in result.get("data", [])
+        ]
     request.otel_page_summary = {
         "page": "otel",
         "earliest": earliest,
@@ -222,3 +232,39 @@ def otel_overview(request):
         "earliest": earliest,
         "time_ranges": _OTEL_TIME_RANGES,
     })
+
+
+@login_required
+def otel2_overview(request):
+    earliest = request.GET.get("earliest", "-1h")
+    result = otel_recent_transactions(earliest)
+    request.otel_page_summary = {"page": "otel2", "earliest": earliest,
+                                  "row_count": len(result.get("data", [])), "success": result.get("success")}
+    return render(request, "dashboard/otel2.html", {
+        "result": result,
+        "earliest": earliest,
+        "time_ranges": _OTEL_TIME_RANGES,
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def otel_endpoint_detail(request):
+    service = request.GET.get("service", "")
+    earliest = request.GET.get("earliest", "-1h")
+    if not service:
+        return JsonResponse({"success": False, "message": "service required"})
+    return JsonResponse(otel_endpoint_summary(service, earliest))
+
+
+@login_required
+@require_http_methods(["GET"])
+def otel_transaction_detail(request):
+    service = request.GET.get("service", "")
+    endpoint = request.GET.get("endpoint", "")
+    method = request.GET.get("method", "")
+    status = request.GET.get("status", "")
+    earliest = request.GET.get("earliest", "-1h")
+    if not all([service, endpoint, method, status]):
+        return JsonResponse({"success": False, "message": "service, endpoint, method, status all required"})
+    return JsonResponse(otel_transaction_list(service, endpoint, method, status, earliest))

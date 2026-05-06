@@ -22,19 +22,9 @@
     <aside class="w-64 bg-gray-800 p-6 flex flex-col">
         <h1 class="text-2xl font-bold mb-6">🏠 HomeLab</h1>
         <nav class="flex flex-col space-y-1">
-            <!-- Dashboard Section with Children -->
-            <div class="menu-group">
-                <button onclick="toggleSubmenu('dashboard-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
-                    <span>Dashboard</span>
-                    <svg id="dashboard-submenu-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
-                <div id="dashboard-submenu" class="ml-4 mt-1 space-y-1 hidden">
-                    <a href="{% url 'home' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Overview</a>
-                    <a href="{% url 'otel_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">OTEL</a>
-                </div>
-            </div>
+            <a href="{% url 'home' %}" class="hover:bg-gray-700 p-2 rounded">Dashboard</a>
+            <a href="{% url 'otel_overview' %}" class="hover:bg-gray-700 p-2 rounded">OTEL</a>
+            <a href="{% url 'otel2_overview' %}" class="hover:bg-gray-700 p-2 rounded">OTEL Explorer</a>
             <a href="{% url 'k8s' %}" class="hover:bg-gray-700 p-2 rounded">Kubernetes</a>
             <a href="{% url 'networking' %}" class="hover:bg-gray-700 p-2 rounded">Networking</a>
             <!-- Energy Section with Children -->
@@ -129,9 +119,6 @@
         // Auto-expand submenus based on current page
         window.addEventListener('DOMContentLoaded', function() {
             const currentPath = window.location.pathname;
-            if (currentPath === '/' || currentPath.includes('/otel')) {
-                toggleSubmenu('dashboard-submenu');
-            }
             if (currentPath.includes('/energy/') || currentPath.includes('/electricity/')) {
                 toggleSubmenu('energy-submenu');
             }

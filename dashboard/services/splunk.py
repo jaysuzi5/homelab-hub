@@ -110,6 +110,87 @@ def otel_response_summary(earliest: str = "-1h") -> dict:
     return {"success": True, "data": result["data"]}
 
 
+def otel_service_status_summary(earliest: str = "-1h") -> dict:
+    query = r"""
+        search index="otel_logging" event="Response"
+        | rename service.name as service_name
+        | eval endpoint = coalesce(endpoint, "none")
+        | eval service = coalesce(service, service_name, "none")
+        | eval status = coalesce(status, "none")
+        | eval method = coalesce(method, "")
+        | eval path = coalesce(path, "")
+        | stats dc(transaction_id) as transactions by service status
+        | xyseries service status transactions
+        | sort service
+    """
+    result = _splunk_search(query, earliest=earliest)
+    if not result["success"]:
+        return {"success": False, "data": [], "status_columns": [], "message": result.get("message", "Query failed")}
+    data = result["data"]
+    status_cols = sorted({k for row in data for k in row if k != "service"}, key=lambda x: x.zfill(10))
+    return {"success": True, "data": data, "status_columns": status_cols}
+
+
+def otel_endpoint_summary(service: str, earliest: str = "-1h") -> dict:
+    query = f"""
+        search index="otel_logging" event="Response" service="{service}"
+        | rename service.name as service_name
+        | eval endpoint = coalesce(endpoint, "none")
+        | eval service = coalesce(service, service_name, "none")
+        | eval status = coalesce(status, "")
+        | eval method = coalesce(method, "")
+        | eval path = coalesce(path, "")
+        | stats dc(transaction_id) as transactions by service, endpoint, method, status
+        | sort service, endpoint, method, status
+    """
+    result = _splunk_search(query, earliest=earliest)
+    if not result["success"]:
+        return {"success": False, "data": [], "message": result.get("message", "Query failed")}
+    return {"success": True, "data": result["data"]}
+
+
+def otel_transaction_list(service: str, endpoint: str, method: str, status: str, earliest: str = "-1h") -> dict:
+    query = f"""
+        search index="otel_logging" event="Response" service="{service}" endpoint="{endpoint}" method="{method}" status="{status}"
+        | rename service.name as service_name
+        | eval endpoint = coalesce(endpoint, "none")
+        | eval service = coalesce(service, service_name, "none")
+        | eval status = coalesce(status, "")
+        | eval method = coalesce(method, "")
+        | eval path = coalesce(path, "")
+        | spath input=_raw path=response_body output=response_body_json
+        | eval response_body_text = if(isnotnull(response_body_json), response_body_json, tostring(response_body))
+        | table timestamp, level, transaction_id, service, endpoint, method, status, response_body_text
+        | sort timestamp
+    """
+    result = _splunk_search(query, earliest=earliest)
+    if not result["success"]:
+        return {"success": False, "data": [], "message": result.get("message", "Query failed")}
+    return {"success": True, "data": result["data"]}
+
+
+def otel_recent_transactions(earliest: str = "-1h", limit: int = 500) -> dict:
+    query = f"""
+        search index="otel_logging" event="Response"
+        | rename service.name as service_name
+        | eval service = coalesce(service, service_name, "none")
+        | eval endpoint = coalesce(endpoint, "none")
+        | eval method = coalesce(method, "")
+        | eval status = tostring(coalesce(status, ""))
+        | eval level = coalesce(level, "INFO")
+        | spath input=_raw path=duration_seconds output=duration_s
+        | spath input=_raw path=response_body output=response_body_json
+        | eval response_body_text = if(isnotnull(response_body_json), response_body_json, tostring(response_body))
+        | table timestamp, service, endpoint, method, status, duration_s, transaction_id, level, path, response_body_text
+        | sort -_time
+        | head {limit}
+    """
+    result = _splunk_search(query, earliest=earliest)
+    if not result["success"]:
+        return {"success": False, "data": [], "message": result.get("message", "Query failed")}
+    return {"success": True, "data": result["data"]}
+
+
 def splunk_collector_summary():
     query = r"""
         search index="otel_logging"

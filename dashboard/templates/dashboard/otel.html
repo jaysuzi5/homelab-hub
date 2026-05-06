@@ -9,8 +9,6 @@
             <h1 class="text-2xl font-bold text-white">OTEL Overview</h1>
             <p class="text-gray-400 text-sm mt-1">Response summary from <code class="text-blue-400">index="otel_logging"</code></p>
         </div>
-
-        <!-- Time Range Selector -->
         <form method="get" class="flex items-center gap-2">
             <label class="text-gray-400 text-sm">Time Range:</label>
             <select name="earliest" onchange="this.form.submit()"
@@ -24,106 +22,109 @@
 
     {% if result.success %}
 
-    <!-- Summary Stats -->
-    <div class="grid grid-cols-3 gap-4 mb-6">
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Total Transactions</div>
-            <div class="text-2xl font-bold text-white">
-                {% with total=0 %}
-                    {% for row in result.data %}
-                        {% with total=total|add:row.transactions %}{% endwith %}
-                    {% endfor %}
-                {% endwith %}
-                {{ result.data|length|add:"0" }}
-                <span class="text-sm text-gray-400 font-normal">
-                    ({% for row in result.data %}{% if forloop.last %}{{ forloop.counter }} rows{% endif %}{% endfor %})
-                </span>
+    <!-- Level 1: Service × Status pivot -->
+    <div id="level1-panel">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-6">
+            <div class="px-4 py-3 border-b border-gray-700">
+                <span class="text-sm font-medium text-gray-300">Services by Status</span>
+                <span class="text-xs text-gray-500 ml-2">{{ result.data|length }} service(s) &bull; {{ earliest }} &bull; click row to drill down</span>
+            </div>
+            {% if result.data %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead id="l1-thead">
+                        <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide">
+                            <th class="px-4 py-3 text-left">Service</th>
+                            {% for col in result.status_columns %}
+                            <th class="px-4 py-3 text-right">{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody id="l1-tbody" class="divide-y divide-gray-700">
+                        {% for row in result.rows %}
+                        <tr class="hover:bg-gray-700 cursor-pointer transition-colors level1-row"
+                            data-service="{{ row.service }}">
+                            <td class="px-4 py-3 text-blue-300 font-mono text-xs font-semibold">{{ row.service }}</td>
+                            {% for cell in row.cells %}
+                            <td class="px-4 py-3 text-right font-mono text-xs">
+                                <span class="status-cell" data-status="{{ cell.col }}">
+                                    {% if cell.count %}{{ cell.count }}{% else %}—{% endif %}
+                                </span>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-gray-400">No results for the selected time range.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Level 2: Endpoint/Method/Status breakdown -->
+    <div id="level2-panel" class="hidden mb-6">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                <div>
+                    <span class="text-sm font-medium text-gray-300">Endpoint Breakdown — </span>
+                    <span id="level2-service-label" class="text-sm text-blue-300 font-mono"></span>
+                    <span class="text-xs text-gray-500 ml-2">click row to see transactions</span>
+                </div>
+                <button onclick="closeLevel2()" class="text-xs text-gray-400 hover:text-white px-2 py-1 rounded border border-gray-600 hover:border-gray-400">✕ Close</button>
+            </div>
+            <div id="level2-loading" class="p-8 text-center text-gray-400 hidden">Loading…</div>
+            <div id="level2-error" class="p-6 text-red-400 hidden"></div>
+            <div id="level2-content" class="overflow-x-auto hidden">
+                <table class="w-full text-sm">
+                    <thead id="l2-thead">
+                        <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide">
+                            <th class="px-4 py-3 text-left">Endpoint</th>
+                            <th class="px-4 py-3 text-left">Method</th>
+                            <th class="px-4 py-3 text-left">Status</th>
+                            <th class="px-4 py-3 text-right">Transactions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="level2-body" class="divide-y divide-gray-700"></tbody>
+                </table>
             </div>
         </div>
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Services</div>
-            <div class="text-2xl font-bold text-white" id="service-count">—</div>
-        </div>
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Endpoints</div>
-            <div class="text-2xl font-bold text-white" id="endpoint-count">—</div>
-        </div>
     </div>
 
-    {% if result.data %}
-    <!-- Results Table -->
-    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-300">Response Summary</span>
-            <span class="text-xs text-gray-500">{{ result.data|length }} rows &bull; {{ earliest }}</span>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide">
-                        <th class="px-4 py-3 text-left">Service</th>
-                        <th class="px-4 py-3 text-left">Endpoint</th>
-                        <th class="px-4 py-3 text-left">Method</th>
-                        <th class="px-4 py-3 text-left">Status</th>
-                        <th class="px-4 py-3 text-right">Transactions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-700">
-                    {% for row in result.data %}
-                    <tr class="hover:bg-gray-750 transition-colors">
-                        <td class="px-4 py-3 text-gray-300 font-mono text-xs">{{ row.service }}</td>
-                        <td class="px-4 py-3 text-gray-200 font-mono text-xs">{{ row.endpoint }}</td>
-                        <td class="px-4 py-3">
-                            {% if row.method == "GET" %}
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-900 text-blue-300">{{ row.method }}</span>
-                            {% elif row.method == "POST" %}
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-green-900 text-green-300">{{ row.method }}</span>
-                            {% elif row.method == "DELETE" %}
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-red-900 text-red-300">{{ row.method }}</span>
-                            {% else %}
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-300">{{ row.method }}</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-3">
-                            {% with status=row.status|add:"" %}
-                            {% if row.status >= "200" and row.status < "300" %}
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-green-900 text-green-300">{{ row.status }}</span>
-                            {% elif row.status >= "300" and row.status < "400" %}
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-900 text-yellow-300">{{ row.status }}</span>
-                            {% elif row.status >= "400" %}
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-red-900 text-red-300">{{ row.status }}</span>
-                            {% else %}
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-300">{{ row.status }}</span>
-                            {% endif %}
-                            {% endwith %}
-                        </td>
-                        <td class="px-4 py-3 text-right text-white font-semibold">{{ row.transactions }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- Level 3: Individual transactions -->
+    <div id="level3-panel" class="hidden mb-6">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                <div>
+                    <span class="text-sm font-medium text-gray-300">Transactions — </span>
+                    <span id="level3-label" class="text-xs text-gray-400 font-mono"></span>
+                </div>
+                <button onclick="closeLevel3()" class="text-xs text-gray-400 hover:text-white px-2 py-1 rounded border border-gray-600 hover:border-gray-400">✕ Close</button>
+            </div>
+            <div id="level3-loading" class="p-8 text-center text-gray-400 hidden">Loading…</div>
+            <div id="level3-error" class="p-6 text-red-400 hidden"></div>
+            <div id="level3-content" class="overflow-x-auto hidden">
+                <table class="w-full text-sm">
+                    <thead id="l3-thead">
+                        <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide">
+                            <th class="px-4 py-3 text-left">Timestamp</th>
+                            <th class="px-4 py-3 text-left">Level</th>
+                            <th class="px-4 py-3 text-left">Transaction ID</th>
+                            <th class="px-4 py-3 text-left">Status</th>
+                            <th class="px-4 py-3 text-left">Response Body</th>
+                        </tr>
+                    </thead>
+                    <tbody id="level3-body" class="divide-y divide-gray-700"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     {% else %}
-    <div class="bg-gray-800 rounded-lg border border-gray-700 p-12 text-center">
-        <p class="text-gray-400">No results for the selected time range.</p>
-        <p class="text-gray-500 text-sm mt-2">Try expanding the time range or check that OTEL logs are flowing to Splunk.</p>
-    </div>
-    {% endif %}
-
-    {% else %}
-    <!-- Error state -->
     <div class="bg-red-900/30 border border-red-700 rounded-lg p-6">
-        <div class="flex items-start gap-3">
-            <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <div>
-                <p class="text-red-300 font-medium">Splunk query failed</p>
-                <p class="text-red-400 text-sm mt-1">{{ result.message }}</p>
-            </div>
-        </div>
+        <p class="text-red-300 font-medium">Splunk query failed</p>
+        <p class="text-red-400 text-sm mt-1">{{ result.message }}</p>
     </div>
     {% endif %}
 
@@ -132,18 +133,234 @@
 
 {% block scripts %}
 <script>
-(function() {
-    const rows = {{ result.data|length }};
-    const data = [
-        {% for row in result.data %}
-        { service: "{{ row.service|escapejs }}", endpoint: "{{ row.endpoint|escapejs }}", transactions: {{ row.transactions }} }{% if not forloop.last %},{% endif %}
-        {% endfor %}
-    ];
+const EARLIEST = "{{ earliest|escapejs }}";
 
-    const services = new Set(data.map(r => r.service));
-    const endpoints = new Set(data.map(r => r.endpoint));
-    document.getElementById('service-count').textContent = services.size;
-    document.getElementById('endpoint-count').textContent = endpoints.size;
-})();
+// ── Sortable tables ──────────────────────────────────────────────────────────
+const _ss = {}; // sort state keyed by tbody id
+function makeSortable(theadEl, tbodyEl) {
+    const ths = Array.from(theadEl.querySelectorAll('th'));
+    const key = tbodyEl.id;
+    _ss[key] = {col: -1, dir: 1};
+    ths.forEach((th, i) => {
+        th.classList.add('cursor-pointer', 'select-none');
+        const icon = document.createElement('span');
+        icon.className = 'sort-icon ml-1 text-gray-600 text-xs';
+        icon.textContent = '↕';
+        th.appendChild(icon);
+        th.addEventListener('click', () => {
+            const prev = _ss[key];
+            const dir = prev.col === i ? -prev.dir : 1;
+            _ss[key] = {col: i, dir};
+            ths.forEach((h, j) => {
+                const ic = h.querySelector('.sort-icon');
+                if (ic) ic.textContent = j === i ? (dir === 1 ? '↑' : '↓') : '↕';
+            });
+            const rows = Array.from(tbodyEl.querySelectorAll('tr'));
+            rows.sort((a, b) => {
+                const av = a.cells[i]?.textContent.replace(/[↕↑↓]/g,'').trim() || '';
+                const bv = b.cells[i]?.textContent.replace(/[↕↑↓]/g,'').trim() || '';
+                const an = parseFloat(av), bn = parseFloat(bv);
+                if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir;
+                return av.localeCompare(bv) * dir;
+            });
+            rows.forEach(r => tbodyEl.appendChild(r));
+        });
+    });
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const l1h = document.getElementById('l1-thead');
+    const l1b = document.getElementById('l1-tbody');
+    if (l1h && l1b) makeSortable(l1h, l1b);
+});
+
+function statusBadge(status) {
+    const s = String(status);
+    let cls = "bg-gray-700 text-gray-300";
+    if (s >= "200" && s < "300") cls = "bg-green-900 text-green-300";
+    else if (s >= "300" && s < "400") cls = "bg-yellow-900 text-yellow-300";
+    else if (s >= "400") cls = "bg-red-900 text-red-300";
+    return `<span class="px-1.5 py-0.5 rounded text-xs font-medium ${cls}">${s}</span>`;
+}
+
+function methodBadge(method) {
+    let cls = "bg-gray-700 text-gray-300";
+    if (method === "GET") cls = "bg-blue-900 text-blue-300";
+    else if (method === "POST") cls = "bg-green-900 text-green-300";
+    else if (method === "DELETE") cls = "bg-red-900 text-red-300";
+    return `<span class="px-1.5 py-0.5 rounded text-xs font-medium ${cls}">${method}</span>`;
+}
+
+function levelBadge(level) {
+    const cls = level === "ERROR" ? "text-red-400" : "text-green-400";
+    return `<span class="text-xs font-medium ${cls}">${level}</span>`;
+}
+
+// Color status cells in Level 1 table
+document.querySelectorAll(".status-cell").forEach(el => {
+    const status = el.dataset.status;
+    const val = el.textContent.trim();
+    if (val === "—") return;
+    let cls = "text-gray-300";
+    if (status >= "200" && status < "300") cls = "text-green-400";
+    else if (status >= "300" && status < "400") cls = "text-yellow-400";
+    else if (status >= "400") cls = "text-red-400";
+    el.className = `font-semibold ${cls}`;
+});
+
+// Level 1 row click
+document.querySelectorAll(".level1-row").forEach(row => {
+    row.addEventListener("click", () => {
+        const service = row.dataset.service;
+        document.querySelectorAll(".level1-row").forEach(r => r.classList.remove("bg-blue-900/30"));
+        row.classList.add("bg-blue-900/30");
+        loadLevel2(service);
+    });
+});
+
+function closeLevel2() {
+    document.getElementById("level2-panel").classList.add("hidden");
+    closeLevel3();
+    document.querySelectorAll(".level1-row").forEach(r => r.classList.remove("bg-blue-900/30"));
+}
+
+function closeLevel3() {
+    document.getElementById("level3-panel").classList.add("hidden");
+    document.querySelectorAll(".level2-row").forEach(r => r.classList.remove("bg-blue-900/30"));
+}
+
+function loadLevel2(service) {
+    const panel = document.getElementById("level2-panel");
+    const loading = document.getElementById("level2-loading");
+    const error = document.getElementById("level2-error");
+    const content = document.getElementById("level2-content");
+    const body = document.getElementById("level2-body");
+
+    document.getElementById("level2-service-label").textContent = service;
+    panel.classList.remove("hidden");
+    loading.classList.remove("hidden");
+    error.classList.add("hidden");
+    content.classList.add("hidden");
+    closeLevel3();
+
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    const url = `/otel/endpoint-detail/?service=${encodeURIComponent(service)}&earliest=${encodeURIComponent(EARLIEST)}`;
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            loading.classList.add("hidden");
+            if (!data.success) {
+                error.textContent = data.message || "Query failed";
+                error.classList.remove("hidden");
+                return;
+            }
+            body.innerHTML = data.data.map(row => `
+                <tr class="hover:bg-gray-700 cursor-pointer transition-colors level2-row"
+                    data-service="${escHtml(row.service)}"
+                    data-endpoint="${escHtml(row.endpoint)}"
+                    data-method="${escHtml(row.method)}"
+                    data-status="${escHtml(String(row.status))}">
+                    <td class="px-4 py-3 text-gray-200 font-mono text-xs">${escHtml(row.endpoint)}</td>
+                    <td class="px-4 py-3">${methodBadge(row.method)}</td>
+                    <td class="px-4 py-3">${statusBadge(row.status)}</td>
+                    <td class="px-4 py-3 text-right text-white font-semibold">${row.transactions}</td>
+                </tr>`).join("");
+            content.classList.remove("hidden");
+            makeSortable(document.getElementById('l2-thead'), document.getElementById('level2-body'));
+
+            // Wire up Level 2 row clicks
+            document.querySelectorAll(".level2-row").forEach(row => {
+                row.addEventListener("click", () => {
+                    document.querySelectorAll(".level2-row").forEach(r => r.classList.remove("bg-blue-900/30"));
+                    row.classList.add("bg-blue-900/30");
+                    loadLevel3(row.dataset.service, row.dataset.endpoint, row.dataset.method, row.dataset.status);
+                });
+            });
+        })
+        .catch(() => {
+            loading.classList.add("hidden");
+            error.textContent = "Request failed";
+            error.classList.remove("hidden");
+        });
+}
+
+function formatTimestampEST(ts) {
+    if (!ts) return "";
+    try {
+        const d = new Date(ts);
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/New_York',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        }).formatToParts(d);
+        const p = {};
+        parts.forEach(({type, value}) => p[type] = value);
+        return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+    } catch(e) { return ts; }
+}
+
+function splunkTxnUrl(txnId) {
+    const q = `search index="otel_logging" transaction_id="${txnId}" earliest=-24h`;
+    return `http://192.168.86.220:8000/en-US/app/search/search?q=${encodeURIComponent(q)}`;
+}
+
+function loadLevel3(service, endpoint, method, status) {
+    const panel = document.getElementById("level3-panel");
+    const loading = document.getElementById("level3-loading");
+    const error = document.getElementById("level3-error");
+    const content = document.getElementById("level3-content");
+    const body = document.getElementById("level3-body");
+
+    document.getElementById("level3-label").textContent =
+        `${service} / ${endpoint} / ${method} / ${status}`;
+    panel.classList.remove("hidden");
+    loading.classList.remove("hidden");
+    error.classList.add("hidden");
+    content.classList.add("hidden");
+
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    const url = `/otel/transaction-detail/?service=${encodeURIComponent(service)}&endpoint=${encodeURIComponent(endpoint)}&method=${encodeURIComponent(method)}&status=${encodeURIComponent(status)}&earliest=${encodeURIComponent(EARLIEST)}`;
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            loading.classList.add("hidden");
+            if (!data.success) {
+                error.textContent = data.message || "Query failed";
+                error.classList.remove("hidden");
+                return;
+            }
+            body.innerHTML = data.data.map(row => {
+                let bodyText = row.response_body_text || "";
+                try { bodyText = JSON.stringify(JSON.parse(bodyText), null, 0); } catch(e) {}
+                const txnId = row.transaction_id || "";
+                const splunkUrl = splunkTxnUrl(txnId);
+                return `<tr class="hover:bg-gray-700 cursor-pointer transition-colors"
+                            onclick="window.open('${escHtml(splunkUrl)}', '_blank')">
+                    <td class="px-4 py-3 text-gray-400 font-mono text-xs whitespace-nowrap">${escHtml(formatTimestampEST(row.timestamp))}</td>
+                    <td class="px-4 py-3">${levelBadge(row.level || "")}</td>
+                    <td class="px-4 py-3 text-blue-400 font-mono text-xs">${escHtml(txnId)}</td>
+                    <td class="px-4 py-3">${statusBadge(row.status || "")}</td>
+                    <td class="px-4 py-3 text-gray-300 font-mono text-xs max-w-xs truncate" title="${escHtml(bodyText)}">${escHtml(bodyText)}</td>
+                </tr>`;
+            }).join("");
+            content.classList.remove("hidden");
+            makeSortable(document.getElementById('l3-thead'), document.getElementById('level3-body'));
+        })
+        .catch(() => {
+            loading.classList.add("hidden");
+            error.textContent = "Request failed";
+            error.classList.remove("hidden");
+        });
+}
+
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
 </script>
 {% endblock %}

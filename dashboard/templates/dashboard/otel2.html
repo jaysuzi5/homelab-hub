@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white">OTEL Explorer</h1>
+            <p class="text-gray-400 text-sm mt-1">Flat transaction explorer — filter, sort, drill to raw detail</p>
+        </div>
+        <form method="get" class="flex items-center gap-2">
+            <label class="text-gray-400 text-sm">Time Range:</label>
+            <select name="earliest" onchange="this.form.submit()"
+                    class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                {% for value, label in time_ranges %}
+                <option value="{{ value }}" {% if value == earliest %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    {% if result.success %}
+
+    <!-- KPI Strip (computed by JS from data) -->
+    <div class="grid grid-cols-5 gap-3 mb-4">
+        <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Total</div>
+            <div class="text-xl font-bold text-white" id="kpi-total">—</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Errors (4xx/5xx)</div>
+            <div class="text-xl font-bold text-red-400" id="kpi-errors">—</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Error Rate</div>
+            <div class="text-xl font-bold text-yellow-400" id="kpi-errrate">—</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Services</div>
+            <div class="text-xl font-bold text-blue-400" id="kpi-services">—</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Endpoints</div>
+            <div class="text-xl font-bold text-purple-400" id="kpi-endpoints">—</div>
+        </div>
+    </div>
+
+    <!-- Filter Bar + Top Errors -->
+    <div class="flex gap-4 mb-4">
+        <!-- Filters -->
+        <div class="flex-1 bg-gray-800 rounded-lg border border-gray-700 p-3 flex items-center gap-3 flex-wrap">
+            <select id="svc-filter" class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="">All Services</option>
+            </select>
+            <div class="flex gap-1">
+                <button class="status-filter-btn px-2 py-1 text-xs rounded border border-gray-600 hover:border-blue-400 text-gray-300" data-filter="">All</button>
+                <button class="status-filter-btn px-2 py-1 text-xs rounded border border-gray-600 hover:border-green-400 text-green-400" data-filter="2">2xx</button>
+                <button class="status-filter-btn px-2 py-1 text-xs rounded border border-gray-600 hover:border-yellow-400 text-yellow-400" data-filter="3">3xx</button>
+                <button class="status-filter-btn px-2 py-1 text-xs rounded border border-gray-600 hover:border-red-400 text-red-400" data-filter="4">4xx</button>
+                <button class="status-filter-btn px-2 py-1 text-xs rounded border border-gray-600 hover:border-red-600 text-red-500" data-filter="5">5xx</button>
+            </div>
+            <input id="txt-filter" type="text" placeholder="Search service, endpoint, path…"
+                   class="flex-1 min-w-48 bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500">
+            <span class="text-gray-500 text-xs" id="filter-count"></span>
+        </div>
+
+        <!-- Top Error Endpoints -->
+        <div class="w-72 bg-gray-800 rounded-lg border border-gray-700 p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-400 mb-2">Top Error Endpoints</div>
+            <div id="top-errors-list" class="space-y-1 text-xs"></div>
+        </div>
+    </div>
+
+    <!-- Transaction Table -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead id="txn-thead">
+                    <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide">
+                        <th class="px-3 py-3 text-left w-40">Timestamp</th>
+                        <th class="px-3 py-3 text-left">Service</th>
+                        <th class="px-3 py-3 text-left">Endpoint</th>
+                        <th class="px-3 py-3 text-left w-16">Method</th>
+                        <th class="px-3 py-3 text-left w-16">Status</th>
+                        <th class="px-3 py-3 text-left w-16">Dur (s)</th>
+                        <th class="px-3 py-3 text-left">Transaction ID</th>
+                    </tr>
+                </thead>
+                <tbody id="txn-tbody" class="divide-y divide-gray-700"></tbody>
+            </table>
+        </div>
+        <div id="txn-empty" class="p-8 text-center text-gray-400 hidden">No transactions match filters.</div>
+    </div>
+
+    {% else %}
+    <div class="bg-red-900/30 border border-red-700 rounded-lg p-6">
+        <p class="text-red-300 font-medium">Splunk query failed</p>
+        <p class="text-red-400 text-sm mt-1">{{ result.message }}</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EARLIEST2 = "{{ earliest|escapejs }}";
+const ALL_DATA = {{ result.data|safe }};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function statusBadge(s) {
+    const sc = String(s||'');
+    let cls = 'bg-gray-700 text-gray-300';
+    if (sc>='200'&&sc<'300') cls='bg-green-900 text-green-300';
+    else if (sc>='300'&&sc<'400') cls='bg-yellow-900 text-yellow-300';
+    else if (sc>='400') cls='bg-red-900 text-red-300';
+    return `<span class="px-1.5 py-0.5 rounded text-xs font-medium ${cls}">${escHtml(sc)}</span>`;
+}
+function methodBadge(m) {
+    let cls='bg-gray-700 text-gray-300';
+    if (m==='GET') cls='bg-blue-900 text-blue-300';
+    else if (m==='POST') cls='bg-green-900 text-green-300';
+    else if (m==='DELETE') cls='bg-red-900 text-red-300';
+    return `<span class="px-1.5 py-0.5 rounded text-xs font-medium ${cls}">${escHtml(m)}</span>`;
+}
+function rowBgClass(status) {
+    const s = String(status||'');
+    if (s>='500') return 'bg-red-950/40';
+    if (s>='400') return 'bg-orange-950/30';
+    if (s>='300') return 'bg-yellow-950/20';
+    return '';
+}
+function formatTS(ts) {
+    if (!ts) return '';
+    try {
+        const d = new Date(ts);
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone:'America/New_York', year:'numeric', month:'2-digit', day:'2-digit',
+            hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+        }).formatToParts(d);
+        const p={};
+        parts.forEach(({type,value})=>p[type]=value);
+        return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+    } catch(e){ return ts; }
+}
+function splunkUrl(txnId) {
+    const q=`search index="otel_logging" transaction_id="${txnId}" earliest=-24h`;
+    return `http://192.168.86.220:8000/en-US/app/search/search?q=${encodeURIComponent(q)}`;
+}
+
+// ── KPIs ─────────────────────────────────────────────────────────────────────
+function computeKpis(data) {
+    const total = data.length;
+    const errors = data.filter(r => String(r.status||'') >= '400').length;
+    const services = new Set(data.map(r=>r.service)).size;
+    const endpoints = new Set(data.map(r=>r.endpoint)).size;
+    const errRate = total ? ((errors/total)*100).toFixed(1)+'%' : '0%';
+    document.getElementById('kpi-total').textContent = total;
+    document.getElementById('kpi-errors').textContent = errors;
+    document.getElementById('kpi-errrate').textContent = errRate;
+    document.getElementById('kpi-services').textContent = services;
+    document.getElementById('kpi-endpoints').textContent = endpoints;
+}
+
+// ── Top errors ────────────────────────────────────────────────────────────────
+function renderTopErrors(data) {
+    const errMap = {};
+    data.filter(r=>String(r.status||'')>='400').forEach(r=>{
+        const k=`${r.endpoint}`;
+        errMap[k] = (errMap[k]||0)+1;
+    });
+    const sorted = Object.entries(errMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const el = document.getElementById('top-errors-list');
+    if (!sorted.length) { el.innerHTML='<span class="text-gray-500">No errors</span>'; return; }
+    el.innerHTML = sorted.map(([ep,cnt])=>
+        `<div class="flex justify-between items-center">
+            <span class="text-gray-300 truncate mr-2 font-mono" title="${escHtml(ep)}">${escHtml(ep.length>28?ep.slice(-28):ep)}</span>
+            <span class="text-red-400 font-semibold shrink-0">${cnt}</span>
+        </div>`
+    ).join('');
+}
+
+// ── Service dropdown ──────────────────────────────────────────────────────────
+function populateServiceFilter(data) {
+    const svcs = [...new Set(data.map(r=>r.service))].sort();
+    const sel = document.getElementById('svc-filter');
+    svcs.forEach(s=>{
+        const o = document.createElement('option');
+        o.value=s; o.textContent=s;
+        sel.appendChild(o);
+    });
+}
+
+// ── Filter state ──────────────────────────────────────────────────────────────
+let filterSvc='', filterStatus='', filterTxt='';
+
+function applyFilters() {
+    let rows = ALL_DATA;
+    if (filterSvc) rows = rows.filter(r=>r.service===filterSvc);
+    if (filterStatus) rows = rows.filter(r=>String(r.status||'').startsWith(filterStatus));
+    if (filterTxt) {
+        const q=filterTxt.toLowerCase();
+        rows = rows.filter(r=>
+            (r.service||'').toLowerCase().includes(q)||
+            (r.endpoint||'').toLowerCase().includes(q)||
+            (r.path||'').toLowerCase().includes(q)||
+            (r.transaction_id||'').toLowerCase().includes(q)||
+            (r.response_body_text||'').toLowerCase().includes(q)
+        );
+    }
+    document.getElementById('filter-count').textContent = `${rows.length} / ${ALL_DATA.length} rows`;
+    renderTable(rows);
+    computeKpis(rows);
+    renderTopErrors(rows);
+}
+
+// ── Table render ──────────────────────────────────────────────────────────────
+let _tableSortCol=-1, _tableSortDir=1;
+
+function renderTable(data) {
+    const tbody = document.getElementById('txn-tbody');
+    const empty = document.getElementById('txn-empty');
+    if (!data.length) { tbody.innerHTML=''; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    tbody.innerHTML = data.map((row, idx) => {
+        const bg = rowBgClass(row.status);
+        let body = row.response_body_text||'';
+        try { body = JSON.stringify(JSON.parse(body), null, 0); } catch(e){}
+        return `<tr class="border-b border-gray-700 hover:bg-gray-700 cursor-pointer transition-colors ${bg}"
+                    data-idx="${idx}" onclick="toggleExpand(this, ${idx}, ${JSON.stringify(escHtml(row.transaction_id||''))}, ${JSON.stringify(escHtml(splunkUrl(row.transaction_id||'')))})">
+            <td class="px-3 py-2 text-gray-400 font-mono text-xs whitespace-nowrap">${escHtml(formatTS(row.timestamp))}</td>
+            <td class="px-3 py-2 text-gray-200 font-mono text-xs">${escHtml(row.service||'')}</td>
+            <td class="px-3 py-2 text-gray-200 font-mono text-xs">${escHtml(row.endpoint||'')}</td>
+            <td class="px-3 py-2">${methodBadge(row.method||'')}</td>
+            <td class="px-3 py-2">${statusBadge(row.status||'')}</td>
+            <td class="px-3 py-2 text-gray-400 font-mono text-xs">${row.duration_s ? parseFloat(row.duration_s).toFixed(3) : '—'}</td>
+            <td class="px-3 py-2 text-blue-400 font-mono text-xs">${escHtml(row.transaction_id||'')}</td>
+        </tr>
+        <tr id="expand-${idx}" class="hidden border-b border-gray-700 bg-gray-900">
+            <td colspan="7" class="px-4 py-3">
+                <div class="text-xs space-y-1">
+                    <div><span class="text-gray-500">Path:</span> <span class="text-gray-300 font-mono">${escHtml(row.path||'')}</span></div>
+                    <div><span class="text-gray-500">Response Body:</span> <span class="text-gray-300 font-mono break-all">${escHtml(body)}</span></div>
+                    <div class="pt-1">
+                        <a href="${escHtml(splunkUrl(row.transaction_id||''))}" target="_blank"
+                           class="text-blue-400 hover:text-blue-300 text-xs underline"
+                           onclick="event.stopPropagation()">Open in Splunk →</a>
+                    </div>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function toggleExpand(tr, idx) {
+    const expRow = document.getElementById(`expand-${idx}`);
+    if (!expRow) return;
+    expRow.classList.toggle('hidden');
+}
+
+// ── Sortable ──────────────────────────────────────────────────────────────────
+const _ss2 = {col:-1, dir:1};
+function initSort() {
+    const ths = Array.from(document.getElementById('txn-thead').querySelectorAll('th'));
+    const fields = ['timestamp','service','endpoint','method','status','duration_s','transaction_id'];
+    ths.forEach((th, i) => {
+        th.classList.add('cursor-pointer','select-none');
+        const icon = document.createElement('span');
+        icon.className='sort-icon ml-1 text-gray-600 text-xs';
+        icon.textContent='↕';
+        th.appendChild(icon);
+        th.addEventListener('click', () => {
+            const dir = _ss2.col===i ? -_ss2.dir : 1;
+            _ss2.col=i; _ss2.dir=dir;
+            ths.forEach((h,j)=>{ const ic=h.querySelector('.sort-icon'); if(ic) ic.textContent=j===i?(dir===1?'↑':'↓'):'↕'; });
+            // Re-sort ALL_DATA then re-apply filters
+            const field = fields[i];
+            ALL_DATA.sort((a,b)=>{
+                const av=String(a[field]||''), bv=String(b[field]||'');
+                const an=parseFloat(av), bn=parseFloat(bv);
+                if(!isNaN(an)&&!isNaN(bn)) return (an-bn)*dir;
+                return av.localeCompare(bv)*dir;
+            });
+            applyFilters();
+        });
+    });
+}
+
+// ── Wire up filter controls ───────────────────────────────────────────────────
+document.getElementById('svc-filter').addEventListener('change', e=>{ filterSvc=e.target.value; applyFilters(); });
+document.getElementById('txt-filter').addEventListener('input', e=>{ filterTxt=e.target.value; applyFilters(); });
+document.querySelectorAll('.status-filter-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.status-filter-btn').forEach(b=>b.classList.remove('bg-gray-700'));
+        btn.classList.add('bg-gray-700');
+        filterStatus=btn.dataset.filter;
+        applyFilters();
+    });
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', ()=>{
+    populateServiceFilter(ALL_DATA);
+    computeKpis(ALL_DATA);
+    renderTopErrors(ALL_DATA);
+    renderTable(ALL_DATA);
+    document.getElementById('filter-count').textContent = `${ALL_DATA.length} / ${ALL_DATA.length} rows`;
+    initSort();
+    // Default: highlight "All" status button
+    document.querySelector('.status-filter-btn[data-filter=""]').classList.add('bg-gray-700');
+});
+</script>
+{% endblock %}
