@@ -5,6 +5,12 @@ asgiref==3.9.1
     #   django
     #   django-allauth
     #   django-browser-reload
+boto3==1.43.4
+    # via django-storages
+botocore==1.43.4
+    # via
+    #   boto3
+    #   s3transfer
 browser-cookie3==0.20.1
     # via homelab-hub (pyproject.toml)
 cachetools==5.5.2
@@ -27,12 +33,15 @@ django==5.2.6
     #   django-allauth
     #   django-browser-reload
     #   django-jazzmin
+    #   django-storages
     #   django-tailwind
 django-allauth==65.11.2
     # via homelab-hub (pyproject.toml)
 django-browser-reload==1.20.0
     # via homelab-hub (pyproject.toml)
 django-jazzmin==3.0.1
+    # via homelab-hub (pyproject.toml)
+django-storages==1.14.6
     # via homelab-hub (pyproject.toml)
 django-tailwind==4.2.0
     # via homelab-hub (pyproject.toml)
@@ -50,6 +59,10 @@ importlib-metadata==8.7.1
     # via opentelemetry-api
 j-utilities-toolkit==0.0.2
     # via homelab-hub (pyproject.toml)
+jmespath==1.1.0
+    # via
+    #   boto3
+    #   botocore
 kubernetes==33.1.0
     # via homelab-hub (pyproject.toml)
 lz4==4.4.5
@@ -105,7 +118,9 @@ pycryptodomex==3.23.0
 pyjwt==2.10.1
     # via homelab-hub (pyproject.toml)
 python-dateutil==2.9.0.post0
-    # via kubernetes
+    # via
+    #   botocore
+    #   kubernetes
 python-decouple==3.8
     # via homelab-hub (pyproject.toml)
 python-dotenv==1.1.1
@@ -129,6 +144,8 @@ requests-oauthlib==2.0.0
     # via kubernetes
 rsa==4.9.1
     # via google-auth
+s3transfer==0.17.0
+    # via boto3
 six==1.17.0
     # via
     #   kubernetes
@@ -145,6 +162,7 @@ typing-extensions==4.15.0
     #   opentelemetry-semantic-conventions
 urllib3==2.5.0
     # via
+    #   botocore
     #   kubernetes
     #   python-synology
     #   requests

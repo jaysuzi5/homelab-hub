@@ -69,5 +69,12 @@ class Book(models.Model):
     class Meta:
         ordering = ['date_read']
 
+    @property
+    def cover_image_url(self):
+        if self.cover_local:
+            from django.core.files.storage import default_storage
+            return default_storage.url(self.cover_local)
+        return self.cover_url
+
     def __str__(self):
         return f"{self.title} by {self.author}"
