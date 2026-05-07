@@ -1,0 +1,83 @@
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+        <span>Network Overview</span>
+        {% if network_metrics.online %}
+            <span class="text-green-400 text-sm font-semibold">Online</span>
+        {% else %}
+            <span class="text-red-400 text-sm font-semibold">Offline</span>
+        {% endif %}
+    </h3>
+
+    <div class="grid grid-cols-4 gap-2 text-center mb-4">
+        <div class="rounded p-2 {% if network_metrics.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
+            <span class="font-bold">{{ network_metrics.tcp_latency|floatformat:1 }} ms</span><br>
+            <span class="text-gray-300 text-sm">TCP Latency</span>
+        </div>
+        <div class="rounded p-2 {% if network_metrics.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
+            <span class="font-bold">{{ network_metrics.internet_ping|floatformat:1 }} ms</span><br>
+            <span class="text-gray-300 text-sm">Ping</span>
+        </div>
+        <div class="rounded p-2 {% if network_metrics.internet_download < 250 %}bg-red-700{% else %}bg-green-700{% endif %}">
+            <span class="font-bold">{{ network_metrics.internet_download|floatformat:1 }} Mbps</span><br>
+            <span class="text-gray-300 text-sm">Download</span>
+        </div>
+        <div class="rounded p-2 {% if network_metrics.internet_upload < 20 %}bg-red-700{% else %}bg-green-700{% endif %}">
+            <span class="font-bold">{{ network_metrics.internet_upload|floatformat:1 }} Mbps</span><br>
+            <span class="text-gray-300 text-sm">Upload</span>
+        </div>
+    </div>
+
+    <h4 class="text-md font-semibold text-gray-200 mb-2">Host Status</h4>
+    {% if host_status %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-2 py-1">Host</th>
+                    <th class="px-2 py-1">Address</th>
+                    <th class="px-2 py-1 text-center">Status</th>
+                    <th class="px-2 py-1 text-right">Latency</th>
+                    <th class="px-2 py-1 text-right">Last Check</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in host_status %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700">
+                    <td class="px-2 py-1 font-semibold">{{ h.name }}</td>
+                    <td class="px-2 py-1 text-gray-400">{{ h.address }}</td>
+                    <td class="px-2 py-1 text-center">
+                        {% if h.is_up is None %}
+                            <span class="text-gray-400">No data</span>
+                        {% elif h.is_up %}
+                            <span class="text-green-400 font-semibold">UP</span>
+                        {% else %}
+                            <span class="text-red-400 font-semibold">DOWN</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-2 py-1 text-right">
+                        {% if h.latency_ms is not None %}
+                            <span class="{% if h.latency_ms > 50 %}text-yellow-400{% else %}text-gray-200{% endif %}">
+                                {{ h.latency_ms|floatformat:1 }} ms
+                            </span>
+                        {% else %}
+                            <span class="text-gray-500">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-2 py-1 text-right text-gray-400 text-xs">
+                        {% if h.checked_at %}
+                            {% if h.stale %}<span class="text-yellow-400">{% endif %}
+                            {{ h.checked_at|date:"H:i" }}
+                            {% if h.stale %}</span>{% endif %}
+                        {% else %}
+                            <span class="text-gray-500">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm">No hosts configured. Add hosts via Django admin under <span class="text-blue-400">Monitoring → Monitored Hosts</span>.</p>
+    {% endif %}
+</div>

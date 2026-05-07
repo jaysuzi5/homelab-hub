@@ -1,11 +1,9 @@
-import asyncio
 import json
 import requests as http_requests
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.decorators import login_required
 from dashboard.services.k8s import collect_k8s_metrics_summary, collect_k8s_metrics_detailed
 from dashboard.services.synology import collect_synology_summary
@@ -19,7 +17,6 @@ from dashboard.services.weather import collect_weather_summary
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
 from config.utils import get_config
-from asgiref.sync import sync_to_async
 from datetime import datetime
 from opentelemetry import trace as otel_trace
 
@@ -33,65 +30,89 @@ def _todo_headers():
     return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
 
 @login_required
-async def home(request):
-    async def timed(func, span_name):
-        with _tracer.start_as_current_span(span_name):
-            return func()
+def home(request):
+    request.otel_page_summary = {"page": "home"}
+    return render(request, "dashboard/home.html", {})
 
-    async def timed_async(coro, span_name):
-        with _tracer.start_as_current_span(span_name):
-            return await coro
 
-    with _tracer.start_as_current_span("dashboard.home"):
-        (
-            (pods_status, nodes, total_pods, cluster_cpu, cluster_mem),
-            synology_metrics,
-            network_metrics,
-            emporia_metrics,
-            emporia_daily_summary,
-            enhase_summary,
-            splunk_summary,
-            weather_summary,
-            claude_summary,
-            host_status,
-        ) = await asyncio.gather(
-            timed(collect_k8s_metrics_summary,         "k8s.summary"),
-            timed(collect_synology_summary,             "synology.summary"),
-            timed(collect_network_summary,              "network.summary"),
-            timed(collect_emporia_summary,              "emporia.summary"),
-            timed(collect_emporia_daily_summary,        "emporia.daily"),
-            timed(collect_enhase_summary,               "enphase.summary"),
-            timed(splunk_collector_summary,             "splunk.summary"),
-            timed(collect_weather_summary,              "weather.summary"),
-            timed_async(sync_to_async(collect_claude_dashboard_summary)(), "claude.summary"),
-            timed_async(sync_to_async(collect_host_status)(),              "host.status"),
-        )
+@login_required
+def card_k8s(request):
+    with _tracer.start_as_current_span("card.k8s"):
+        pods_status, nodes, total_pods, cluster_cpu, cluster_mem = collect_k8s_metrics_summary()
+    return render(request, "dashboard/partials/_card_k8s.html", {
+        "pods": pods_status, "nodes": nodes, "total_pods": total_pods,
+        "cluster_cpu_percent": cluster_cpu, "cluster_mem_percent": cluster_mem,
+    })
 
-        context = {
-            "pods": pods_status,
-            "total_pods": total_pods,
-            "nodes": nodes,
-            "cluster_cpu_percent": cluster_cpu,
-            "cluster_mem_percent": cluster_mem,
-            "synology_metrics": synology_metrics,
-            "network_metrics": network_metrics,
-            "emporia_metrics": json.dumps(emporia_metrics, cls=DjangoJSONEncoder),
-            "enphase_metrics": enhase_summary,
-            "emporia_daily_summary": emporia_daily_summary,
-            "splunk_summary": splunk_summary,
-            "weather_summary": weather_summary,
-            "claude_summary": claude_summary,
-            "host_status": host_status,
+
+@login_required
+def card_synology(request):
+    with _tracer.start_as_current_span("card.synology"):
+        synology_metrics = collect_synology_summary()
+    return render(request, "dashboard/partials/_card_synology.html", {
+        "synology_metrics": synology_metrics,
+    })
+
+
+@login_required
+def card_claude(request):
+    with _tracer.start_as_current_span("card.claude"):
+        claude_summary = collect_claude_dashboard_summary()
+    return render(request, "dashboard/partials/_card_claude.html", {
+        "claude_summary": claude_summary,
+    })
+
+
+@login_required
+def card_network(request):
+    with _tracer.start_as_current_span("card.network"):
+        network_metrics = collect_network_summary() or {
+            'tcp_latency': 0, 'internet_ping': 0,
+            'internet_download': 0, 'internet_upload': 0, 'online': False,
         }
-        request.otel_page_summary = {
-            "page": "home",
-            "total_pods": total_pods,
-            "nodes": len(nodes) if nodes else 0,
-            "cluster_cpu_percent": cluster_cpu,
-            "cluster_mem_percent": cluster_mem,
-            "online": network_metrics.get("online") if network_metrics else False,
-        }
-        return render(request, "dashboard/home.html", context)
+        host_status = collect_host_status()
+    return render(request, "dashboard/partials/_card_network.html", {
+        "network_metrics": network_metrics, "host_status": host_status,
+    })
+
+
+@login_required
+def card_emporia_chart(request):
+    with _tracer.start_as_current_span("card.emporia_chart"):
+        emporia_metrics = collect_emporia_summary()
+        enhase_summary = collect_enhase_summary()
+    return render(request, "dashboard/partials/_card_emporia_chart.html", {
+        "emporia_metrics": json.dumps(emporia_metrics, cls=DjangoJSONEncoder),
+        "enphase_metrics": enhase_summary,
+    })
+
+
+@login_required
+def card_emporia_daily(request):
+    with _tracer.start_as_current_span("card.emporia_daily"):
+        selected_day = request.GET.get('day', datetime.now().strftime('%Y-%m-%d'))
+        emporia_daily_summary = collect_emporia_daily_summary(selected_day)
+    return render(request, "dashboard/partials/_card_emporia_daily.html", {
+        "emporia_daily_summary": emporia_daily_summary,
+    })
+
+
+@login_required
+def card_splunk(request):
+    with _tracer.start_as_current_span("card.splunk"):
+        splunk_summary = splunk_collector_summary()
+    return render(request, "dashboard/partials/_card_splunk.html", {
+        "splunk_summary": splunk_summary,
+    })
+
+
+@login_required
+def card_weather(request):
+    with _tracer.start_as_current_span("card.weather"):
+        weather_summary = collect_weather_summary()
+    return render(request, "dashboard/partials/_card_weather.html", {
+        "weather_summary": weather_summary,
+    })
 
 @login_required
 def k8s(request):

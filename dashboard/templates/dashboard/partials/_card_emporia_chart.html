@@ -1,0 +1,16 @@
+<div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition" style="min-height: 24rem;">
+    <h3 class="text-xl font-bold mb-4">Electricity Produced and Usage by Day</h3>
+    <div class="w-full h-72">
+        <canvas id="emporiaUsageChart" class="h-50 relative"></canvas>
+    </div>
+</div>
+<script>
+(function() {
+    const emporiaMetrics = {{ emporia_metrics|safe }};
+    const enphaseMetrics = {{ enphase_metrics|safe }};
+    renderEmporiaUsageChart("emporiaUsageChart", emporiaMetrics);
+    if (document.getElementById('enphaseChart')) {
+        renderEnphaseChart("enphaseChart", enphaseMetrics);
+    }
+})();
+</script>

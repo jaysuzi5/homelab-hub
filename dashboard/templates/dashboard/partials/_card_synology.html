@@ -1,0 +1,102 @@
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+        <span>Synology NAS Overview</span>
+        <span class="text-lg text-gray-300 font-semibold">Model: {{ synology_metrics.model }}</span>
+    </h3>
+
+    <div class="mb-4">
+        <h4 class="text-md font-semibold text-gray-200 mb-2">Health Overview</h4>
+        <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="rounded p-2 {% if synology_metrics.utilization.cpu_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.cpu_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
+                <span class="font-bold text-lg">{{ synology_metrics.cpu_percent }}%</span><br>
+                <span class="text-gray-300 text-sm">CPU Usage</span>
+            </div>
+            <div class="rounded p-2 {% if synology_metrics.utilization.memory_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.memory_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
+                <span class="font-bold text-lg">{{ synology_metrics.memory_percent }}%</span><br>
+                <span class="text-gray-300 text-sm">Memory Usage</span>
+            </div>
+            <div class="rounded p-2 {% if synology_metrics.utilization.memory_percent >= 85 %}bg-red-700{% elif synology_metrics.utilization.memory_percent >= 70 %}bg-yellow-600{% else %}bg-green-700{% endif %}">
+                <span class="font-bold text-lg">{{ synology_metrics.overall_percent_used }}%</span><br>
+                <span class="text-gray-300 text-sm">Disk Usage</span>
+            </div>
+        </div>
+    </div>
+
+    <h4 class="text-md font-semibold text-gray-200 mb-2">Volume Summary</h4>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-2 py-1">Volume</th>
+                    <th class="px-2 py-1 text-center">Size</th>
+                    <th class="px-2 py-1 text-center">Used</th>
+                    <th class="px-2 py-1 text-center">Storage %</th>
+                    <th class="px-2 py-1 text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vol in synology_metrics.volumes %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700">
+                    <td class="px-2 py-1">{{ vol.name }}</td>
+                    <td class="px-2 py-1 text-center">{{ vol.size_total }}</td>
+                    <td class="px-2 py-1 text-center">{{ vol.size_used }}</td>
+                    <td class="px-2 py-1 text-center">{{ vol.percent_used }}%</td>
+                    <td class="px-2 py-1 text-center">
+                        {% if vol.status and vol.status == 'normal' %}
+                            <span class="text-green-400 font-semibold">{{ vol.status }}</span>
+                        {% else %}
+                            <span class="text-red-400 font-semibold">{{ vol.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <br>
+
+    <h4 class="text-md font-semibold text-gray-200 mb-2">Disk Summary</h4>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-2 py-1">Disk</th>
+                    <th class="px-2 py-1 text-center">Name</th>
+                    <th class="px-2 py-1 text-center">Temperature</th>
+                    <th class="px-2 py-1 text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for disk in synology_metrics.disks %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700">
+                    <td class="px-2 py-1">{{ disk.id }}</td>
+                    <td class="px-2 py-1 text-center">{{ disk.name }}</td>
+                    <td class="px-2 py-1 text-center">{{ disk.temperature }}</td>
+                    <td class="px-2 py-1 text-center">
+                        {% if disk.smart_status and disk.smart_status == 'normal' %}
+                            <span class="text-green-400 font-semibold">{{ disk.smart_status }}</span>
+                        {% else %}
+                            <span class="text-red-400 font-semibold">{{ disk.smart_status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4 flex gap-4 justify-around">
+        <div class="text-center">
+            <span class="block text-gray-300 text-sm">Net Up</span>
+            <span class="block font-bold text-lg">{{ synology_metrics.net_up|filesizeformat }}/s</span>
+        </div>
+        <div class="text-center">
+            <span class="block text-gray-300 text-sm">Net Down</span>
+            <span class="block font-bold text-lg">{{ synology_metrics.net_down|filesizeformat }}/s</span>
+        </div>
+        <div class="text-center">
+            <span class="block text-gray-300 text-sm">Uptime</span>
+            <span class="block font-bold text-lg">{{ synology_metrics.uptime_days }}d {{ synology_metrics.uptime_hours }}h {{ synology_metrics.uptime_minutes }}m</span>
+        </div>
+    </div>
+</div>

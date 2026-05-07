@@ -1,0 +1,73 @@
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+        <span>Kubernetes Overview</span>
+        <span class="text-lg text-gray-300 font-semibold">Total Pods: {{ total_pods }}</span>
+    </h3>
+
+    <div class="mb-4">
+        <h4 class="text-md font-semibold text-gray-200 mb-2">Pods Status</h4>
+        <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-green-700 rounded p-2">
+                <span class="font-bold">{{ pods.running }}</span><br>
+                <span class="text-gray-300 text-sm">Running</span>
+            </div>
+            {% if pods.pending > 0 %}
+            <div class="bg-yellow-600 rounded p-2">
+                <span class="font-bold">{{ pods.pending }}</span><br>
+                <span class="text-gray-300 text-sm">Pending</span>
+            </div>
+            {% endif %}
+            {% if pods.failed > 0 %}
+            <div class="bg-red-700 rounded p-2">
+                <span class="font-bold">{{ pods.failed }}</span><br>
+                <span class="text-gray-300 text-sm">Failed</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <h4 class="text-md font-semibold text-gray-200 mb-2">Node Summary</h4>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-2 py-1">Node</th>
+                    <th class="px-2 py-1">CPU Alloc / Cap</th>
+                    <th class="px-2 py-1">CPU %</th>
+                    <th class="px-2 py-1">Mem Alloc / Cap (GiB)</th>
+                    <th class="px-2 py-1">Mem %</th>
+                    <th class="px-2 py-1">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for node in nodes %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700">
+                    <td class="px-2 py-1">{{ node.name }}</td>
+                    <td class="px-2 py-1">{{ node.cpu_allocatable }} / {{ node.cpu_capacity }}</td>
+                    <td class="px-2 py-1 {% if node.cpu_percent >= 85 %}font-bold text-red-400{% elif node.cpu_percent >= 70 %}font-bold text-yellow-400{% endif %}">{{ node.cpu_percent }}%</td>
+                    <td class="px-2 py-1">{{ node.mem_usage }} / {{ node.mem_allocatable }}</td>
+                    <td class="px-2 py-1 {% if node.mem_percent >= 85 %}font-bold text-red-400{% elif node.mem_percent >= 70 %}font-bold text-yellow-400{% endif %}">{{ node.mem_percent }}%</td>
+                    <td class="px-2 py-1">
+                        {% if node.ready %}
+                            <span class="text-green-400 font-semibold">Ready</span>
+                        {% else %}
+                            <span class="text-red-400 font-semibold">NotReady</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4 flex gap-4 justify-around">
+        <div class="text-center">
+            <span class="block text-gray-300 text-sm">CPU Load</span>
+            <span class="block font-bold text-lg">{{ cluster_cpu_percent }}%</span>
+        </div>
+        <div class="text-center">
+            <span class="block text-gray-300 text-sm">Memory Load</span>
+            <span class="block font-bold text-lg">{{ cluster_mem_percent }}%</span>
+        </div>
+    </div>
+</div>

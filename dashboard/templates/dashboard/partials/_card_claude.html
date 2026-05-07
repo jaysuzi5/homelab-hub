@@ -1,0 +1,99 @@
+<div class="bg-gray-800 rounded-2xl shadow p-6 hover:shadow-lg transition">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold">Claude Usage</h3>
+        <div class="flex items-center gap-3">
+            {% if claude_summary.session_pct is not None %}
+            <span class="text-sm font-semibold {% if claude_summary.session_pct >= 80 %}text-red-400{% elif claude_summary.session_pct >= 50 %}text-yellow-400{% else %}text-blue-400{% endif %}">
+                {{ claude_summary.session_pct|floatformat:0 }}<span class="font-normal text-gray-400">% session</span>
+            </span>
+            {% endif %}
+            {% if claude_summary.weekly_pct is not None %}
+            <span class="text-lg font-bold {% if claude_summary.weekly_pct >= 80 %}text-red-400{% elif claude_summary.weekly_pct >= 60 %}text-yellow-400{% else %}text-green-400{% endif %}">
+                {{ claude_summary.weekly_pct|floatformat:0 }}<span class="text-sm font-normal text-gray-400">% weekly</span>
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="flex items-baseline justify-between mb-2">
+        <p class="text-sm text-gray-400">Tool calls by day
+            <span class="text-gray-300 font-semibold ml-1">({{ claude_summary.total_7d }} total)</span>
+        </p>
+        <div class="text-right">
+            {% if claude_summary.weekly_resets_at %}
+            <p class="text-xs text-gray-500">
+                Week resets {{ claude_summary.weekly_resets_at|date:"D M j" }}
+                <span class="text-gray-400 font-semibold">({{ claude_summary.days_until_reset }}d)</span>
+            </p>
+            {% endif %}
+            {% if claude_summary.session_resets_at %}
+            <p class="text-xs text-gray-500">Session resets {{ claude_summary.session_resets_at|date:"g:i A" }} ET</p>
+            {% endif %}
+        </div>
+    </div>
+    <div style="position:relative;height:144px;" class="mb-6"><canvas id="claudeDayChart"></canvas></div>
+    <p class="text-sm text-gray-400 mb-2">By tool type</p>
+    <div id="claudeToolWrap" style="position:relative;height:160px;"><canvas id="claudeToolChart"></canvas></div>
+    <p id="claudeToolNone" class="hidden text-gray-500 text-sm">No tool breakdown — run <code class="text-blue-400">sync_local_counts</code> locally.</p>
+</div>
+<script>
+(function() {
+    new Chart(document.getElementById('claudeDayChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: {{ claude_summary.labels_json|safe }},
+            datasets: [{ label: 'Tool Calls', data: {{ claude_summary.counts_json|safe }},
+                backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 3 }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+            },
+            plugins: { legend: { display: false }, datalabels: { display: false } },
+        },
+    });
+
+    const byTool = {{ claude_summary.by_tool_json|safe }};
+    const CATEGORY_DEFS = [
+        { name: 'File Operations', color: 'rgba(139,92,246,0.8)', tools: ['Read','Edit','Write','Glob','Grep','NotebookEdit'] },
+        { name: 'Execution',       color: 'rgba(59,130,246,0.8)',  tools: ['Bash'] },
+        { name: 'Research',        color: 'rgba(16,185,129,0.8)',  tools: ['WebFetch','WebSearch'] },
+        { name: 'Agents & Tasks',  color: 'rgba(245,158,11,0.8)',  tools: ['Agent','TodoWrite','TaskCreate','TaskGet','TaskUpdate','TaskStop','TaskList','TaskOutput','AskUserQuestion','Skill'] },
+        { name: 'MCP Servers',     color: 'rgba(236,72,153,0.8)',  tools: [] },
+    ];
+    const seen = new Set();
+    const categories = CATEGORY_DEFS.map(cat => {
+        let total = 0;
+        if (cat.tools.length > 0) {
+            for (const t of cat.tools) { if (byTool[t]) { total += byTool[t]; seen.add(t); } }
+        } else {
+            for (const [t, n] of Object.entries(byTool)) { if (!seen.has(t)) total += n; }
+        }
+        return { name: cat.name, color: cat.color, count: total };
+    }).filter(c => c.count > 0);
+
+    if (categories.length === 0) {
+        document.getElementById('claudeToolWrap').classList.add('hidden');
+        document.getElementById('claudeToolNone').classList.remove('hidden');
+    } else {
+        new Chart(document.getElementById('claudeToolChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: categories.map(c => c.name),
+                datasets: [{ data: categories.map(c => c.count), backgroundColor: categories.map(c => c.color), borderRadius: 3 }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                    y: { ticks: { color: '#9ca3af', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                },
+                plugins: { legend: { display: false }, datalabels: { display: false } },
+            },
+        });
+    }
+})();
+</script>

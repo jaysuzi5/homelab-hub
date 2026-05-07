@@ -2,7 +2,16 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from dashboard.views import home, k8s, energy, networking, todo_tasks, todo_task_complete, otel_overview, otel_endpoint_detail, otel_transaction_detail, otel_logging_overview, otel_logging_transactions, otel_trace_overview, otel_trace_detail_view, otel_metrics_overview, otel_metrics_query_view
+from dashboard.views import (
+    home, k8s, energy, networking,
+    todo_tasks, todo_task_complete,
+    otel_overview, otel_endpoint_detail, otel_transaction_detail,
+    otel_logging_overview, otel_logging_transactions,
+    otel_trace_overview, otel_trace_detail_view,
+    otel_metrics_overview, otel_metrics_query_view,
+    card_k8s, card_synology, card_claude, card_network,
+    card_emporia_chart, card_emporia_daily, card_splunk, card_weather,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -26,4 +35,12 @@ urlpatterns = [
     path('otel/transaction-detail/', otel_transaction_detail, name='otel_transaction_detail'),
     path('todo/tasks/', todo_tasks, name='todo_tasks'),
     path('todo/tasks/<int:task_id>/complete/', todo_task_complete, name='todo_task_complete'),
+    path('dashboard/api/card/k8s/', card_k8s, name='card_k8s'),
+    path('dashboard/api/card/synology/', card_synology, name='card_synology'),
+    path('dashboard/api/card/claude/', card_claude, name='card_claude'),
+    path('dashboard/api/card/network/', card_network, name='card_network'),
+    path('dashboard/api/card/emporia-chart/', card_emporia_chart, name='card_emporia_chart'),
+    path('dashboard/api/card/emporia-daily/', card_emporia_daily, name='card_emporia_daily'),
+    path('dashboard/api/card/splunk/', card_splunk, name='card_splunk'),
+    path('dashboard/api/card/weather/', card_weather, name='card_weather'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

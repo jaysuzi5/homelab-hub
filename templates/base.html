@@ -18,6 +18,17 @@
 </head>
 <body class="bg-gray-900 text-gray-200 flex min-h-screen">
 
+    <!-- Page loading overlay -->
+    <div id="page-overlay" class="hidden fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-50">
+        <div class="flex flex-col items-center gap-3">
+            <svg class="animate-spin h-12 w-12 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 5.373 0 0 12h4z"></path>
+            </svg>
+            <span class="text-blue-300 text-sm font-semibold tracking-wide">Loading...</span>
+        </div>
+    </div>
+
     <!-- Sidebar -->
     <aside class="w-64 bg-gray-800 p-6 flex flex-col">
         <h1 class="text-2xl font-bold mb-6">🏠 HomeLab</h1>
@@ -160,18 +171,17 @@
     {% block scripts %}{% endblock %}
 
     <script>
-        // Wait cursor while navigating to pages that run slow queries
+        function showPageOverlay() {
+            document.getElementById('page-overlay').classList.remove('hidden');
+        }
         document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('form').forEach(function(f) {
-                f.addEventListener('submit', function() { document.body.style.cursor = 'wait'; });
-            });
-            // Sidebar nav links (non-AJAX full page loads)
             document.querySelectorAll('aside a').forEach(function(a) {
-                a.addEventListener('click', function() { document.body.style.cursor = 'wait'; });
+                a.addEventListener('click', showPageOverlay);
             });
         });
-        // Restore cursor if user presses back or page is re-shown
-        window.addEventListener('pageshow', function() { document.body.style.cursor = ''; });
+        window.addEventListener('pageshow', function() {
+            document.getElementById('page-overlay').classList.add('hidden');
+        });
     </script>
 </body>
 </html>
