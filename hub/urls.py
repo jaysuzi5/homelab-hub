@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from dashboard.views import home, k8s, energy, networking, todo_tasks, todo_task_complete, otel_overview, otel_endpoint_detail, otel_transaction_detail, otel2_overview, otel2_transactions, otel_trace_overview, otel_trace_detail_view, otel_metrics_overview, otel_metrics_query_view
+from dashboard.views import home, k8s, energy, networking, todo_tasks, todo_task_complete, otel_overview, otel_endpoint_detail, otel_transaction_detail, otel_logging_overview, otel_logging_transactions, otel_trace_overview, otel_trace_detail_view, otel_metrics_overview, otel_metrics_query_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -16,8 +16,8 @@ urlpatterns = [
     path('health/', include('health.urls')),
     path('claude-usage/', include('claude_usage.urls')),
     path('otel/', otel_overview, name='otel_overview'),
-    path('otel2/', otel2_overview, name='otel2_overview'),
-    path('otel2/transactions/', otel2_transactions, name='otel2_transactions'),
+    path('otel/logging/', otel_logging_overview, name='otel_logging_overview'),
+    path('otel/logging/transactions/', otel_logging_transactions, name='otel_logging_transactions'),
     path('otel/trace/', otel_trace_overview, name='otel_trace_overview'),
     path('otel/trace/detail/', otel_trace_detail_view, name='otel_trace_detail'),
     path('otel/metrics/', otel_metrics_overview, name='otel_metrics_overview'),

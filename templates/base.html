@@ -32,7 +32,7 @@
                     </svg>
                 </button>
                 <div id="otel-submenu" class="ml-4 mt-1 space-y-1 hidden">
-                    <a href="{% url 'otel2_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Logging Explorer</a>
+                    <a href="{% url 'otel_logging_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Logging Explorer</a>
                     <a href="{% url 'otel_trace_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Trace Explorer</a>
                     <a href="{% url 'otel_metrics_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Metric Explorer</a>
                 </div>
@@ -158,5 +158,20 @@
     </main>
 
     {% block scripts %}{% endblock %}
+
+    <script>
+        // Wait cursor while navigating to pages that run slow queries
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('form').forEach(function(f) {
+                f.addEventListener('submit', function() { document.body.style.cursor = 'wait'; });
+            });
+            // Sidebar nav links (non-AJAX full page loads)
+            document.querySelectorAll('aside a').forEach(function(a) {
+                a.addEventListener('click', function() { document.body.style.cursor = 'wait'; });
+            });
+        });
+        // Restore cursor if user presses back or page is re-shown
+        window.addEventListener('pageshow', function() { document.body.style.cursor = ''; });
+    </script>
 </body>
 </html>

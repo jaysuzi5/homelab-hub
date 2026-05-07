@@ -21,6 +21,9 @@ from monitoring.services import collect_host_status
 from config.utils import get_config
 from asgiref.sync import sync_to_async
 from datetime import datetime
+from opentelemetry import trace as otel_trace
+
+_tracer = otel_trace.get_tracer("homelab-hub.dashboard")
 
 _TODO_BASE = 'https://todo.jaycurtis.org/api/v1'
 _TODO_LIST_ID = 3
@@ -31,57 +34,64 @@ def _todo_headers():
 
 @login_required
 async def home(request):
-    async def wrap(func):
-        return func()  # call sync function inside small coroutine
-    (
-        (pods_status, nodes, total_pods, cluster_cpu, cluster_mem),
-        synology_metrics,
-        network_metrics,
-        emporia_metrics,
-        emporia_daily_summary,
-        enhase_summary,
-        splunk_summary,
-        weather_summary,
-        claude_summary,
-        host_status,
-    ) = await asyncio.gather(
-        wrap(collect_k8s_metrics_summary),
-        wrap(collect_synology_summary),
-        wrap(collect_network_summary),
-        wrap(collect_emporia_summary),
-        wrap(collect_emporia_daily_summary),
-        wrap(collect_enhase_summary),
-        wrap(splunk_collector_summary),
-        wrap(collect_weather_summary),
-        sync_to_async(collect_claude_dashboard_summary)(),
-        sync_to_async(collect_host_status)(),
-    )
+    async def timed(func, span_name):
+        with _tracer.start_as_current_span(span_name):
+            return func()
 
-    context = {
-        "pods": pods_status,
-        "total_pods": total_pods,
-        "nodes": nodes,
-        "cluster_cpu_percent": cluster_cpu,
-        "cluster_mem_percent": cluster_mem,
-        "synology_metrics": synology_metrics,
-        "network_metrics": network_metrics,
-        "emporia_metrics": json.dumps(emporia_metrics, cls=DjangoJSONEncoder),
-        "enphase_metrics": enhase_summary,
-        "emporia_daily_summary": emporia_daily_summary,
-        "splunk_summary": splunk_summary,
-        "weather_summary": weather_summary,
-        "claude_summary": claude_summary,
-        "host_status": host_status,
-    }
-    request.otel_page_summary = {
-        "page": "home",
-        "total_pods": total_pods,
-        "nodes": len(nodes) if nodes else 0,
-        "cluster_cpu_percent": cluster_cpu,
-        "cluster_mem_percent": cluster_mem,
-        "online": network_metrics.get("online") if network_metrics else False,
-    }
-    return render(request, "dashboard/home.html", context)
+    async def timed_async(coro, span_name):
+        with _tracer.start_as_current_span(span_name):
+            return await coro
+
+    with _tracer.start_as_current_span("dashboard.home"):
+        (
+            (pods_status, nodes, total_pods, cluster_cpu, cluster_mem),
+            synology_metrics,
+            network_metrics,
+            emporia_metrics,
+            emporia_daily_summary,
+            enhase_summary,
+            splunk_summary,
+            weather_summary,
+            claude_summary,
+            host_status,
+        ) = await asyncio.gather(
+            timed(collect_k8s_metrics_summary,         "k8s.summary"),
+            timed(collect_synology_summary,             "synology.summary"),
+            timed(collect_network_summary,              "network.summary"),
+            timed(collect_emporia_summary,              "emporia.summary"),
+            timed(collect_emporia_daily_summary,        "emporia.daily"),
+            timed(collect_enhase_summary,               "enphase.summary"),
+            timed(splunk_collector_summary,             "splunk.summary"),
+            timed(collect_weather_summary,              "weather.summary"),
+            timed_async(sync_to_async(collect_claude_dashboard_summary)(), "claude.summary"),
+            timed_async(sync_to_async(collect_host_status)(),              "host.status"),
+        )
+
+        context = {
+            "pods": pods_status,
+            "total_pods": total_pods,
+            "nodes": nodes,
+            "cluster_cpu_percent": cluster_cpu,
+            "cluster_mem_percent": cluster_mem,
+            "synology_metrics": synology_metrics,
+            "network_metrics": network_metrics,
+            "emporia_metrics": json.dumps(emporia_metrics, cls=DjangoJSONEncoder),
+            "enphase_metrics": enhase_summary,
+            "emporia_daily_summary": emporia_daily_summary,
+            "splunk_summary": splunk_summary,
+            "weather_summary": weather_summary,
+            "claude_summary": claude_summary,
+            "host_status": host_status,
+        }
+        request.otel_page_summary = {
+            "page": "home",
+            "total_pods": total_pods,
+            "nodes": len(nodes) if nodes else 0,
+            "cluster_cpu_percent": cluster_cpu,
+            "cluster_mem_percent": cluster_mem,
+            "online": network_metrics.get("online") if network_metrics else False,
+        }
+        return render(request, "dashboard/home.html", context)
 
 @login_required
 def k8s(request):
@@ -237,12 +247,12 @@ def otel_overview(request):
 
 
 @login_required
-def otel2_overview(request):
+def otel_logging_overview(request):
     earliest = request.GET.get("earliest", "-1h")
     result = otel_summary(earliest)
-    request.otel_page_summary = {"page": "otel2", "earliest": earliest,
+    request.otel_page_summary = {"page": "otel_logging", "earliest": earliest,
                                   "row_count": len(result.get("data", [])), "success": result.get("success")}
-    return render(request, "dashboard/otel2.html", {
+    return render(request, "dashboard/otel_logging.html", {
         "result": result,
         "earliest": earliest,
         "time_ranges": _OTEL_TIME_RANGES,
@@ -251,7 +261,7 @@ def otel2_overview(request):
 
 @login_required
 @require_http_methods(["GET"])
-def otel2_transactions(request):
+def otel_logging_transactions(request):
     service = request.GET.get("service", "")
     endpoint = request.GET.get("endpoint", "")
     method = request.GET.get("method", "")
@@ -291,13 +301,23 @@ def otel_trace_overview(request):
     focus_trace_id = request.GET.get("trace_id", "")
 
     services_result = tempo_services()
-    traces_result = tempo_recent_traces(service=service, earliest=earliest)
 
     focus_trace_json = "null"
     if focus_trace_id:
         detail = tempo_trace_detail(focus_trace_id)
         if detail.get("success"):
             focus_trace_json = json.dumps(detail.get("data"), cls=DjangoJSONEncoder)
+            # Auto-detect service from trace so the list is filtered to the same service
+            if not service:
+                for batch in detail.get("data", {}).get("batches", []):
+                    for attr in batch.get("resource", {}).get("attributes", []):
+                        if attr.get("key") == "service.name":
+                            service = attr.get("value", {}).get("stringValue", "") or ""
+                            break
+                    if service:
+                        break
+
+    traces_result = tempo_recent_traces(service=service, earliest=earliest)
 
     request.otel_page_summary = {"page": "otel_trace", "earliest": earliest}
     return render(request, "dashboard/otel_trace.html", {
