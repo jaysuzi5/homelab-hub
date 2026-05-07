@@ -324,8 +324,29 @@ function fetchTransactions() {
     doFetch(`/otel2/transactions/?${params}`, parts.length ? parts.join(' · ') : 'All traffic');
 }
 
-// ── Fetch (row click — exact combo) ──────────────────────────────────────────
+// ── Fetch (row click — exact combo, also syncs filters) ───────────────────────
 function fetchRowTransactions(service, endpoint, method, status) {
+    // Sync filter state
+    fSvc = service;
+    fEp = endpoint;
+    fMethod = method;
+    fTxt = '';
+    const prefix = ['2','3','4','5'].includes(String(status||'').charAt(0)) ? String(status).charAt(0) : '';
+    fStatusPrefix = prefix;
+
+    // Sync UI controls
+    document.getElementById('svc-filter').value = service;
+    document.getElementById('ep-filter').value = endpoint;
+    document.getElementById('method-filter').value = method;
+    document.getElementById('txt-filter').value = '';
+    document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('bg-gray-700'));
+    const activeBtn = document.querySelector(`.status-btn[data-prefix="${prefix}"]`);
+    if (activeBtn) activeBtn.classList.add('bg-gray-700');
+
+    // Refresh summary table to reflect new filter state
+    applyFilters();
+
+    // Fetch transactions using exact status (not prefix)
     const params = new URLSearchParams({ earliest: EARLIEST2, service, endpoint, method, status });
     doFetch(`/otel2/transactions/?${params}`, `${service} · ${endpoint} · ${method} · ${status}`);
 }
