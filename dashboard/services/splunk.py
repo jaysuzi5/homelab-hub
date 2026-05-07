@@ -169,6 +169,64 @@ def otel_transaction_list(service: str, endpoint: str, method: str, status: str,
     return {"success": True, "data": result["data"]}
 
 
+def otel_summary(earliest: str = "-1h") -> dict:
+    query = r"""
+        search index="otel_logging" event="Response"
+        | rename service.name as service_name
+        | eval service = coalesce(service, service_name, "none")
+        | eval endpoint = coalesce(endpoint, "none")
+        | eval method = coalesce(method, "")
+        | eval status = tostring(coalesce(status, ""))
+        | spath input=_raw path=duration_seconds output=duration_s
+        | eval duration_s = tonumber(duration_s)
+        | stats dc(transaction_id) as count, avg(duration_s) as avg_duration by service, endpoint, method, status
+        | eval avg_duration = round(avg_duration, 3)
+        | sort -count
+    """
+    result = _splunk_search(query, earliest=earliest)
+    if not result["success"]:
+        return {"success": False, "data": [], "message": result.get("message", "Query failed")}
+    return {"success": True, "data": result["data"]}
+
+
+def otel_filtered_transactions(service: str = "", endpoint: str = "", method: str = "",
+                                status: str = "", status_prefix: str = "",
+                                earliest: str = "-1h", limit: int = 200) -> dict:
+    search_parts = ['index="otel_logging"', 'event="Response"']
+    if service:
+        search_parts.append(f'service="{service}"')
+    if endpoint and endpoint != "none":
+        search_parts.append(f'endpoint="{endpoint}"')
+    if method:
+        search_parts.append(f'method="{method}"')
+    if status:
+        search_parts.append(f'status="{status}"')
+
+    status_where = ""
+    if status_prefix and not status:
+        status_where = f'| where substr(status, 1, 1)="{status_prefix}"'
+
+    query = f"""
+        search {" ".join(search_parts)}
+        | rename service.name as service_name
+        | eval service = coalesce(service, service_name, "none")
+        | eval endpoint = coalesce(endpoint, "none")
+        | eval method = coalesce(method, "")
+        | eval status = tostring(coalesce(status, ""))
+        | spath input=_raw path=duration_seconds output=duration_s
+        | spath input=_raw path=response_body output=response_body_json
+        | eval response_body_text = if(isnotnull(response_body_json), response_body_json, tostring(response_body))
+        {status_where}
+        | table timestamp, service, endpoint, method, status, duration_s, transaction_id, path, response_body_text
+        | sort -_time
+        | head {limit}
+    """
+    result = _splunk_search(query, earliest=earliest)
+    if not result["success"]:
+        return {"success": False, "data": [], "message": result.get("message", "Query failed")}
+    return {"success": True, "data": result["data"]}
+
+
 def otel_recent_transactions(earliest: str = "-1h", limit: int = 500) -> dict:
     query = f"""
         search index="otel_logging" event="Response"

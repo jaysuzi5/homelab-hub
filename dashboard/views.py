@@ -12,7 +12,7 @@ from dashboard.services.synology import collect_synology_summary
 from dashboard.services.network import collect_network_summary, collect_network_monthly_summary
 from dashboard.services.emporia import collect_emporia_summary, collect_emporia_daily_summary, collect_emporia_monthly_summary, collect_emporia_monthly_category_summary
 from dashboard.services.enphase import collect_enhase_summary
-from dashboard.services.splunk import splunk_collector_summary, otel_response_summary, otel_service_status_summary, otel_endpoint_summary, otel_transaction_list, otel_recent_transactions
+from dashboard.services.splunk import splunk_collector_summary, otel_response_summary, otel_service_status_summary, otel_endpoint_summary, otel_transaction_list, otel_recent_transactions, otel_summary, otel_filtered_transactions
 from dashboard.services.weather import collect_weather_summary
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
@@ -237,7 +237,7 @@ def otel_overview(request):
 @login_required
 def otel2_overview(request):
     earliest = request.GET.get("earliest", "-1h")
-    result = otel_recent_transactions(earliest)
+    result = otel_summary(earliest)
     request.otel_page_summary = {"page": "otel2", "earliest": earliest,
                                   "row_count": len(result.get("data", [])), "success": result.get("success")}
     return render(request, "dashboard/otel2.html", {
@@ -245,6 +245,18 @@ def otel2_overview(request):
         "earliest": earliest,
         "time_ranges": _OTEL_TIME_RANGES,
     })
+
+
+@login_required
+@require_http_methods(["GET"])
+def otel2_transactions(request):
+    service = request.GET.get("service", "")
+    endpoint = request.GET.get("endpoint", "")
+    method = request.GET.get("method", "")
+    status = request.GET.get("status", "")
+    status_prefix = request.GET.get("status_prefix", "")
+    earliest = request.GET.get("earliest", "-1h")
+    return JsonResponse(otel_filtered_transactions(service, endpoint, method, status, status_prefix, earliest))
 
 
 @login_required
