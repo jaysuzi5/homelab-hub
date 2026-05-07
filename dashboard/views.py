@@ -288,8 +288,17 @@ def otel_transaction_detail(request):
 def otel_trace_overview(request):
     earliest = request.GET.get("earliest", "-1h")
     service = request.GET.get("service", "")
+    focus_trace_id = request.GET.get("trace_id", "")
+
     services_result = tempo_services()
     traces_result = tempo_recent_traces(service=service, earliest=earliest)
+
+    focus_trace_json = "null"
+    if focus_trace_id:
+        detail = tempo_trace_detail(focus_trace_id)
+        if detail.get("success"):
+            focus_trace_json = json.dumps(detail.get("data"), cls=DjangoJSONEncoder)
+
     request.otel_page_summary = {"page": "otel_trace", "earliest": earliest}
     return render(request, "dashboard/otel_trace.html", {
         "services": services_result.get("data", []),
@@ -297,6 +306,8 @@ def otel_trace_overview(request):
         "selected_service": service,
         "earliest": earliest,
         "time_ranges": _OTEL_TIME_RANGES,
+        "focus_trace_id": focus_trace_id,
+        "focus_trace_json": focus_trace_json,
     })
 
 

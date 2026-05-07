@@ -215,9 +215,11 @@ def otel_filtered_transactions(service: str = "", endpoint: str = "", method: st
         | eval status = tostring(coalesce(status, ""))
         | spath input=_raw path=duration_seconds output=duration_s
         | spath input=_raw path=response_body output=response_body_json
+        | spath input=_raw path=trace_id output=_trace_id_raw
         | eval response_body_text = if(isnotnull(response_body_json), response_body_json, tostring(response_body))
+        | eval trace_id = coalesce(trace_id, _trace_id_raw, "")
         {status_where}
-        | table timestamp, service, endpoint, method, status, duration_s, transaction_id, path, response_body_text
+        | table timestamp, service, endpoint, method, status, duration_s, transaction_id, trace_id, path, response_body_text
         | sort -_time
         | head {limit}
     """
