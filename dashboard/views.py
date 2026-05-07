@@ -13,6 +13,8 @@ from dashboard.services.network import collect_network_summary, collect_network_
 from dashboard.services.emporia import collect_emporia_summary, collect_emporia_daily_summary, collect_emporia_monthly_summary, collect_emporia_monthly_category_summary
 from dashboard.services.enphase import collect_enhase_summary
 from dashboard.services.splunk import splunk_collector_summary, otel_response_summary, otel_service_status_summary, otel_endpoint_summary, otel_transaction_list, otel_recent_transactions, otel_summary, otel_filtered_transactions
+from dashboard.services.tempo import tempo_services, tempo_recent_traces, tempo_trace_detail
+from dashboard.services.prometheus_svc import prom_instant_query, prom_range_query
 from dashboard.services.weather import collect_weather_summary
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
@@ -280,3 +282,51 @@ def otel_transaction_detail(request):
     if not all([service, endpoint, method, status]):
         return JsonResponse({"success": False, "message": "service, endpoint, method, status all required"})
     return JsonResponse(otel_transaction_list(service, endpoint, method, status, earliest))
+
+
+@login_required
+def otel_trace_overview(request):
+    earliest = request.GET.get("earliest", "-1h")
+    service = request.GET.get("service", "")
+    services_result = tempo_services()
+    traces_result = tempo_recent_traces(service=service, earliest=earliest)
+    request.otel_page_summary = {"page": "otel_trace", "earliest": earliest}
+    return render(request, "dashboard/otel_trace.html", {
+        "services": services_result.get("data", []),
+        "traces": traces_result,
+        "selected_service": service,
+        "earliest": earliest,
+        "time_ranges": _OTEL_TIME_RANGES,
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def otel_trace_detail_view(request):
+    trace_id = request.GET.get("trace_id", "")
+    if not trace_id:
+        return JsonResponse({"success": False, "message": "trace_id required"})
+    return JsonResponse(tempo_trace_detail(trace_id))
+
+
+@login_required
+def otel_metrics_overview(request):
+    earliest = request.GET.get("earliest", "-1h")
+    request.otel_page_summary = {"page": "otel_metrics", "earliest": earliest}
+    return render(request, "dashboard/otel_metrics.html", {
+        "earliest": earliest,
+        "time_ranges": _OTEL_TIME_RANGES,
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def otel_metrics_query_view(request):
+    query = request.GET.get("query", "")
+    earliest = request.GET.get("earliest", "-1h")
+    query_type = request.GET.get("type", "instant")
+    if not query:
+        return JsonResponse({"success": False, "message": "query required"})
+    if query_type == "range":
+        return JsonResponse(prom_range_query(query, earliest))
+    return JsonResponse(prom_instant_query(query))

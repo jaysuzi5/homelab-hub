@@ -262,12 +262,12 @@ function renderSummary(data) {
     tbody.innerHTML = data.map(row => {
         const bg = String(row.status||'') >= '500' ? 'bg-red-950/30' :
                    String(row.status||'') >= '400' ? 'bg-orange-950/20' : '';
-        const svc = JSON.stringify(String(row.service||''));
-        const ep  = JSON.stringify(String(row.endpoint||''));
-        const mth = JSON.stringify(String(row.method||''));
-        const st  = JSON.stringify(String(row.status||''));
         return `<tr class="border-b border-gray-700 hover:bg-gray-700/50 cursor-pointer transition-colors ${bg}"
-                    onclick="fetchRowTransactions(${svc}, ${ep}, ${mth}, ${st})" title="Click to fetch transactions">
+                    data-svc="${escHtml(row.service||'')}"
+                    data-ep="${escHtml(row.endpoint||'')}"
+                    data-method="${escHtml(row.method||'')}"
+                    data-status="${escHtml(row.status||'')}"
+                    onclick="fetchRowTransactions(this)" title="Click to fetch transactions">
             <td class="px-3 py-2 text-gray-200 font-mono text-xs">${escHtml(row.service||'')}</td>
             <td class="px-3 py-2 text-gray-200 font-mono text-xs">${escHtml(row.endpoint||'')}</td>
             <td class="px-3 py-2">${methodBadge(row.method||'')}</td>
@@ -324,8 +324,13 @@ function fetchTransactions() {
     doFetch(`/otel2/transactions/?${params}`, parts.length ? parts.join(' · ') : 'All traffic');
 }
 
-// ── Fetch (row click — exact combo, also syncs filters) ───────────────────────
-function fetchRowTransactions(service, endpoint, method, status) {
+// ── Fetch (row click — reads data attributes, syncs filters) ─────────────────
+function fetchRowTransactions(tr) {
+    const service  = tr.dataset.svc;
+    const endpoint = tr.dataset.ep;
+    const method   = tr.dataset.method;
+    const status   = tr.dataset.status;
+
     // Sync filter state
     fSvc = service;
     fEp = endpoint;
@@ -343,10 +348,8 @@ function fetchRowTransactions(service, endpoint, method, status) {
     const activeBtn = document.querySelector(`.status-btn[data-prefix="${prefix}"]`);
     if (activeBtn) activeBtn.classList.add('bg-gray-700');
 
-    // Refresh summary table to reflect new filter state
     applyFilters();
 
-    // Fetch transactions using exact status (not prefix)
     const params = new URLSearchParams({ earliest: EARLIEST2, service, endpoint, method, status });
     doFetch(`/otel2/transactions/?${params}`, `${service} · ${endpoint} · ${method} · ${status}`);
 }
@@ -355,12 +358,13 @@ function fetchRowTransactions(service, endpoint, method, status) {
 let _txnData = [];
 
 async function doFetch(url, label) {
-    const section = document.getElementById('txn-section');
-    const loading = document.getElementById('txn-loading');
-    const errDiv  = document.getElementById('txn-error');
-    const errMsg  = document.getElementById('txn-error-msg');
-    const emptyDiv = document.getElementById('txn-empty');
+    const section   = document.getElementById('txn-section');
+    const loading   = document.getElementById('txn-loading');
+    const errDiv    = document.getElementById('txn-error');
+    const errMsg    = document.getElementById('txn-error-msg');
+    const emptyDiv  = document.getElementById('txn-empty');
     const tableWrap = document.getElementById('txn-table-wrap');
+    const fetchBtn  = document.getElementById('fetch-btn');
 
     section.classList.remove('hidden');
     loading.classList.remove('hidden');
@@ -368,8 +372,12 @@ async function doFetch(url, label) {
     emptyDiv.classList.add('hidden');
     tableWrap.classList.add('hidden');
     document.getElementById('txn-subtitle').textContent = label;
-    document.getElementById('txn-count').textContent = 'Loading…';
+    document.getElementById('txn-count').textContent = 'Querying…';
     section.scrollIntoView({behavior:'smooth', block:'start'});
+
+    document.body.style.cursor = 'wait';
+    fetchBtn.disabled = true;
+    fetchBtn.textContent = 'Loading…';
 
     try {
         const resp = await fetch(url);
@@ -392,6 +400,10 @@ async function doFetch(url, label) {
         errMsg.textContent = String(e);
         errDiv.classList.remove('hidden');
         document.getElementById('txn-count').textContent = '';
+    } finally {
+        document.body.style.cursor = '';
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = 'Fetch Transactions';
     }
 }
 

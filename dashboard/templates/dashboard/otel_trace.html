@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white">OTEL Trace Explorer</h1>
+            <p class="text-gray-400 text-sm mt-1">Distributed traces via Grafana Tempo · <span class="font-mono text-xs text-gray-500">tempo.monitoring.svc.cluster.local:3100</span></p>
+        </div>
+        <form method="get" class="flex items-center gap-2 flex-wrap justify-end">
+            {% if services %}
+            <select name="service" onchange="this.form.submit()"
+                    class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="">All Services</option>
+                {% for svc in services %}
+                <option value="{{ svc }}" {% if svc == selected_service %}selected{% endif %}>{{ svc }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <select name="earliest" onchange="this.form.submit()"
+                    class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                {% for value, label in time_ranges %}
+                <option value="{{ value }}" {% if value == earliest %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    {% if not traces.success %}
+    <div class="bg-red-900/30 border border-red-700 rounded-lg p-6 mb-4">
+        <p class="text-red-300 font-medium">Tempo query failed</p>
+        <p class="text-red-400 text-sm mt-1">{{ traces.message }}</p>
+        <p class="text-gray-500 text-xs mt-2">Ensure Tempo is reachable at <span class="font-mono">tempo.monitoring.svc.cluster.local:3100</span> and the OTEL collector is forwarding traces.</p>
+    </div>
+    {% elif not traces.data %}
+    <div class="bg-gray-800 border border-gray-700 rounded-lg p-10 text-center">
+        <div class="text-gray-400 text-4xl mb-3">◎</div>
+        <p class="text-gray-300 font-medium mb-1">No traces found</p>
+        <p class="text-gray-500 text-sm">No traces in the selected time range{% if selected_service %} for <span class="font-mono text-gray-400">{{ selected_service }}</span>{% endif %}.</p>
+        <p class="text-gray-600 text-xs mt-3">Traces are collected via OTLP → otel-collector → Tempo. Verify the application is instrumented with the OpenTelemetry SDK trace provider.</p>
+    </div>
+    {% else %}
+
+    <!-- Stats strip -->
+    <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Traces</div>
+            <div class="text-xl font-bold text-white">{{ traces.data|length }}</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Services</div>
+            <div class="text-xl font-bold text-blue-400" id="stat-services">—</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Avg Duration</div>
+            <div class="text-xl font-bold text-purple-400" id="stat-avg-dur">—</div>
+        </div>
+    </div>
+
+    <!-- Trace table -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide">
+                        <th class="px-3 py-3 text-left w-40">Start Time (EST)</th>
+                        <th class="px-3 py-3 text-left">Root Service</th>
+                        <th class="px-3 py-3 text-left">Root Span</th>
+                        <th class="px-3 py-3 text-right w-24">Duration (ms)</th>
+                        <th class="px-3 py-3 text-left w-32">Trace ID</th>
+                    </tr>
+                </thead>
+                <tbody id="trace-tbody" class="divide-y divide-gray-700"></tbody>
+            </table>
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TRACE_DATA = {{ traces.data|safe }};
+const EARLIEST_TRACE = "{{ earliest|escapejs }}";
+
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatNanoTS(ns) {
+    if (!ns) return '—';
+    try {
+        // ns is a string like "1234567890123456789"
+        const ms = Number(BigInt(ns) / 1000000n);
+        const d = new Date(ms);
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone:'America/New_York', year:'numeric', month:'2-digit', day:'2-digit',
+            hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+        }).formatToParts(d);
+        const p={};
+        parts.forEach(({type,value})=>p[type]=value);
+        return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+    } catch(e){ return String(ns); }
+}
+
+function renderTraces(data) {
+    const tbody = document.getElementById('trace-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = data.map((t, idx) => {
+        const traceId = t.traceID || '';
+        const short = traceId.slice(0, 8) + '…';
+        const dur = t.durationMs != null ? Number(t.durationMs).toFixed(1) : '—';
+        const durNum = parseFloat(dur);
+        const durClass = durNum > 1000 ? 'text-red-400' : durNum > 500 ? 'text-yellow-400' : 'text-gray-300';
+        return `<tr class="border-b border-gray-700 hover:bg-gray-700 cursor-pointer transition-colors"
+                    data-traceid="${escHtml(traceId)}"
+                    onclick="toggleSpans(this, ${idx})">
+            <td class="px-3 py-2 text-gray-400 font-mono text-xs whitespace-nowrap">${escHtml(formatNanoTS(t.startTimeUnixNano))}</td>
+            <td class="px-3 py-2 text-gray-200 font-mono text-xs">${escHtml(t.rootServiceName||'—')}</td>
+            <td class="px-3 py-2 text-gray-300 text-xs">${escHtml(t.rootTraceName||'—')}</td>
+            <td class="px-3 py-2 text-right font-mono text-xs ${durClass}">${dur}</td>
+            <td class="px-3 py-2 text-blue-400 font-mono text-xs" title="${escHtml(traceId)}">${escHtml(short)}</td>
+        </tr>
+        <tr id="span-row-${idx}" class="hidden border-b border-gray-700 bg-gray-900">
+            <td colspan="5" class="px-4 py-3" id="span-content-${idx}">
+                <div class="text-gray-400 text-xs">Loading spans…</div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function toggleSpans(tr, idx) {
+    const spanRow = document.getElementById(`span-row-${idx}`);
+    const content = document.getElementById(`span-content-${idx}`);
+    if (!spanRow.classList.contains('hidden')) {
+        spanRow.classList.add('hidden');
+        return;
+    }
+    spanRow.classList.remove('hidden');
+    const traceId = tr.dataset.traceid;
+    if (content.dataset.loaded) return;
+
+    document.body.style.cursor = 'wait';
+    try {
+        const resp = await fetch(`/otel/trace/detail/?trace_id=${encodeURIComponent(traceId)}`);
+        const json = await resp.json();
+        if (!json.success) {
+            content.innerHTML = `<span class="text-red-400 text-xs">${escHtml(json.message)}</span>`;
+            return;
+        }
+        content.innerHTML = renderSpans(json.data);
+        content.dataset.loaded = '1';
+    } catch(e) {
+        content.innerHTML = `<span class="text-red-400 text-xs">${escHtml(String(e))}</span>`;
+    } finally {
+        document.body.style.cursor = '';
+    }
+}
+
+function renderSpans(data) {
+    const spans = [];
+    for (const batch of (data.batches || [])) {
+        const attrs = batch.resource?.attributes || [];
+        const svcAttr = attrs.find(a => a.key === 'service.name');
+        const service = svcAttr?.value?.stringValue || 'unknown';
+        for (const ils of (batch.instrumentationLibrarySpans || batch.scopeSpans || [])) {
+            for (const span of (ils.spans || [])) {
+                const startNs = BigInt(span.startTimeUnixNano || '0');
+                const endNs   = BigInt(span.endTimeUnixNano   || '0');
+                const durMs   = Number(endNs - startNs) / 1e6;
+                const hasError = span.status?.code === 2 || span.status?.code === 'STATUS_CODE_ERROR';
+                spans.push({ service, name: span.name, durMs, hasError,
+                             parentSpanId: span.parentSpanId || '', spanId: span.spanId || '',
+                             startNs });
+            }
+        }
+    }
+    spans.sort((a,b) => Number(a.startNs - b.startNs));
+    if (!spans.length) return '<span class="text-gray-500 text-xs">No span data returned.</span>';
+
+    const maxDur = Math.max(...spans.map(s=>s.durMs), 1);
+    const rows = spans.map(s => {
+        const pct = Math.max(2, Math.round((s.durMs / maxDur) * 100));
+        const barColor = s.hasError ? 'bg-red-500' : 'bg-blue-500';
+        const textColor = s.hasError ? 'text-red-400' : 'text-gray-300';
+        const indent = s.parentSpanId ? 'pl-6' : '';
+        return `<div class="flex items-center gap-3 py-0.5 ${indent}">
+            <span class="text-gray-500 font-mono text-xs w-20 shrink-0">${escHtml(s.service)}</span>
+            <span class="${textColor} text-xs flex-1 truncate" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
+            <div class="w-32 bg-gray-700 rounded-full h-1.5 shrink-0">
+                <div class="${barColor} h-1.5 rounded-full" style="width:${pct}%"></div>
+            </div>
+            <span class="text-gray-400 font-mono text-xs w-16 text-right shrink-0">${s.durMs.toFixed(1)}ms</span>
+        </div>`;
+    }).join('');
+    return `<div class="space-y-0.5">${rows}</div>`;
+}
+
+// Compute stats
+function computeStats(data) {
+    const svcs = new Set(data.map(t=>t.rootServiceName).filter(Boolean));
+    const avgDur = data.length ? (data.reduce((s,t)=>s+(t.durationMs||0),0)/data.length).toFixed(0) : 0;
+    const el1 = document.getElementById('stat-services');
+    const el2 = document.getElementById('stat-avg-dur');
+    if (el1) el1.textContent = svcs.size;
+    if (el2) el2.textContent = avgDur + ' ms';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderTraces(TRACE_DATA);
+    computeStats(TRACE_DATA);
+});
+</script>
+{% endblock %}

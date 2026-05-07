@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white">OTEL Metric Explorer</h1>
+            <p class="text-gray-400 text-sm mt-1">Prometheus query interface · <span class="font-mono text-xs text-gray-500">prometheus-operator-kube-p-prometheus.monitoring:9090</span></p>
+        </div>
+        <div class="flex items-center gap-2">
+            <label class="text-gray-400 text-sm">Time Range:</label>
+            <select id="range-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                {% for value, label in time_ranges %}
+                <option value="{{ value }}" {% if value == earliest %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-4 gap-4">
+
+        <!-- Preset Queries Sidebar -->
+        <div class="col-span-1">
+            <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                <div class="px-3 py-2 border-b border-gray-700">
+                    <span class="text-xs uppercase tracking-wide text-gray-400 font-semibold">Preset Queries</span>
+                </div>
+                <div id="preset-list" class="divide-y divide-gray-700"></div>
+            </div>
+        </div>
+
+        <!-- Query + Results Panel -->
+        <div class="col-span-3 space-y-4">
+
+            <!-- Query Input -->
+            <div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                <div class="flex items-start gap-2">
+                    <div class="flex-1">
+                        <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1">PromQL</label>
+                        <textarea id="query-input" rows="2"
+                                  class="w-full bg-gray-700 border border-gray-600 text-white text-sm font-mono rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none placeholder-gray-500"
+                                  placeholder="e.g. up"></textarea>
+                    </div>
+                    <div class="flex flex-col gap-2 mt-5">
+                        <button id="exec-instant" onclick="executeQuery('instant')"
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded transition-colors whitespace-nowrap">
+                            Instant
+                        </button>
+                        <button id="exec-range" onclick="executeQuery('range')"
+                                class="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 text-white text-sm font-medium rounded transition-colors whitespace-nowrap">
+                            Range
+                        </button>
+                    </div>
+                </div>
+                <div id="query-status" class="mt-2 text-xs text-gray-500 hidden"></div>
+            </div>
+
+            <!-- Results -->
+            <div id="results-panel" class="hidden">
+                <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                    <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                        <span class="text-sm font-semibold text-gray-300 uppercase tracking-wide">Results</span>
+                        <span class="text-gray-500 text-xs" id="result-meta"></span>
+                    </div>
+                    <div id="result-loading" class="p-8 text-center text-gray-400 hidden">
+                        <div class="animate-spin inline-block w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full mb-2"></div>
+                        <div class="text-sm">Querying Prometheus…</div>
+                    </div>
+                    <div id="result-error" class="p-6 hidden">
+                        <p class="text-red-300 font-medium text-sm">Query failed</p>
+                        <p class="text-red-400 text-xs mt-1" id="result-error-msg"></p>
+                    </div>
+                    <div class="overflow-x-auto" id="result-table-wrap">
+                        <table class="w-full text-sm" id="result-table">
+                            <thead id="result-thead">
+                                <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide"></tr>
+                            </thead>
+                            <tbody id="result-tbody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                    <div id="result-empty" class="p-6 text-center text-gray-500 text-sm hidden">No results returned.</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PRESET_LIST = [
+    { label: "K8s Nodes Ready",        query: 'count(kube_node_status_condition{condition="Ready",status="true"})',                                           type: "instant" },
+    { label: "Total Running Pods",     query: 'count(kube_pod_status_phase{phase="Running"})',                                                               type: "instant" },
+    { label: "homelab-hub Pod CPU",    query: 'sum(rate(container_cpu_usage_seconds_total{namespace="homelab-hub",container!=""}[5m])) by (pod)',             type: "instant" },
+    { label: "homelab-hub Pod Memory", query: 'sum(container_memory_working_set_bytes{namespace="homelab-hub",container!=""}) by (pod)',                     type: "instant" },
+    { label: "Cluster CPU %",          query: '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))',                                              type: "instant" },
+    { label: "Cluster Memory %",       query: '(sum(node_memory_MemTotal_bytes)-sum(node_memory_MemAvailable_bytes))/sum(node_memory_MemTotal_bytes)*100',    type: "instant" },
+    { label: "PVC Status",             query: 'kube_persistentvolumeclaim_status_phase',                                                                     type: "instant" },
+    { label: "OTEL HTTP Request Rate", query: 'rate(http_server_request_duration_seconds_count[5m])',                                                        type: "instant" },
+    { label: "homelab-hub Pod Status", query: 'kube_pod_status_phase{namespace="homelab-hub"}',                                                             type: "instant" },
+];
+
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderPresetList() {
+    const el = document.getElementById('preset-list');
+    el.innerHTML = PRESET_LIST.map((p, i) =>
+        `<button class="w-full text-left px-3 py-2.5 hover:bg-gray-700 transition-colors" onclick="loadPreset(${i})">
+            <div class="text-gray-200 text-xs font-medium">${escHtml(p.label)}</div>
+            <div class="text-gray-500 text-xs mt-0.5 font-mono truncate" title="${escHtml(p.query)}">${escHtml(p.query.length>40 ? p.query.slice(0,40)+'…' : p.query)}</div>
+        </button>`
+    ).join('');
+}
+
+function loadPreset(idx) {
+    const p = PRESET_LIST[idx];
+    if (!p) return;
+    document.getElementById('query-input').value = p.query;
+    executeQuery(p.type || 'instant');
+}
+
+async function executeQuery(qtype) {
+    const query = document.getElementById('query-input').value.trim();
+    if (!query) return;
+
+    const earliest = document.getElementById('range-select').value;
+    const status = document.getElementById('query-status');
+    const panel = document.getElementById('results-panel');
+    const loading = document.getElementById('result-loading');
+    const errDiv = document.getElementById('result-error');
+    const errMsg = document.getElementById('result-error-msg');
+    const tableWrap = document.getElementById('result-table-wrap');
+    const emptyDiv = document.getElementById('result-empty');
+    const meta = document.getElementById('result-meta');
+
+    panel.classList.remove('hidden');
+    loading.classList.remove('hidden');
+    errDiv.classList.add('hidden');
+    tableWrap.classList.add('hidden');
+    emptyDiv.classList.add('hidden');
+    meta.textContent = '';
+    status.textContent = 'Running…';
+    status.classList.remove('hidden');
+
+    document.body.style.cursor = 'wait';
+    document.getElementById('exec-instant').disabled = true;
+    document.getElementById('exec-range').disabled = true;
+
+    try {
+        const params = new URLSearchParams({ query, earliest, type: qtype });
+        const resp = await fetch(`/otel/metrics/query/?${params}`);
+        const json = await resp.json();
+        loading.classList.add('hidden');
+
+        if (!json.success) {
+            errMsg.textContent = json.message || 'Unknown error';
+            errDiv.classList.remove('hidden');
+            status.textContent = 'Error';
+            return;
+        }
+
+        status.classList.add('hidden');
+        const data = json.data;
+        meta.textContent = `${data.length} series · ${json.result_type} · ${qtype}`;
+
+        if (!data.length) { emptyDiv.classList.remove('hidden'); return; }
+
+        if (json.result_type === 'vector') {
+            renderVectorResults(data);
+        } else if (json.result_type === 'matrix') {
+            renderMatrixResults(data);
+        } else if (json.result_type === 'scalar' || json.result_type === 'string') {
+            renderScalarResult(data);
+        } else {
+            renderRawResults(data);
+        }
+        tableWrap.classList.remove('hidden');
+
+    } catch(e) {
+        loading.classList.add('hidden');
+        errMsg.textContent = String(e);
+        errDiv.classList.remove('hidden');
+        status.textContent = 'Error';
+    } finally {
+        document.body.style.cursor = '';
+        document.getElementById('exec-instant').disabled = false;
+        document.getElementById('exec-range').disabled = false;
+    }
+}
+
+function formatValue(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return escHtml(String(v));
+    if (n >= 1e9) return (n/1e9).toFixed(3) + ' GB';
+    if (n >= 1e6) return (n/1e6).toFixed(3) + ' MB';
+    if (n >= 1000) return n.toFixed(1);
+    if (n < 0.001 && n > 0) return n.toExponential(3);
+    return n.toFixed(4).replace(/\.?0+$/, '');
+}
+
+function renderVectorResults(data) {
+    const thead = document.getElementById('result-thead').querySelector('tr');
+    const tbody = document.getElementById('result-tbody');
+
+    // Collect all label keys
+    const labelKeys = [...new Set(data.flatMap(r => Object.keys(r.metric).filter(k => k !== '__name__')))].sort();
+    const metricName = data[0]?.metric?.__name__ || '';
+
+    thead.innerHTML = labelKeys.map(k => `<th class="px-3 py-2 text-left">${escHtml(k)}</th>`).join('') +
+                      `<th class="px-3 py-2 text-right w-32">Value</th>`;
+
+    tbody.innerHTML = data.map(r => {
+        const val = r.value?.[1] ?? '—';
+        const n = parseFloat(val);
+        const valClass = n > 0 ? 'text-green-400' : 'text-gray-400';
+        return `<tr class="border-b border-gray-700 hover:bg-gray-700/30">
+            ${labelKeys.map(k => `<td class="px-3 py-2 text-gray-300 font-mono text-xs">${escHtml(r.metric[k]||'')}</td>`).join('')}
+            <td class="px-3 py-2 text-right font-mono text-xs font-semibold ${valClass}">${formatValue(val)}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderMatrixResults(data) {
+    const thead = document.getElementById('result-thead').querySelector('tr');
+    const tbody = document.getElementById('result-tbody');
+
+    const labelKeys = [...new Set(data.flatMap(r => Object.keys(r.metric).filter(k => k !== '__name__')))].sort();
+
+    thead.innerHTML = labelKeys.map(k => `<th class="px-3 py-2 text-left">${escHtml(k)}</th>`).join('') +
+                      `<th class="px-3 py-2 text-right w-20">Points</th>` +
+                      `<th class="px-3 py-2 text-right w-32">Latest Value</th>`;
+
+    tbody.innerHTML = data.map(r => {
+        const vals = r.values || [];
+        const latest = vals.length ? vals[vals.length-1][1] : '—';
+        return `<tr class="border-b border-gray-700 hover:bg-gray-700/30">
+            ${labelKeys.map(k => `<td class="px-3 py-2 text-gray-300 font-mono text-xs">${escHtml(r.metric[k]||'')}</td>`).join('')}
+            <td class="px-3 py-2 text-right text-gray-500 font-mono text-xs">${vals.length}</td>
+            <td class="px-3 py-2 text-right font-mono text-xs font-semibold text-green-400">${formatValue(latest)}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderScalarResult(data) {
+    const thead = document.getElementById('result-thead').querySelector('tr');
+    const tbody = document.getElementById('result-tbody');
+    thead.innerHTML = `<th class="px-3 py-2 text-left">Value</th>`;
+    const val = Array.isArray(data) ? data[1] : data;
+    tbody.innerHTML = `<tr class="border-b border-gray-700"><td class="px-3 py-2 font-mono text-sm text-green-400">${formatValue(val)}</td></tr>`;
+}
+
+function renderRawResults(data) {
+    const thead = document.getElementById('result-thead').querySelector('tr');
+    const tbody = document.getElementById('result-tbody');
+    thead.innerHTML = `<th class="px-3 py-2 text-left">Raw</th>`;
+    tbody.innerHTML = `<tr><td class="px-3 py-2 font-mono text-xs text-gray-300"><pre class="whitespace-pre-wrap">${escHtml(JSON.stringify(data, null, 2))}</pre></td></tr>`;
+}
+
+document.addEventListener('DOMContentLoaded', renderPresetList);
+</script>
+{% endblock %}
