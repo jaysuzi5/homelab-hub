@@ -177,9 +177,11 @@ def otel_summary(earliest: str = "-1h") -> dict:
         | eval endpoint = coalesce(endpoint, "none")
         | eval method = coalesce(method, "")
         | eval status = tostring(coalesce(status, ""))
+        | eval path = coalesce(path, "")
+        | eval type = if(match(path, "^/api"), "API", "Application")
         | spath input=_raw path=duration_seconds output=duration_s
         | eval duration_s = tonumber(duration_s)
-        | stats dc(transaction_id) as count, avg(duration_s) as avg_duration by service, endpoint, method, status
+        | stats dc(transaction_id) as count, avg(duration_s) as avg_duration by service, endpoint, method, status, type
         | eval avg_duration = round(avg_duration, 3)
         | sort -count
     """

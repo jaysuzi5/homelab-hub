@@ -46,12 +46,35 @@
         </div>
     </div>
 
-    <!-- Summary Section -->
+    <!-- Service Summary Table -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 mb-4">
+        <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+            <span class="text-sm font-semibold text-gray-300 uppercase tracking-wide">Services</span>
+            <span class="text-gray-500 text-xs">Click a row to filter the detail table below</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead id="svc-sum-thead">
+                    <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide">
+                        <th class="px-3 py-2 text-left w-28">Type</th>
+                        <th class="px-3 py-2 text-left">Service</th>
+                        <th class="px-3 py-2 text-right w-28">Requests</th>
+                        <th class="px-3 py-2 text-right w-24">Errors</th>
+                        <th class="px-3 py-2 text-right w-24">Error Rate</th>
+                        <th class="px-3 py-2 text-right w-28">Avg Dur (s)</th>
+                    </tr>
+                </thead>
+                <tbody id="svc-summary-tbody" class="divide-y divide-gray-700"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Traffic Detail Table -->
     <div class="bg-gray-800 rounded-lg border border-gray-700 mb-4">
         <div class="px-4 py-3 border-b border-gray-700">
             <div class="flex items-center justify-between gap-3 flex-wrap">
                 <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-sm font-semibold text-gray-300 uppercase tracking-wide mr-1">Traffic Summary</span>
+                    <span class="text-sm font-semibold text-gray-300 uppercase tracking-wide mr-1">Traffic Detail</span>
                     <select id="svc-filter" class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
                         <option value="">All Services</option>
                     </select>
@@ -61,6 +84,11 @@
                     <select id="method-filter" class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
                         <option value="">All Methods</option>
                     </select>
+                    <div class="flex gap-1">
+                        <button class="type-btn px-2 py-1 text-xs rounded border border-gray-600 text-gray-300" data-type="">All</button>
+                        <button class="type-btn px-2 py-1 text-xs rounded border border-gray-600 text-blue-400" data-type="API">API</button>
+                        <button class="type-btn px-2 py-1 text-xs rounded border border-gray-600 text-purple-400" data-type="Application">App</button>
+                    </div>
                     <div class="flex gap-1">
                         <button class="status-btn px-2 py-1 text-xs rounded border border-gray-600 text-gray-300" data-prefix="">All</button>
                         <button class="status-btn px-2 py-1 text-xs rounded border border-gray-600 text-green-400" data-prefix="2">2xx</button>
@@ -77,7 +105,7 @@
                     Fetch Transactions
                 </button>
             </div>
-            <p class="text-gray-500 text-xs mt-2">Click any row to fetch transactions for that exact combination, or use filters above and click Fetch Transactions.</p>
+            <p class="text-gray-500 text-xs mt-2">Click any row to fetch transactions for that exact combination, or use filters above and click Fetch Transactions. Type filter also applies to Service Summary above.</p>
         </div>
 
         <div class="overflow-x-auto">
@@ -85,6 +113,7 @@
                 <thead id="sum-thead">
                     <tr class="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wide">
                         <th class="px-3 py-2 text-left">Service</th>
+                        <th class="px-3 py-2 text-left w-28">Type</th>
                         <th class="px-3 py-2 text-left">Endpoint</th>
                         <th class="px-3 py-2 text-left w-20">Method</th>
                         <th class="px-3 py-2 text-left w-20">Status</th>
@@ -163,6 +192,12 @@ function statusBadge(s) {
     else if (sc>='400') cls='bg-red-900 text-red-300';
     return `<span class="px-1.5 py-0.5 rounded text-xs font-medium ${cls}">${escHtml(sc)}</span>`;
 }
+function typeBadge(t) {
+    const cls = t === 'API' ? 'bg-blue-900 text-blue-300' :
+                t === 'Mixed' ? 'bg-indigo-900 text-indigo-300' :
+                'bg-purple-900 text-purple-300';
+    return `<span class="px-1.5 py-0.5 rounded text-xs font-medium ${cls}">${escHtml(t||'—')}</span>`;
+}
 function methodBadge(m) {
     let cls='bg-gray-700 text-gray-300';
     if (m==='GET') cls='bg-blue-900 text-blue-300';
@@ -195,7 +230,7 @@ function splunkUrl(txnId) {
     return `http://192.168.86.220:8000/en-US/app/search/search?q=${encodeURIComponent(q)}`;
 }
 
-// ── KPIs (computed from current summary view) ─────────────────────────────────
+// ── KPIs ──────────────────────────────────────────────────────────────────────
 function computeKpis(data) {
     let total = 0, errors = 0;
     const services = new Set(), endpoints = new Set();
@@ -214,7 +249,128 @@ function computeKpis(data) {
     document.getElementById('kpi-endpoints').textContent = endpoints.size;
 }
 
-// ── Populate dropdowns from all summary data ──────────────────────────────────
+// ── Service summary aggregation ───────────────────────────────────────────────
+function buildServiceSummary(data) {
+    const map = {};
+    data.forEach(r => {
+        const svc = r.service || '';
+        if (!map[svc]) map[svc] = { service: svc, count: 0, errors: 0, dur_sum: 0, dur_n: 0, types: new Set() };
+        const cnt = parseInt(r.count) || 0;
+        map[svc].count += cnt;
+        if (String(r.status || '') >= '400') map[svc].errors += cnt;
+        if (r.avg_duration && cnt) {
+            map[svc].dur_sum += parseFloat(r.avg_duration) * cnt;
+            map[svc].dur_n += cnt;
+        }
+        if (r.type) map[svc].types.add(r.type);
+    });
+    return Object.values(map).map(s => {
+        const types = [...s.types];
+        const typeLabel = types.length > 1 ? 'Mixed' : (types[0] || '—');
+        return {
+            service: s.service,
+            type: typeLabel,
+            count: s.count,
+            errors: s.errors,
+            error_rate: s.count ? ((s.errors / s.count) * 100).toFixed(1) : '0.0',
+            avg_duration: s.dur_n ? s.dur_sum / s.dur_n : null,
+        };
+    }).sort((a, b) => b.count - a.count);
+}
+
+// ── Filter state ──────────────────────────────────────────────────────────────
+let fSvc='', fEp='', fMethod='', fStatusPrefix='', fTxt='', fType='';
+let _selectedSvc = '';
+
+// ── Service summary sort state (default: type asc, then service asc) ──────────
+const _svs = { col: -1, dir: 1 };
+const svcSumFields = ['type','service','count','errors','error_rate','avg_duration'];
+
+// Used for service summary: respects all filters except fSvc
+function getFilteredForSvcSummary() {
+    return SUMMARY_DATA.filter(r => {
+        if (fType && r.type !== fType) return false;
+        if (fEp && r.endpoint !== fEp) return false;
+        if (fMethod && r.method !== fMethod) return false;
+        if (fStatusPrefix && !String(r.status||'').startsWith(fStatusPrefix)) return false;
+        return true;
+    });
+}
+
+// Used for detail table: respects all filters
+function getFiltered() {
+    return SUMMARY_DATA.filter(r => {
+        if (fSvc && r.service !== fSvc) return false;
+        if (fType && r.type !== fType) return false;
+        if (fEp && r.endpoint !== fEp) return false;
+        if (fMethod && r.method !== fMethod) return false;
+        if (fStatusPrefix && !String(r.status||'').startsWith(fStatusPrefix)) return false;
+        if (fTxt) {
+            const q = fTxt.toLowerCase();
+            if (!(r.service||'').toLowerCase().includes(q) &&
+                !(r.endpoint||'').toLowerCase().includes(q) &&
+                !String(r.status||'').includes(q)) return false;
+        }
+        return true;
+    });
+}
+
+// ── Render service summary table ──────────────────────────────────────────────
+function sortSvcRows(rows) {
+    if (_svs.col >= 0) {
+        const field = svcSumFields[_svs.col];
+        rows.sort((a, b) => {
+            const av = String(a[field] ?? ''), bv = String(b[field] ?? '');
+            const an = parseFloat(av), bn = parseFloat(bv);
+            if (!isNaN(an) && !isNaN(bn)) return (an - bn) * _svs.dir;
+            return av.localeCompare(bv) * _svs.dir;
+        });
+    } else {
+        // Default: type asc, then service asc
+        rows.sort((a, b) => {
+            const tc = (a.type || '').localeCompare(b.type || '');
+            return tc !== 0 ? tc : (a.service || '').localeCompare(b.service || '');
+        });
+    }
+    return rows;
+}
+
+function renderServiceSummary() {
+    const rows = sortSvcRows(buildServiceSummary(getFilteredForSvcSummary()));
+    const tbody = document.getElementById('svc-summary-tbody');
+    tbody.innerHTML = rows.map(r => {
+        const isSelected = r.service === _selectedSvc;
+        const errRateNum = parseFloat(r.error_rate);
+        const errCls = errRateNum >= 10 ? 'text-red-400' : errRateNum > 0 ? 'text-yellow-400' : 'text-gray-400';
+        const selCls = isSelected ? 'bg-blue-900/40 border-l-2 border-blue-400' : 'hover:bg-gray-700/50';
+        return `<tr class="border-b border-gray-700 cursor-pointer transition-colors ${selCls}"
+                    data-svc="${escHtml(r.service)}"
+                    onclick="selectService(this, '${escHtml(r.service)}')"
+                    title="${isSelected ? 'Click to clear filter' : 'Click to filter by this service'}">
+            <td class="px-3 py-2">${typeBadge(r.type)}</td>
+            <td class="px-3 py-2 text-gray-200 font-mono text-xs font-medium">${escHtml(r.service)}</td>
+            <td class="px-3 py-2 text-right text-gray-200 font-mono text-xs font-semibold">${r.count.toLocaleString()}</td>
+            <td class="px-3 py-2 text-right font-mono text-xs ${r.errors ? 'text-red-400' : 'text-gray-500'}">${r.errors.toLocaleString()}</td>
+            <td class="px-3 py-2 text-right font-mono text-xs ${errCls}">${r.error_rate}%</td>
+            <td class="px-3 py-2 text-right text-gray-400 font-mono text-xs">${r.avg_duration !== null ? r.avg_duration.toFixed(3) : '—'}</td>
+        </tr>`;
+    }).join('');
+}
+
+function selectService(tr, svc) {
+    if (_selectedSvc === svc) {
+        _selectedSvc = '';
+        fSvc = '';
+    } else {
+        _selectedSvc = svc;
+        fSvc = svc;
+    }
+    document.getElementById('svc-filter').value = fSvc;
+    renderServiceSummary();
+    applyFilters();
+}
+
+// ── Populate dropdowns ────────────────────────────────────────────────────────
 function populateDropdowns(data) {
     const svcs = [...new Set(data.map(r=>r.service))].sort();
     const eps = [...new Set(data.map(r=>r.endpoint))].sort();
@@ -230,28 +386,9 @@ function populateDropdowns(data) {
     methods.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m; mSel.appendChild(o); });
 }
 
-// ── Filter state ──────────────────────────────────────────────────────────────
-let fSvc='', fEp='', fMethod='', fStatusPrefix='', fTxt='';
-
-function getFiltered() {
-    return SUMMARY_DATA.filter(r => {
-        if (fSvc && r.service !== fSvc) return false;
-        if (fEp && r.endpoint !== fEp) return false;
-        if (fMethod && r.method !== fMethod) return false;
-        if (fStatusPrefix && !String(r.status||'').startsWith(fStatusPrefix)) return false;
-        if (fTxt) {
-            const q = fTxt.toLowerCase();
-            if (!(r.service||'').toLowerCase().includes(q) &&
-                !(r.endpoint||'').toLowerCase().includes(q) &&
-                !String(r.status||'').includes(q)) return false;
-        }
-        return true;
-    });
-}
-
-// ── Summary table ─────────────────────────────────────────────────────────────
+// ── Detail summary table ──────────────────────────────────────────────────────
 const _ss = {col:-1, dir:1};
-const sumFields = ['service','endpoint','method','status','count','avg_duration'];
+const sumFields = ['service','type','endpoint','method','status','count','avg_duration'];
 
 function renderSummary(data) {
     const tbody = document.getElementById('sum-tbody');
@@ -269,6 +406,7 @@ function renderSummary(data) {
                     data-status="${escHtml(row.status||'')}"
                     onclick="fetchRowTransactions(this)" title="Click to fetch transactions">
             <td class="px-3 py-2 text-gray-200 font-mono text-xs">${escHtml(row.service||'')}</td>
+            <td class="px-3 py-2">${typeBadge(row.type||'')}</td>
             <td class="px-3 py-2 text-gray-200 font-mono text-xs">${escHtml(row.endpoint||'')}</td>
             <td class="px-3 py-2">${methodBadge(row.method||'')}</td>
             <td class="px-3 py-2">${statusBadge(row.status||'')}</td>
@@ -284,7 +422,33 @@ function applyFilters() {
     computeKpis(filtered);
 }
 
-// ── Summary sort ──────────────────────────────────────────────────────────────
+function applyAllFilters() {
+    renderServiceSummary();
+    applyFilters();
+}
+
+// ── Service summary sort ──────────────────────────────────────────────────────
+function initSvcSummarySort() {
+    const ths = Array.from(document.getElementById('svc-sum-thead').querySelectorAll('th'));
+    ths.forEach((th, i) => {
+        th.classList.add('cursor-pointer', 'select-none');
+        const icon = document.createElement('span');
+        icon.className = 'sort-icon ml-1 text-gray-600 text-xs';
+        icon.textContent = '↕';
+        th.appendChild(icon);
+        th.addEventListener('click', () => {
+            const dir = _svs.col === i ? -_svs.dir : 1;
+            _svs.col = i; _svs.dir = dir;
+            ths.forEach((h, j) => {
+                const ic = h.querySelector('.sort-icon');
+                if (ic) ic.textContent = j === i ? (dir === 1 ? '↑' : '↓') : '↕';
+            });
+            renderServiceSummary();
+        });
+    });
+}
+
+// ── Detail table sort ─────────────────────────────────────────────────────────
 function initSummarySort() {
     const ths = Array.from(document.getElementById('sum-thead').querySelectorAll('th'));
     ths.forEach((th, i) => {
@@ -309,7 +473,7 @@ function initSummarySort() {
     });
 }
 
-// ── Fetch (button — respects current filter state) ────────────────────────────
+// ── Fetch (button) ────────────────────────────────────────────────────────────
 function fetchTransactions() {
     const params = new URLSearchParams({ earliest: EARLIEST2 });
     if (fSvc) params.set('service', fSvc);
@@ -324,14 +488,13 @@ function fetchTransactions() {
     doFetch(`/otel/logging/transactions/?${params}`, parts.length ? parts.join(' · ') : 'All traffic');
 }
 
-// ── Fetch (row click — reads data attributes, syncs filters) ─────────────────
+// ── Fetch (detail row click) ──────────────────────────────────────────────────
 function fetchRowTransactions(tr) {
     const service  = tr.dataset.svc;
     const endpoint = tr.dataset.ep;
     const method   = tr.dataset.method;
     const status   = tr.dataset.status;
 
-    // Sync filter state
     fSvc = service;
     fEp = endpoint;
     fMethod = method;
@@ -339,7 +502,9 @@ function fetchRowTransactions(tr) {
     const prefix = ['2','3','4','5'].includes(String(status||'').charAt(0)) ? String(status).charAt(0) : '';
     fStatusPrefix = prefix;
 
-    // Sync UI controls
+    _selectedSvc = service;
+    renderServiceSummary();
+
     document.getElementById('svc-filter').value = service;
     document.getElementById('ep-filter').value = endpoint;
     document.getElementById('method-filter').value = method;
@@ -482,16 +647,31 @@ function initTxnSort() {
 }
 
 // ── Wire filter controls ──────────────────────────────────────────────────────
-document.getElementById('svc-filter').addEventListener('change', e=>{ fSvc=e.target.value; applyFilters(); });
-document.getElementById('ep-filter').addEventListener('change', e=>{ fEp=e.target.value; applyFilters(); });
-document.getElementById('method-filter').addEventListener('change', e=>{ fMethod=e.target.value; applyFilters(); });
+document.getElementById('svc-filter').addEventListener('change', e => {
+    fSvc = e.target.value;
+    _selectedSvc = fSvc;
+    renderServiceSummary();
+    applyFilters();
+});
+document.getElementById('ep-filter').addEventListener('change', e=>{ fEp=e.target.value; applyAllFilters(); });
+document.getElementById('method-filter').addEventListener('change', e=>{ fMethod=e.target.value; applyAllFilters(); });
 document.getElementById('txt-filter').addEventListener('input', e=>{ fTxt=e.target.value; applyFilters(); });
+
+document.querySelectorAll('.type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('bg-gray-700'));
+        btn.classList.add('bg-gray-700');
+        fType = btn.dataset.type;
+        applyAllFilters();
+    });
+});
+
 document.querySelectorAll('.status-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('bg-gray-700'));
         btn.classList.add('bg-gray-700');
         fStatusPrefix = btn.dataset.prefix;
-        applyFilters();
+        applyAllFilters();
     });
 });
 
@@ -499,9 +679,12 @@ document.querySelectorAll('.status-btn').forEach(btn => {
 document.addEventListener('DOMContentLoaded', () => {
     populateDropdowns(SUMMARY_DATA);
     computeKpis(SUMMARY_DATA);
+    renderServiceSummary();
+    initSvcSummarySort();
     renderSummary(SUMMARY_DATA);
     initSummarySort();
     document.querySelector('.status-btn[data-prefix=""]').classList.add('bg-gray-700');
+    document.querySelector('.type-btn[data-type=""]').classList.add('bg-gray-700');
 });
 </script>
 {% endblock %}
