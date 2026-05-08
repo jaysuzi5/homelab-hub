@@ -1,114 +1,252 @@
-# OTEL Logging — Homelab Hub
+# OTEL — Homelab Hub
 
-## Overview
+Two distinct OTEL concerns:
 
-Homelab Hub displays observability data collected from a set of external Python collector services. The collectors use a custom structured logging library (`jTookkit.jLogging`) whose output is routed through an OpenTelemetry Collector, stored in Splunk, and surfaced on the dashboard's **Collector Job Summary** tab.
-
-The Django application itself does **not** have any OpenTelemetry instrumentation. Page-level observability recommendations are in the final section.
-
----
-
-## Architecture
-
-```
-External Collectors (Python)
-  └── jTookkit.jLogging (Python stdlib logging)
-        └── OTEL Python SDK bridge (OTLPLogExporter)
-              └── OpenTelemetry Collector (otel-collector, monitoring namespace)
-                    ├── Logs  → Splunk HEC → index: otel_logging
-                    ├── Traces → Tempo (tempo.monitoring.svc.cluster.local:4317)
-                    └── Metrics → Prometheus (port 8890)
-
-Homelab Hub (Django)
-  └── dashboard/services/splunk.py
-        └── Queries Splunk index=otel_logging via web proxy (port 8000)
-              └── Renders "Collector Job Summary: Last 24 hours" tab
-```
+1. **Application Instrumentation** — what the Django app itself emits (logs, traces, metrics)
+2. **Dashboard Display** — what OTEL data is surfaced in the UI (Logging/Trace/Metrics explorers + Collector Job Summary)
 
 ---
 
-## External Collector Logging (jTookkit.jLogging)
+---
 
-### Library
+# Part 1: Application Instrumentation
 
-**Package:** `j-utilities-toolkit` (`jTookkit.jLogging`)  
-**Transport:** Python stdlib `logging` module → OTEL SDK log bridge → OTLP gRPC (port 4317)
+The Django app emits OTEL signals for every page request via `hub/otel.py` and `hub/middleware.py`.
 
-### Event Types
+## Setup — `hub/otel.py`
 
-All collectors emit four structured event types:
+Called once at startup by `PageLoggingMiddleware`. Initializes three providers, all exporting over OTLP/HTTP to `OTLP_ENDPOINT`:
 
-| EventType | When Emitted | Required Fields |
+| Provider | Export endpoint | Signal |
 |---|---|---|
-| `transaction_start` | Beginning of each collection cycle | `transaction_id`, `timestamp` |
-| `transaction_end` | End of each collection cycle | `transaction_id`, `return_code`, `duration`, `timestamp` |
-| `span_start` | Beginning of a sub-operation (e.g., API call, DB insert) | `transaction_id`, `source_transaction_id`, `source_component` |
-| `span_end` | End of a sub-operation | `transaction_id`, `source_transaction_id`, `return_code`, `duration` |
+| `TracerProvider` | `$OTLP_ENDPOINT/v1/traces` | Distributed traces |
+| `MeterProvider` | `$OTLP_ENDPOINT/v1/metrics` | Metrics |
+| `LoggerProvider` | `$OTLP_ENDPOINT/v1/logs` | Structured logs |
 
-A `message` event type also exists for freeform log lines within a transaction.
+If `OTLP_ENDPOINT` is unset, providers are still initialized but nothing is exported.
 
-### Log Levels
+**Metric created:** `page_visits_total` (counter, unit `"1"`) — incremented per response with labels `endpoint`, `method`, `status`.
 
-| Level | Condition |
+**Tracer created:** `_tracer` (service name from `OTEL_SERVICE_NAME`, default `"homelab-hub"`) — used by middleware and dashboard views for manual spans.
+
+## Middleware — `hub/middleware.py` → `PageLoggingMiddleware`
+
+Wraps every request. Skips paths matching `_SKIP_PREFIXES`: `/admin/`, `/accounts/`, `/static/`, `/favicon`, `/__reload__`.
+
+**Per request:**
+
+1. Generates a `transaction_id` (UUID4), stored on `request.otel_transaction_id`
+2. Resolves path to a logical `endpoint` string (e.g. `dashboard/home`, `financial/calculator`)
+3. Emits a **Request log** (JSON to `page` logger → OTLP logs)
+4. Starts an OTEL span with kind `SERVER`, attributes: `http.method`, `http.path`, `transaction_id`
+5. Calls the view
+6. Closes span, captures `trace_id` and `span_id` from span context
+7. Emits a **Response log** (JSON to `page` logger → OTLP logs)
+8. Increments `page_visits_total` metric
+
+## Log Format
+
+Both request and response events are structured JSON dicts emitted to the `page` Python logger, which is bridged to OTLP via `LoggingHandler`. They land in Splunk at index `otel_logging`.
+
+**Request event fields:**
+
+| Field | Value |
 |---|---|
-| `INFO` | All transaction/span start and end events; standard `message()` calls |
-| `ERROR` | `message()` called with `exception=` or `error=True` |
-| `DEBUG` | `message()` called with `debug=True`; also requires `LOG_LEVEL=DEBUG` env var |
+| `event` | `"Request"` |
+| `method` | HTTP method |
+| `version` | `"v1"` (hardcoded) |
+| `service` | `OTEL_SERVICE_NAME` |
+| `timestamp` | UTC ISO 8601 |
+| `transaction_id` | UUID4 |
+| `level` | `"INFO"` |
+| `endpoint` | logical endpoint string |
+| `hostname` | pod hostname |
+| `path` | raw URL path |
+| `remote_addr` | client IP (respects `X-Forwarded-For`) |
+| `request_body` | `{}` (not captured) |
+| `query_params` | `dict(request.GET)` |
 
-Default level is `INFO` (controlled by `LOG_LEVEL` environment variable).
+**Response event adds:**
 
-### Log Format
+| Field | Value |
+|---|---|
+| `event` | `"Response"` |
+| `duration_seconds` | float, rounded to 6 decimal places |
+| `status` | HTTP status code (int) |
+| `level` | `"INFO"` if status < 400, `"ERROR"` otherwise |
+| `response_body` | `request.otel_page_summary` dict (set by the view) |
+| `trace_id` | 32-char hex trace ID (if span was active) |
+| `span_id` | 16-char hex span ID (if span was active) |
 
-Events are structured Python dicts serialized to the log body. A `transaction_end` event looks like:
+## Manual Spans — `dashboard/views.py`
 
-```python
-{
-    "level": "INFO",
-    "event_type": "transaction_end",
-    "timestamp": "2026-05-06T11:40:22.123456+00:00",
-    "transaction_id": "a1b2c3d4-...",
-    "component": "enphase-collector",
-    "component_type": "python",
-    "return_code": 200,
-    "duration": 0.842
-}
+The `home()` view wraps each dashboard card in a child span under the request span:
+
+| Span name | What it covers |
+|---|---|
+| `card.k8s` | Kubernetes metrics collection |
+| `card.synology` | NAS health and storage metrics |
+| `card.claude` | Claude API usage data |
+| `card.network` | Network traffic metrics |
+| `card.emporia_chart` | Energy usage chart data |
+| `card.emporia_daily` | Daily energy usage summary |
+| `card.splunk` | Splunk collector job summary |
+| `card.weather` | Weather data |
+
+## Environment Variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `OTLP_ENDPOINT` | `""` (disabled) | Base URL for OTLP/HTTP export, e.g. `http://otel-collector.monitoring.svc.cluster.local:4318` |
+| `OTEL_SERVICE_NAME` | `"homelab-hub"` | Service name on all signals |
+
+## Dependencies (`pyproject.toml`)
+
+```toml
+"opentelemetry-api>=1.24.0",
+"opentelemetry-sdk>=1.24.0",
+"opentelemetry-exporter-otlp-proto-http>=1.24.0",
 ```
 
-A `message` event with error context:
+## Signal Destinations
 
-```python
-{
-    "level": "ERROR",
-    "event_type": "message",
-    "timestamp": "...",
-    "transaction_id": "...",
-    "component": "enphase-collector",
-    "component_type": "python",
-    "message": "Exception inserting Enphase data locally",
-    "data": {
-        "exception": "ConnectionError(...)",
-        "status_code": 500,
-        "response.text": "..."
-    },
-    "stack_trace": "Traceback (most recent call last):\n  ..."
-}
+All signals route through the OTEL Collector (`otel-collector`, `monitoring` namespace):
+
+```
+homelab-hub (Django)
+  └── hub/otel.py + PageLoggingMiddleware
+        └── OTLP/HTTP (port 4318) → OpenTelemetry Collector
+              ├── Logs  → Splunk HEC → index: otel_logging
+              ├── Traces → Tempo (tempo.monitoring.svc.cluster.local:3100)
+              └── Metrics → Prometheus (prometheus-operator, port 9090)
 ```
 
-In Splunk, these dicts land in the `_raw` field as Python repr strings (single-quoted keys). The dashboard SPL query uses `rex` field extractions to parse them.
+---
 
-### Collector Components
+---
 
-| Component Name | Description |
+# Part 2: Dashboard Display
+
+The dashboard has four OTEL-related UI areas, each backed by a different data source.
+
+## OTEL Overview — `/otel/`
+
+**View:** `otel_overview()` in `dashboard/views.py`  
+**Template:** `dashboard/otel.html`  
+**Source:** Splunk index `otel_logging`  
+**Service function:** `otel_service_status_summary()` in `dashboard/services/splunk.py`
+
+Displays a pivot table of **service × HTTP status code** with transaction counts. Each row is a service; columns are status codes found in the time window. Supports a time range selector (1h, 6h, 24h, 7d, 30d).
+
+Clicking a service row navigates to the Logging Explorer filtered to that service.
+
+**AJAX endpoints used:**
+- `/otel/endpoint-detail/?service=&earliest=` → `otel_endpoint_summary()` — per-endpoint breakdown for a service
+- `/otel/transaction-detail/?service=&endpoint=&method=&status=&earliest=` → `otel_transaction_list()` — individual transaction records
+
+---
+
+## Logging Explorer — `/otel/logging/`
+
+**View:** `otel_logging_overview()` in `dashboard/views.py`  
+**Template:** `dashboard/otel_logging.html`  
+**Source:** Splunk index `otel_logging`  
+**Service function:** `otel_summary()` in `dashboard/services/splunk.py`
+
+Displays a summary table of all `event="Response"` log records grouped by `service / endpoint / method / status`, showing:
+
+| Column | Source |
 |---|---|
-| `enphase-collector` | Solar panel production data from Enphase API |
-| `emporia-collector` | Home energy usage from Emporia Vue |
+| Service | `service` field |
+| Endpoint | `endpoint` field |
+| Method | HTTP method |
+| Status | HTTP status code |
+| Count | `dc(transaction_id)` |
+| Avg Duration | `avg(duration_seconds)` |
+
+Clicking a row opens a transaction list panel, loaded via AJAX to `/otel/logging/transactions/` → `otel_filtered_transactions()`. Each transaction shows timestamp, duration, trace_id (linked to Trace Explorer), and response body summary.
+
+Supports time range selector (1h, 6h, 24h, 7d, 30d) and client-side filter/search.
+
+---
+
+## Trace Explorer — `/otel/trace/`
+
+**View:** `otel_trace_overview()` in `dashboard/views.py`  
+**Template:** `dashboard/otel_trace.html`  
+**Source:** Grafana Tempo  
+**Config:** `TEMPO_URL` env var (default: `http://tempo.monitoring.svc.cluster.local:3100`)  
+**Service functions:** `tempo_services()`, `tempo_recent_traces()`, `tempo_trace_detail()` in `dashboard/services/tempo.py`
+
+Displays recent distributed traces from Tempo, filterable by service and time range. Shows per-trace: trace ID, root span name, duration, start time, and span count.
+
+Clicking a trace loads the full span waterfall detail (spans with parent/child relationships, duration bars, service labels).
+
+If a `?trace_id=` query param is present on page load, that trace is auto-loaded and the service filter is auto-detected from the trace's `service.name` resource attribute.
+
+The Logging Explorer links directly to this page via `?trace_id=<id>` on rows that have a `trace_id` field.
+
+**AJAX endpoint:** `/otel/trace/detail/?trace_id=` → `otel_trace_detail_view()` → `tempo_trace_detail()`
+
+---
+
+## Metrics Explorer — `/otel/metrics/`
+
+**View:** `otel_metrics_overview()` in `dashboard/views.py`  
+**Template:** `dashboard/otel_metrics.html`  
+**Source:** Prometheus  
+**Config:** `PROMETHEUS_URL` env var (default: `http://prometheus-operator-kube-p-prometheus.monitoring.svc.cluster.local:9090`)  
+**Service functions:** `prom_instant_query()`, `prom_range_query()` in `dashboard/services/prometheus_svc.py`
+
+Provides a PromQL query interface. Supports two query modes:
+
+| Mode | Endpoint | Prometheus API |
+|---|---|---|
+| Instant | `/otel/metrics/query/?type=instant&query=` | `/api/v1/query` |
+| Range | `/otel/metrics/query/?type=range&query=&earliest=` | `/api/v1/query_range` with step `60s` |
+
+Returns raw Prometheus result sets which the template renders as tables or charts.
+
+Example query to see app traffic: `page_visits_total`
+
+---
+
+## Collector Job Summary — Main Dashboard `/`
+
+**Tab:** "Collector Job Summary: Last 24 hours" on `homelab-hub.com/`  
+**View:** `home()` → `card_splunk()` in `dashboard/views.py`  
+**Source:** Splunk index `otel_logging`  
+**Service function:** `splunk_collector_summary()` in `dashboard/services/splunk.py`
+
+Displays `transaction_end` events emitted by external Python collector services (not the Django app itself). These services use `jTookkit.jLogging` which routes logs through the OTEL Collector to Splunk.
+
+Aggregations per collector component per return code over last 24 hours:
+
+| Column | Source | Notes |
+|---|---|---|
+| Component | `component` field | e.g. `emporia-collector`, `enphase-collector` |
+| Return Code | `return_code` field | HTTP-style; 200 = success, 4xx/5xx = failure |
+| Count | SPL `count` | Number of collection cycles |
+| Avg Duration | SPL `avg(duration)` | Seconds per cycle |
+| Last Run | `max(timestamp)` | Displayed in EST |
+| Stale | Derived | Last run > 10 min ago (enphase: > 4 hours) |
+| Bad Code | Derived | `return_code >= 400` |
+
+Fields are embedded in Splunk's `_raw` as Python dict repr (single-quoted keys), so the SPL query uses `rex` extractions with `coalesce()` fallback.
+
+**Collector components:**
+
+| Component | Description |
+|---|---|
+| `enphase-collector` | Solar panel production (Enphase API) |
+| `emporia-collector` | Home energy usage (Emporia Vue) |
 | `network-collector` | Network traffic metrics |
-| `synology-collector` | NAS health and storage metrics from Synology |
+| `synology-collector` | NAS health and storage (Synology DSM) |
 | `weather-collector` | Local weather data |
 
 ---
 
-## OpenTelemetry Collector Configuration
+## OTEL Collector Infrastructure
 
 **K8s resource:** `OpenTelemetryCollector/otel-collector` in `monitoring` namespace  
 **Image:** `otel/opentelemetry-collector-contrib:0.96.0`
@@ -117,195 +255,22 @@ In Splunk, these dicts land in the `_raw` field as Python repr strings (single-q
 
 | Protocol | Endpoint | Use |
 |---|---|---|
-| OTLP gRPC | `0.0.0.0:4317` | Collector logs and traces |
-| OTLP HTTP | `0.0.0.0:4318` | Alternative HTTP transport |
+| OTLP gRPC | `0.0.0.0:4317` | External collector services (jTookkit) |
+| OTLP HTTP | `0.0.0.0:4318` | Django app (`OTLP_ENDPOINT`) |
 
 ### Pipelines
 
-| Pipeline | Receiver | Processor | Exporter |
-|---|---|---|---|
-| `logs` | otlp | batch | splunk_hec, debug |
-| `traces` | otlp | batch | otlp → Tempo |
-| `metrics` | otlp | batch | prometheus |
+| Pipeline | Exporter |
+|---|---|
+| `logs` | Splunk HEC → index `otel_logging` |
+| `traces` | OTLP → Tempo |
+| `metrics` | Prometheus (scrape port `8890`) |
 
-### Log Exporter (Splunk HEC)
+### Splunk HEC Config
 
 ```
 Endpoint:   https://splunk.splunk.svc.cluster.local:8088/services/collector
 Index:      otel_logging
 Sourcetype: otel:logs
-Source:     otel
 TLS:        insecure_skip_verify (internal cluster)
-```
-
-### Collector Self-Telemetry
-
-The OTEL Collector itself emits internal metrics and logs at:
-- Internal logs: `debug` level (stdout)
-- Internal metrics: `detailed` level on port `8889`
-
----
-
-## Dashboard Display — Collector Job Summary
-
-**Location:** `dashboard/services/splunk.py` → `splunk_collector_summary()`  
-**Tab:** "Collector Job Summary: Last 24 hours" on `homelab-hub.com/`
-
-### What Is Displayed
-
-Only `transaction_end` events are queried and surfaced. Per-component, per-return-code aggregations over the last 24 hours:
-
-| Column | Source Field | Description |
-|---|---|---|
-| Component | `component` | Collector name (e.g., `emporia-collector`) |
-| Return Code | `return_code` | HTTP-style status code (200 = success, 4xx/5xx = failure) |
-| Count | SPL `count` | Number of collection cycles |
-| Avg Duration | SPL `avg(duration)` | Average seconds per cycle |
-| Last Run | `max(timestamp)` | Most recent `transaction_end` timestamp (displayed in EST) |
-| Stale | Derived | `true` if last run > 10 min ago (enphase: > 4 hours) |
-| Bad Code | Derived | `true` if `return_code >= 400` |
-
-### SPL Query Summary
-
-Fields `component`, `return_code`, `duration`, `timestamp`, and `event_type` are not top-level Splunk fields — they are embedded in `_raw` as a Python dict repr. The query uses `rex` extractions to pull them out, with `coalesce()` to prefer any already-indexed fields:
-
-```spl
-search index="otel_logging"
-| rex field=_raw "['\"]event_type['\"]\s*:\s*['\"](?<_event_type>[^'\"]+)['\"]"
-| rex field=_raw "['\"]component['\"]\s*:\s*['\"](?<_component>[^'\"]+)['\"]"
-| ...
-| where event_type="transaction_end" AND match(component, ".*-collector.*")
-| stats count, avg(duration) as duration, max(timestamp) as last_run by component, return_code
-```
-
-### Staleness Thresholds
-
-| Collector | Stale After |
-|---|---|
-| All collectors (default) | 10 minutes |
-| `enphase-collector` | 4 hours (runs less frequently) |
-
----
-
-## Page-Level OTEL — Current State
-
-The homelab-hub Django application has **no OpenTelemetry instrumentation**. There are no:
-- OTEL SDK packages installed
-- OTEL middleware in `settings.py`
-- Distributed traces for page requests
-- Structured request/response logging
-- Dashboard page view metrics
-
-Errors and debug output are emitted via bare `print()` statements to stdout only.
-
----
-
-## Recommendations: Adding Page-Level OTEL
-
-### 1. Install OTEL Packages
-
-Add to `pyproject.toml`:
-
-```toml
-"opentelemetry-api>=1.24.0",
-"opentelemetry-sdk>=1.24.0",
-"opentelemetry-exporter-otlp-proto-grpc>=1.24.0",
-"opentelemetry-instrumentation-django>=0.45b0",
-"opentelemetry-instrumentation-requests>=0.45b0",
-"opentelemetry-instrumentation-logging>=0.45b0",
-```
-
-### 2. Initialize OTEL in Django Settings
-
-Add to `hub/settings.py` (or a dedicated `hub/otel.py` imported at startup):
-
-```python
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-
-resource = Resource.create({"service.name": "homelab-hub", "service.version": "1.0"})
-provider = TracerProvider(resource=resource)
-provider.add_span_processor(
-    BatchSpanProcessor(OTLPSpanExporter(
-        endpoint="http://otel-collector.monitoring.svc.cluster.local:4317"
-    ))
-)
-trace.set_tracer_provider(provider)
-```
-
-### 3. Auto-Instrument Django and Requests
-
-```python
-from opentelemetry.instrumentation.django import DjangoInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
-
-DjangoInstrumentor().instrument()
-RequestsInstrumentor().instrument()
-```
-
-This automatically creates spans for:
-- Every incoming HTTP request to the Django app (URL, method, status, duration)
-- Every outbound `requests` call made by the service layer (API calls to Splunk, K8s, weather, etc.)
-
-### 4. Structured Logging via jTookkit.jLogging
-
-Since `jTookkit.jLogging` is already installed but unused in the Django app, it could instrument dashboard page loads the same way collectors do:
-
-```python
-from jTookkit.jLogging import Logger, LoggingInfo, EventType
-
-_logging_info = LoggingInfo(component="homelab-hub", component_type="django")
-_logger = Logger(_logging_info)
-
-def home(request):
-    txn = _logger.transaction_event(EventType.TRANSACTION_START)
-    try:
-        # ... data collection ...
-        _logger.transaction_event(EventType.TRANSACTION_END, transaction=txn, return_code=200)
-    except Exception as e:
-        _logger.message(transaction=txn, message="Dashboard load failed", exception=e, error=True)
-        _logger.transaction_event(EventType.TRANSACTION_END, transaction=txn, return_code=500)
-```
-
-This would make `homelab-hub` appear as a component in the existing Collector Job Summary display.
-
-### 5. What Would Be Captured at Each Level
-
-| Signal | Level | What It Covers |
-|---|---|---|
-| **Traces** | Span per request | URL, user, response time, downstream service calls (Splunk, K8s APIs, weather, etc.) |
-| **Logs / INFO** | Per page load | `transaction_start` and `transaction_end` for `home()` and `k8s()` views |
-| **Logs / ERROR** | On exception | Failed service calls, unhandled exceptions, partial data loads |
-| **Logs / DEBUG** | Verbose | Individual service call durations, raw API responses (only when `LOG_LEVEL=DEBUG`) |
-| **Metrics** | Aggregated | Request count, error rate, p95 latency per endpoint (auto from DjangoInstrumentor) |
-
-### 6. Splunk Query Extension
-
-With page-level jTookkit logging in place, the existing `splunk_collector_summary()` query would automatically include `homelab-hub` as a row in the Collector Job Summary tab, since it already filters on `match(component, ".*-collector.*")`. That pattern would need updating to also include `homelab-hub`:
-
-```spl
-| where event_type="transaction_end" AND (match(component, ".*-collector.*") OR component="homelab-hub")
-```
-
-Or broaden to all `transaction_end` events regardless of component:
-
-```spl
-| where event_type="transaction_end"
-```
-
-### 7. Add OTEL Env Var to K8s Deployment
-
-```yaml
-env:
-  - name: OTEL_EXPORTER_OTLP_ENDPOINT
-    value: "http://otel-collector.monitoring.svc.cluster.local:4317"
-  - name: OTEL_SERVICE_NAME
-    value: "homelab-hub"
-  - name: OTEL_TRACES_EXPORTER
-    value: "otlp"
-  - name: OTEL_LOGS_EXPORTER
-    value: "otlp"
 ```
