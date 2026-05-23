@@ -1,6 +1,21 @@
 import boto3
+import calendar
 from datetime import date, timedelta
 from config.utils import get_config
+
+# S3 standard storage pricing tiers (US, per GB-month)
+_S3_TIERS = [
+    (51_200,  0.023, "Tier 1"),   # 0 – 50 TB
+    (512_000, 0.022, "Tier 2"),   # 50 – 500 TB
+    (None,    0.021, "Tier 3"),   # 500 TB+
+]
+
+
+def _s3_tier(gb):
+    for threshold, rate, name in _S3_TIERS:
+        if threshold is None or gb < threshold:
+            next_label = f"{threshold // 1024:,} TB" if threshold else None
+            return {"rate": rate, "name": name, "next_tier": next_label}
 
 
 def collect_aws_billing_summary():
@@ -18,6 +33,8 @@ def collect_aws_billing_summary():
 
         today = date.today()
         month_start = today.replace(day=1)
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        period_end = today.replace(day=last_day)
         last_month_end = month_start - timedelta(days=1)
         last_month_start = last_month_end.replace(day=1)
 
@@ -52,14 +69,40 @@ def collect_aws_billing_summary():
                 last_month["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"]
             )
 
+        # S3 storage: GB-Hours / hours elapsed = average GB stored this month
+        s3_gb = None
+        days_elapsed = (today - month_start).days
+        if days_elapsed > 0:
+            s3_usage = ce.get_cost_and_usage(
+                TimePeriod={"Start": str(month_start), "End": str(today)},
+                Granularity="MONTHLY",
+                Filter={"Dimensions": {"Key": "SERVICE", "Values": ["Amazon Simple Storage Service"]}},
+                Metrics=["UsageQuantity"],
+                GroupBy=[{"Type": "DIMENSION", "Key": "USAGE_TYPE"}],
+            )
+            total_gb_hours = 0.0
+            if s3_usage["ResultsByTime"]:
+                for group in s3_usage["ResultsByTime"][0]["Groups"]:
+                    if "TimedStorage" in group["Keys"][0]:
+                        total_gb_hours += float(group["Metrics"]["UsageQuantity"]["Amount"])
+            if total_gb_hours > 0:
+                s3_gb = round(total_gb_hours / (days_elapsed * 24), 3)
+
         return {
             "mtd_total": round(mtd_total, 2),
             "last_month_total": round(last_total, 2),
             "services": services[:10],
             "month_start": str(month_start),
+            "period_end": str(period_end),
             "as_of": str(today),
             "currency": "USD",
+            "s3_gb": s3_gb,
+            "s3_tier": _s3_tier(s3_gb) if s3_gb is not None else None,
             "error": None,
         }
     except Exception as e:
-        return {"error": str(e), "mtd_total": 0, "last_month_total": 0, "services": []}
+        return {
+            "error": str(e),
+            "mtd_total": 0, "last_month_total": 0,
+            "services": [], "s3_gb": None, "s3_tier": None,
+        }

@@ -1,5 +1,5 @@
 <div class="bg-gray-800 rounded-2xl shadow p-6">
-    <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+    <h3 class="text-xl font-bold mb-1 flex justify-between items-center">
         <span>AWS Billing</span>
         {% if billing.error %}
             <span class="text-sm text-red-400 font-normal">Error</span>
@@ -7,23 +7,45 @@
             <span class="text-sm text-gray-400 font-normal">as of {{ billing.as_of }}</span>
         {% endif %}
     </h3>
+    {% if not billing.error %}
+    <p class="text-xs text-gray-500 mb-4">Billing period: {{ billing.month_start }} – {{ billing.period_end }}</p>
+    {% endif %}
 
     {% if billing.error %}
         <p class="text-red-400 text-sm">{{ billing.error }}</p>
     {% else %}
-        <div class="grid grid-cols-2 gap-4 mb-6 text-center">
-            <div class="bg-orange-700 rounded p-4">
-                <span class="block font-bold text-2xl">${{ billing.mtd_total }}</span>
-                <span class="text-gray-300 text-sm">Month-to-Date</span>
+        <div class="grid grid-cols-2 gap-3 mb-4 text-center">
+            <div class="bg-orange-700 rounded p-3">
+                <span class="block font-bold text-xl">${{ billing.mtd_total }}</span>
+                <span class="text-gray-300 text-xs">Month-to-Date</span>
             </div>
-            <div class="bg-gray-700 rounded p-4">
-                <span class="block font-bold text-2xl">${{ billing.last_month_total }}</span>
-                <span class="text-gray-300 text-sm">Last Month Total</span>
+            <div class="bg-gray-700 rounded p-3">
+                <span class="block font-bold text-xl">${{ billing.last_month_total }}</span>
+                <span class="text-gray-300 text-xs">Last Month</span>
             </div>
         </div>
 
+        {% if billing.s3_gb is not None %}
+        <div class="bg-gray-700 rounded p-3 mb-4">
+            <div class="flex justify-between items-baseline">
+                <span class="text-sm font-semibold text-gray-200">S3 Storage</span>
+                <span class="text-white font-mono text-sm">{{ billing.s3_gb }} GB</span>
+            </div>
+            {% if billing.s3_tier %}
+            <div class="flex justify-between items-baseline mt-1">
+                <span class="text-xs text-gray-400">{{ billing.s3_tier.name }} · ${{ billing.s3_tier.rate }}/GB</span>
+                {% if billing.s3_tier.next_tier %}
+                <span class="text-xs text-gray-500">next tier at {{ billing.s3_tier.next_tier }}</span>
+                {% else %}
+                <span class="text-xs text-gray-500">max discount tier</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
         {% if billing.services %}
-        <h4 class="text-sm font-semibold text-gray-300 mb-2">Top Services (MTD)</h4>
+        <h4 class="text-xs font-semibold text-gray-400 uppercase mb-2">Top Services (MTD)</h4>
         <div class="space-y-1">
             {% for svc in billing.services %}
             <div class="flex justify-between items-center text-sm">
