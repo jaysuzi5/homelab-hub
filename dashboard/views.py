@@ -14,6 +14,7 @@ from dashboard.services.splunk import splunk_collector_summary, otel_response_su
 from dashboard.services.tempo import tempo_services, tempo_recent_traces, tempo_trace_detail
 from dashboard.services.prometheus_svc import prom_instant_query, prom_range_query
 from dashboard.services.weather import collect_weather_summary
+from dashboard.services.aws_billing import collect_aws_billing_summary
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
 from config.utils import get_config
@@ -112,6 +113,15 @@ def card_weather(request):
         weather_summary = collect_weather_summary()
     return render(request, "dashboard/partials/_card_weather.html", {
         "weather_summary": weather_summary,
+    })
+
+
+@login_required
+def card_aws_billing(request):
+    with _tracer.start_as_current_span("card.aws_billing"):
+        billing = collect_aws_billing_summary()
+    return render(request, "dashboard/partials/_card_aws_billing.html", {
+        "billing": billing,
     })
 
 @login_required

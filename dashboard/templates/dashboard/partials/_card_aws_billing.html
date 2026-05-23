@@ -1,0 +1,39 @@
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+        <span>AWS Billing</span>
+        {% if billing.error %}
+            <span class="text-sm text-red-400 font-normal">Error</span>
+        {% else %}
+            <span class="text-sm text-gray-400 font-normal">as of {{ billing.as_of }}</span>
+        {% endif %}
+    </h3>
+
+    {% if billing.error %}
+        <p class="text-red-400 text-sm">{{ billing.error }}</p>
+    {% else %}
+        <div class="grid grid-cols-2 gap-4 mb-6 text-center">
+            <div class="bg-orange-700 rounded p-4">
+                <span class="block font-bold text-2xl">${{ billing.mtd_total }}</span>
+                <span class="text-gray-300 text-sm">Month-to-Date</span>
+            </div>
+            <div class="bg-gray-700 rounded p-4">
+                <span class="block font-bold text-2xl">${{ billing.last_month_total }}</span>
+                <span class="text-gray-300 text-sm">Last Month Total</span>
+            </div>
+        </div>
+
+        {% if billing.services %}
+        <h4 class="text-sm font-semibold text-gray-300 mb-2">Top Services (MTD)</h4>
+        <div class="space-y-1">
+            {% for svc in billing.services %}
+            <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-300 truncate mr-2" title="{{ svc.name }}">{{ svc.name }}</span>
+                <span class="text-white font-mono whitespace-nowrap">${{ svc.cost }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm">No charges this month yet.</p>
+        {% endif %}
+    {% endif %}
+</div>

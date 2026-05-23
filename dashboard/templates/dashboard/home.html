@@ -124,6 +124,16 @@
         </div>
     </div>
 
+    <div id="card-aws-billing" data-url="{% url 'card_aws_billing' %}" class="bg-gray-800 rounded-2xl shadow p-6">
+        <div class="animate-pulse space-y-3">
+            <div class="h-6 bg-gray-700 rounded w-1/2"></div>
+            <div class="h-20 bg-gray-700 rounded w-full"></div>
+            <div class="h-4 bg-gray-700 rounded w-full"></div>
+            <div class="h-4 bg-gray-700 rounded w-4/5"></div>
+            <div class="h-4 bg-gray-700 rounded w-3/4"></div>
+        </div>
+    </div>
+
 </div>
 
 
@@ -159,7 +169,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     ['card-k8s', 'card-synology', 'card-claude', 'card-network',
-     'card-emporia-chart', 'card-emporia-daily', 'card-splunk', 'card-weather'].forEach(loadCard);
+     'card-emporia-chart', 'card-emporia-daily', 'card-splunk', 'card-weather',
+     'card-aws-billing'].forEach(loadCard);
 });
 </script>
 <script>
