@@ -339,6 +339,7 @@ def otel_transaction_detail(request):
 def otel_trace_overview(request):
     earliest = request.GET.get("earliest", "-1h")
     service = request.GET.get("service", "")
+    root_span = request.GET.get("root_span", "")
     focus_trace_id = request.GET.get("trace_id", "")
 
     services_result = tempo_services()
@@ -348,7 +349,6 @@ def otel_trace_overview(request):
         detail = tempo_trace_detail(focus_trace_id)
         if detail.get("success"):
             focus_trace_json = json.dumps(detail.get("data"), cls=DjangoJSONEncoder)
-            # Auto-detect service from trace so the list is filtered to the same service
             if not service:
                 for batch in detail.get("data", {}).get("batches", []):
                     for attr in batch.get("resource", {}).get("attributes", []):
@@ -358,13 +358,22 @@ def otel_trace_overview(request):
                     if service:
                         break
 
-    traces_result = tempo_recent_traces(service=service, earliest=earliest)
+    traces_result = tempo_recent_traces(service=service, earliest=earliest, limit=200)
+
+    # Build root span list from full result, then filter
+    all_traces = traces_result.get("data", [])
+    root_spans = sorted({t.get("rootTraceName", "") for t in all_traces if t.get("rootTraceName")})
+    if root_span and root_span not in root_spans:
+        root_span = ""
+    filtered_traces = [t for t in all_traces if not root_span or t.get("rootTraceName") == root_span]
 
     request.otel_page_summary = {"page": "otel_trace", "earliest": earliest}
     return render(request, "dashboard/otel_trace.html", {
         "services": services_result.get("data", []),
-        "traces": traces_result,
+        "traces": {**traces_result, "data": filtered_traces},
         "selected_service": service,
+        "root_spans": root_spans,
+        "selected_root_span": root_span,
         "earliest": earliest,
         "time_ranges": _OTEL_TIME_RANGES,
         "focus_trace_id": focus_trace_id,

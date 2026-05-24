@@ -19,6 +19,15 @@
                 {% endfor %}
             </select>
             {% endif %}
+            {% if root_spans %}
+            <select name="root_span" onchange="this.form.submit()"
+                    class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="">All Root Spans</option>
+                {% for span in root_spans %}
+                <option value="{{ span }}" {% if span == selected_root_span %}selected{% endif %}>{{ span }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
             <select name="earliest" onchange="this.form.submit()"
                     class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 {% for value, label in time_ranges %}
@@ -88,14 +97,8 @@
     <!-- Filter Bar -->
     <div class="bg-gray-800 rounded-lg border border-gray-700 mb-4">
         <div class="px-4 py-3 flex items-center gap-3 flex-wrap">
-            <span class="text-xs uppercase tracking-wide text-gray-400 font-semibold mr-1">Filter</span>
-            <select id="svc-filter" class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <option value="">All Services</option>
-            </select>
-            <select id="span-filter" class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <option value="">All Root Spans</option>
-            </select>
-            <input id="txt-filter" type="text" placeholder="Search…"
+            <span class="text-xs uppercase tracking-wide text-gray-400 font-semibold mr-1">Search</span>
+            <input id="txt-filter" type="text" placeholder="Trace ID, span name, service…"
                    class="flex-1 min-w-40 bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500">
             <span class="text-gray-500 text-xs" id="filter-count"></span>
         </div>
@@ -168,39 +171,18 @@ function computeKpis(data) {
     document.getElementById('kpi-max').textContent = max.toFixed(0) + ' ms';
 }
 
-// ── Populate service filter dropdown ──────────────────────────────────────────
-function populateSvcFilter(data) {
-    const sel = document.getElementById('svc-filter');
-    const svcs = [...new Set(data.map(t=>t.rootServiceName).filter(Boolean))].sort();
-    svcs.forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
-}
-
-function populateSpanFilter(data) {
-    const sel = document.getElementById('span-filter');
-    const prev = sel.value;
-    sel.innerHTML = '<option value="">All Root Spans</option>';
-    const spans = [...new Set(data.map(t=>t.rootTraceName).filter(Boolean))].sort();
-    spans.forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
-    // Restore selection if still valid
-    if (prev && spans.includes(prev)) sel.value = prev; else fSpan = '';
-}
-
 // ── Filter state + logic ──────────────────────────────────────────────────────
-let fSvc='', fTxt='', fSpan='';
+let fTxt='';
 const _sort = {col: 3, dir: -1}; // default: Duration desc
 
 function getFiltered() {
-    return TRACE_DATA.filter(t => {
-        if (fSvc && t.rootServiceName !== fSvc) return false;
-        if (fSpan && t.rootTraceName !== fSpan) return false;
-        if (fTxt) {
-            const q = fTxt.toLowerCase();
-            if (!(t.rootTraceName||'').toLowerCase().includes(q) &&
-                !(t.rootServiceName||'').toLowerCase().includes(q) &&
-                !(t.traceID||'').toLowerCase().includes(q)) return false;
-        }
-        return true;
-    });
+    if (!fTxt) return TRACE_DATA;
+    const q = fTxt.toLowerCase();
+    return TRACE_DATA.filter(t =>
+        (t.rootTraceName||'').toLowerCase().includes(q) ||
+        (t.rootServiceName||'').toLowerCase().includes(q) ||
+        (t.traceID||'').toLowerCase().includes(q)
+    );
 }
 
 // ── Sort ──────────────────────────────────────────────────────────────────────
@@ -344,22 +326,11 @@ function renderSpans(data) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     if (!TRACE_DATA.length) return;
-    populateSvcFilter(TRACE_DATA);
-    populateSpanFilter(TRACE_DATA);
     computeKpis(TRACE_DATA);
     renderTable(TRACE_DATA);
     initSort();
     document.getElementById('filter-count').textContent = `${TRACE_DATA.length} traces`;
 
-    document.getElementById('svc-filter').addEventListener('change', e=>{
-        fSvc=e.target.value;
-        fSpan='';
-        // Repopulate span filter to only show spans for selected service
-        const svcData = fSvc ? TRACE_DATA.filter(t=>t.rootServiceName===fSvc) : TRACE_DATA;
-        populateSpanFilter(svcData);
-        applyFilters();
-    });
-    document.getElementById('span-filter').addEventListener('change', e=>{ fSpan=e.target.value; applyFilters(); });
     document.getElementById('txt-filter').addEventListener('input', e=>{ fTxt=e.target.value; applyFilters(); });
 
     // Render focus trace if present
