@@ -1,4 +1,4 @@
-<div class="bg-gray-800 rounded-2xl shadow p-6">
+<div class="bg-gray-800 rounded-2xl shadow p-6" id="aws-billing-card">
     <h3 class="text-xl font-bold mb-1 flex justify-between items-center">
         <span>AWS Billing</span>
         {% if billing.error %}
@@ -8,11 +8,30 @@
         {% endif %}
     </h3>
     {% if not billing.error %}
-    <p class="text-xs text-gray-500 mb-4">Billing period: {{ billing.month_start }} – {{ billing.period_end }}</p>
+    <div class="flex justify-between items-center mb-4">
+        <p class="text-xs text-gray-500">Billing period: {{ billing.month_start }} – {{ billing.period_end }}</p>
+        <div class="flex items-center gap-2">
+            {% if billing.cached_at %}
+            <span class="text-xs text-gray-600" title="Data cached — refreshes weekly">cached {{ billing.cached_at }}</span>
+            {% endif %}
+            {% if billing.stale %}
+            <span class="text-xs text-yellow-500">stale</span>
+            {% endif %}
+            <button id="aws-refresh-btn"
+                    onclick="awsBillingRefresh()"
+                    class="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition">
+                Refresh
+            </button>
+        </div>
+    </div>
     {% endif %}
 
     {% if billing.error %}
-        <p class="text-red-400 text-sm">{{ billing.error }}</p>
+        <p class="text-red-400 text-sm mb-3">{{ billing.error }}</p>
+        <button onclick="awsBillingRefresh()"
+                class="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition">
+            Retry
+        </button>
     {% else %}
         <div class="grid grid-cols-2 gap-3 mb-4 text-center">
             <div class="bg-orange-700 rounded p-3">
@@ -59,3 +78,21 @@
         {% endif %}
     {% endif %}
 </div>
+<script>
+function awsBillingRefresh() {
+    const btn = document.getElementById('aws-refresh-btn');
+    if (btn) { btn.textContent = '...'; btn.disabled = true; }
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+    fetch('{% url "card_aws_billing_refresh" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrf ? csrf.value : ''},
+    })
+    .then(r => r.text())
+    .then(html => {
+        const tmpl = document.createElement('template');
+        tmpl.innerHTML = html;
+        document.getElementById('aws-billing-card').replaceWith(tmpl.content.cloneNode(true));
+    })
+    .catch(() => { if (btn) { btn.textContent = 'Refresh'; btn.disabled = false; } });
+}
+</script>

@@ -124,6 +124,16 @@ def card_aws_billing(request):
         "billing": billing,
     })
 
+
+@login_required
+@require_http_methods(["POST"])
+def card_aws_billing_refresh(request):
+    with _tracer.start_as_current_span("card.aws_billing.refresh"):
+        billing = collect_aws_billing_summary(force=True)
+    return render(request, "dashboard/partials/_card_aws_billing.html", {
+        "billing": billing,
+    })
+
 @login_required
 def k8s(request):
     data = collect_k8s_metrics_detailed()
