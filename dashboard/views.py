@@ -358,10 +358,11 @@ def otel_trace_overview(request):
                     if service:
                         break
 
-    traces_result = tempo_recent_traces(service=service, earliest=earliest, limit=200)
+    traces_result = tempo_recent_traces(service=service, earliest=earliest, limit=500)
 
     # Build root span list from full result, then filter
     all_traces = traces_result.get("data", [])
+    tempo_metrics = traces_result.get("metrics", {})
     root_spans = sorted({t.get("rootTraceName", "") for t in all_traces if t.get("rootTraceName")})
     if root_span and root_span not in root_spans:
         root_span = ""
@@ -378,6 +379,9 @@ def otel_trace_overview(request):
         "time_ranges": _OTEL_TIME_RANGES,
         "focus_trace_id": focus_trace_id,
         "focus_trace_json": focus_trace_json,
+        "tempo_fetched": len(all_traces),
+        "tempo_inspected": tempo_metrics.get("inspectedTraces", 0),
+        "tempo_shown": len(filtered_traces),
     })
 
 

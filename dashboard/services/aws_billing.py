@@ -79,7 +79,7 @@ def _fetch_live():
         for group in mtd["ResultsByTime"][0]["Groups"]:
             amount = float(group["Metrics"]["UnblendedCost"]["Amount"])
             if amount >= 0.001:
-                services.append({"name": group["Keys"][0], "cost": round(amount, 4)})
+                services.append({"name": group["Keys"][0], "cost": round(amount, 2)})
                 mtd_total += amount
         services.sort(key=lambda x: x["cost"], reverse=True)
 

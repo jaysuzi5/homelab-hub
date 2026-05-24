@@ -77,8 +77,12 @@
     <!-- KPI Strip -->
     <div class="grid grid-cols-4 gap-3 mb-4">
         <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
-            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Traces</div>
-            <div class="text-xl font-bold text-white" id="kpi-total">{{ traces.data|length }}</div>
+            <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Traces Shown</div>
+            <div class="text-xl font-bold text-white" id="kpi-total">{{ tempo_shown }}</div>
+            <div class="text-xs text-gray-500 mt-1">
+                {% if tempo_fetched != tempo_shown %}{{ tempo_fetched }} fetched{% endif %}
+                {% if tempo_inspected and tempo_inspected > tempo_fetched %}&nbsp;· {{ tempo_inspected }} in Tempo{% endif %}
+            </div>
         </div>
         <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
             <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Services</div>
