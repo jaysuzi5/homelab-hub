@@ -358,7 +358,7 @@ def otel_trace_overview(request):
                     if service:
                         break
 
-    traces_result = tempo_recent_traces(service=service, earliest=earliest, limit=500)
+    traces_result = tempo_recent_traces(service=service, earliest=earliest, limit=500, root_span=root_span)
 
     # Build root span list from full result, then filter
     all_traces = traces_result.get("data", [])

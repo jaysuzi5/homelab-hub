@@ -27,12 +27,17 @@ def tempo_services() -> dict:
         return {"success": False, "data": [], "message": str(e)}
 
 
-def tempo_recent_traces(service: str = "", earliest: str = "-1h", limit: int = 50) -> dict:
+def tempo_recent_traces(service: str = "", earliest: str = "-1h", limit: int = 50, root_span: str = "") -> dict:
     try:
         start_ts, end_ts = _parse_earliest(earliest)
         params = {"limit": limit, "start": start_ts, "end": end_ts}
+        tags_parts = []
         if service:
-            params["tags"] = f"service.name={service}"
+            tags_parts.append(f"service.name={service}")
+        if root_span:
+            tags_parts.append(f"name={root_span}")
+        if tags_parts:
+            params["tags"] = " ".join(tags_parts)
         r = requests.get(f"{TEMPO_URL}/api/search", params=params, timeout=15)
         r.raise_for_status()
         data = r.json()
