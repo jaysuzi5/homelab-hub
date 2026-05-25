@@ -29,11 +29,29 @@
         </div>
     </div>
 
+    <!-- Mobile top bar -->
+    <div class="lg:hidden fixed top-0 left-0 right-0 z-30 bg-gray-800 h-14 flex items-center px-4 shadow">
+        <button onclick="toggleSidebar()" class="text-gray-300 hover:text-white focus:outline-none mr-3">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+        </button>
+        <span class="text-lg font-bold">🏠 HomeLab</span>
+    </div>
+
+    <!-- Sidebar backdrop (mobile only) -->
+    <div id="sidebar-backdrop"
+         class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+         onclick="toggleSidebar()"></div>
+
     <!-- Sidebar -->
-    <aside class="w-64 bg-gray-800 p-6 flex flex-col">
+    <aside id="sidebar"
+           class="fixed lg:static inset-y-0 left-0 z-40 w-64 bg-gray-800 p-6 flex flex-col
+                  transition-transform duration-300 -translate-x-full lg:translate-x-0
+                  overflow-y-auto h-full">
         <h1 class="text-2xl font-bold mb-6">🏠 HomeLab</h1>
         <nav class="flex flex-col space-y-1">
-            <a href="{% url 'home' %}" class="hover:bg-gray-700 p-2 rounded">Dashboard</a>
+            <a href="{% url 'home' %}" onclick="closeSidebarOnMobile()" class="hover:bg-gray-700 p-2 rounded">Dashboard</a>
             <!-- OTEL Section with Children -->
             <div class="menu-group">
                 <button onclick="toggleSubmenu('otel-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
@@ -43,13 +61,13 @@
                     </svg>
                 </button>
                 <div id="otel-submenu" class="ml-4 mt-1 space-y-1 hidden">
-                    <a href="{% url 'otel_logging_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Logging Explorer</a>
-                    <a href="{% url 'otel_trace_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Trace Explorer</a>
-                    <a href="{% url 'otel_metrics_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Metric Explorer</a>
+                    <a href="{% url 'otel_logging_overview' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Logging Explorer</a>
+                    <a href="{% url 'otel_trace_overview' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Trace Explorer</a>
+                    <a href="{% url 'otel_metrics_overview' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Metric Explorer</a>
                 </div>
             </div>
-            <a href="{% url 'k8s' %}" class="hover:bg-gray-700 p-2 rounded">Kubernetes</a>
-            <a href="{% url 'networking' %}" class="hover:bg-gray-700 p-2 rounded">Networking</a>
+            <a href="{% url 'k8s' %}" onclick="closeSidebarOnMobile()" class="hover:bg-gray-700 p-2 rounded">Kubernetes</a>
+            <a href="{% url 'networking' %}" onclick="closeSidebarOnMobile()" class="hover:bg-gray-700 p-2 rounded">Networking</a>
             <!-- Energy Section with Children -->
             <div class="menu-group">
                 <button onclick="toggleSubmenu('energy-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
@@ -59,8 +77,8 @@
                     </svg>
                 </button>
                 <div id="energy-submenu" class="ml-4 mt-1 space-y-1 hidden">
-                    <a href="{% url 'energy' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Overview</a>
-                    <a href="{% url 'electricity_usage_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Electricity Usage</a>
+                    <a href="{% url 'energy' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Overview</a>
+                    <a href="{% url 'electricity_usage_list' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Electricity Usage</a>
                 </div>
             </div>
 
@@ -73,9 +91,9 @@
                     </svg>
                 </button>
                 <div id="financial-submenu" class="ml-4 mt-1 space-y-1 hidden">
-                    <a href="{% url 'retirement_dashboard' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Retirement Calculator</a>
-                    <a href="{% url 'portfolio_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Portfolio</a>
-                    <a href="{% url 'networth_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Net Worth</a>
+                    <a href="{% url 'retirement_dashboard' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Retirement Calculator</a>
+                    <a href="{% url 'portfolio_overview' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Portfolio</a>
+                    <a href="{% url 'networth_list' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Net Worth</a>
                 </div>
             </div>
 
@@ -88,9 +106,9 @@
                     </svg>
                 </button>
                 <div id="hobbies-submenu" class="ml-4 mt-1 space-y-1 hidden">
-                    <a href="{% url 'reading_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Reading List</a>
-                    <a href="{% url 'darts' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Darts</a>
-                    <a href="{% url 'guitar' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Guitar</a>
+                    <a href="{% url 'reading_list' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Reading List</a>
+                    <a href="{% url 'darts' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Darts</a>
+                    <a href="{% url 'guitar' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Guitar</a>
                 </div>
             </div>
 
@@ -103,8 +121,8 @@
                     </svg>
                 </button>
                 <div id="health-submenu" class="ml-4 mt-1 space-y-1 hidden">
-                    <a href="{% url 'weight_list' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Weight</a>
-                    <a href="{% url 'exercise' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Exercise</a>
+                    <a href="{% url 'weight_list' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Weight</a>
+                    <a href="{% url 'exercise' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Exercise</a>
                 </div>
             </div>
 
@@ -117,19 +135,40 @@
                     </svg>
                 </button>
                 <div id="claude-usage-submenu" class="ml-4 mt-1 space-y-1 hidden">
-                    <a href="{% url 'claude_usage_overview' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">Overview</a>
-                    <a href="{% url 'claude_usage_history' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">History</a>
-                    <a href="{% url 'claude_usage_by_project' %}" class="block hover:bg-gray-700 p-2 rounded text-sm">By Project</a>
+                    <a href="{% url 'claude_usage_overview' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Overview</a>
+                    <a href="{% url 'claude_usage_history' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">History</a>
+                    <a href="{% url 'claude_usage_by_project' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">By Project</a>
                 </div>
             </div>
         </nav>
     </aside>
 
     <script>
+        function toggleSidebar() {
+            const aside = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            const isOpen = !aside.classList.contains('-translate-x-full');
+            if (isOpen) {
+                aside.classList.add('-translate-x-full');
+                backdrop.classList.add('hidden');
+            } else {
+                aside.classList.remove('-translate-x-full');
+                backdrop.classList.remove('hidden');
+            }
+        }
+
+        function closeSidebarOnMobile() {
+            if (window.innerWidth < 1024) {
+                const aside = document.getElementById('sidebar');
+                const backdrop = document.getElementById('sidebar-backdrop');
+                aside.classList.add('-translate-x-full');
+                backdrop.classList.add('hidden');
+            }
+        }
+
         function toggleSubmenu(submenuId) {
             const submenu = document.getElementById(submenuId);
             const icon = document.getElementById(submenuId + '-icon');
-
             if (submenu.classList.contains('hidden')) {
                 submenu.classList.remove('hidden');
                 icon.style.transform = 'rotate(180deg)';
@@ -139,32 +178,19 @@
             }
         }
 
-        // Auto-expand submenus based on current page
         window.addEventListener('DOMContentLoaded', function() {
             const currentPath = window.location.pathname;
-            if (currentPath.includes('/energy/') || currentPath.includes('/electricity/')) {
-                toggleSubmenu('energy-submenu');
-            }
-            if (currentPath.includes('/financial/')) {
-                toggleSubmenu('financial-submenu');
-            }
-            if (currentPath.includes('/hobbies/')) {
-                toggleSubmenu('hobbies-submenu');
-            }
-            if (currentPath.includes('/health/')) {
-                toggleSubmenu('health-submenu');
-            }
-            if (currentPath.includes('/claude-usage/')) {
-                toggleSubmenu('claude-usage-submenu');
-            }
-            if (currentPath.includes('/otel')) {
-                toggleSubmenu('otel-submenu');
-            }
+            if (currentPath.includes('/energy/') || currentPath.includes('/electricity/')) toggleSubmenu('energy-submenu');
+            if (currentPath.includes('/financial/')) toggleSubmenu('financial-submenu');
+            if (currentPath.includes('/hobbies/')) toggleSubmenu('hobbies-submenu');
+            if (currentPath.includes('/health/')) toggleSubmenu('health-submenu');
+            if (currentPath.includes('/claude-usage/')) toggleSubmenu('claude-usage-submenu');
+            if (currentPath.includes('/otel')) toggleSubmenu('otel-submenu');
         });
     </script>
 
     <!-- Main Content -->
-    <main class="flex-1 p-6">
+    <main class="flex-1 p-6 pt-20 lg:pt-6 min-w-0">
         {% block content %}{% endblock %}
     </main>
 
