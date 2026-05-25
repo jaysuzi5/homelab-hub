@@ -690,7 +690,7 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
         pension_gross = 0.0
         for pa in pension_accounts:
             if pa['pension_benefit_age'] and age >= pa['pension_benefit_age']:
-                pension_gross += pa['pension_monthly_benefit'] * ((1 + ss_inflation) ** year_offset)
+                pension_gross += pa['pension_monthly_benefit']
 
         # Net income after estimated tax on SS + pension
         ss_net = ss_gross * tax_net

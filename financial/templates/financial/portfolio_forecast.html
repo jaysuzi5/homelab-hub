@@ -107,7 +107,7 @@
                         {% if pa.pension_benefit_age and pa.pension_monthly_benefit %}
                         <p class="text-gray-300 text-xs mt-0.5">
                             ${{ pa.pension_monthly_benefit|floatformat:0|intcomma }}/mo starting age {{ pa.pension_benefit_age }}
-                            <span class="text-gray-500 ml-1">(today's dollars, COLA-adjusted)</span>
+                            <span class="text-gray-500 ml-1">(flat rate, not inflation-adjusted)</span>
                         </p>
                         {% else %}
                         <p class="text-yellow-400 text-xs mt-0.5">Monthly benefit and start age not configured</p>
