@@ -20,4 +20,5 @@ urlpatterns = [
     path('networth/create/', views.networth_create, name='networth_create'),
     path('networth/<int:pk>/edit/', views.networth_edit, name='networth_edit'),
     path('networth/<int:pk>/delete/', views.networth_delete, name='networth_delete'),
+    path('forecast/', views.portfolio_forecast, name='portfolio_forecast'),
 ]

@@ -2,10 +2,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Max
 from django.core.serializers.json import DjangoJSONEncoder
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as date_type
 import json
-from .forms import RetirementForm, PortfolioAccountForm, PortfolioSnapshotForm, ElectricityUsageForm, NetWorthForm
-from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth
+from .forms import RetirementForm, PortfolioAccountForm, PortfolioSnapshotForm, ElectricityUsageForm, NetWorthForm, ForecastSettingsForm
+from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth, ForecastSettings
 from .calculator import monte_carlo_simulation, find_max_withdrawal
 from config.utils import get_config
 
@@ -537,4 +537,183 @@ def networth_delete(request, pk):
         return redirect('networth_list')
 
     return render(request, "financial/networth_confirm_delete.html", {"record": record})
+
+
+DEFAULT_WITHDRAWAL_ORDER = ['CASH', 'ROTH_IRA', 'ROTH_401K', 'TRADITIONAL_IRA', '401K', 'HSA', 'BROKERAGE', 'OTHER']
+ACCOUNT_TYPE_LABELS = dict(PortfolioAccount.ACCOUNT_TYPE_CHOICES)
+
+
+@login_required
+def portfolio_forecast(request):
+    settings_obj = ForecastSettings.objects.first()
+    if not settings_obj:
+        settings_obj = ForecastSettings.objects.create(withdrawal_order=DEFAULT_WITHDRAWAL_ORDER)
+
+    if request.method == 'POST':
+        form = ForecastSettingsForm(request.POST, instance=settings_obj)
+        if form.is_valid():
+            settings_obj = form.save(commit=False)
+            withdrawal_order_raw = request.POST.get('withdrawal_order_json', '')
+            try:
+                parsed = json.loads(withdrawal_order_raw)
+                settings_obj.withdrawal_order = parsed if isinstance(parsed, list) else DEFAULT_WITHDRAWAL_ORDER
+            except (json.JSONDecodeError, ValueError):
+                settings_obj.withdrawal_order = DEFAULT_WITHDRAWAL_ORDER
+            settings_obj.save()
+    else:
+        form = ForecastSettingsForm(instance=settings_obj)
+
+    accounts = PortfolioAccount.objects.filter(is_active=True).prefetch_related('snapshots')
+    investment_accounts = []
+    pension_accounts = []
+
+    for account in accounts:
+        latest = account.snapshots.order_by('-snapshot_date').first()
+        balance = float(latest.balance) if latest else 0.0
+        acct_data = {
+            'id': account.id,
+            'name': account.name,
+            'account_type': account.account_type,
+            'account_type_label': ACCOUNT_TYPE_LABELS.get(account.account_type, account.account_type),
+            'tax_treatment': account.tax_treatment,
+            'balance': balance,
+            'annual_growth_rate': float(account.annual_growth_rate),
+            'pension_benefit_age': account.pension_benefit_age,
+            'pension_monthly_benefit': float(account.pension_monthly_benefit) if account.pension_monthly_benefit else 0.0,
+        }
+        if account.tax_treatment == 'PENSION':
+            pension_accounts.append(acct_data)
+        else:
+            investment_accounts.append(acct_data)
+
+    withdrawal_order = settings_obj.withdrawal_order or DEFAULT_WITHDRAWAL_ORDER
+
+    # Ensure all account types present in accounts are covered
+    existing_types = {a['account_type'] for a in investment_accounts}
+    for t in existing_types:
+        if t not in withdrawal_order:
+            withdrawal_order.append(t)
+
+    forecast_rows = _run_forecast(investment_accounts, pension_accounts, settings_obj, withdrawal_order)
+
+    # Build the ordered list of account types that actually have accounts (for table columns)
+    ordered_types_with_accounts = [t for t in withdrawal_order if t in existing_types]
+
+    # Annotate each annual row with withdrawal columns list
+    annual_rows = []
+    for i, row in enumerate(forecast_rows):
+        if i == 0 or row['month_of_year'] == 1 or i == len(forecast_rows) - 1:
+            row['withdrawal_columns'] = [row['withdrawal_by_type'].get(t, 0.0) for t in ordered_types_with_accounts]
+            annual_rows.append(row)
+
+    # Chart: monthly data, sample labels every 12 months for readability
+    chart_data = [{'date': r['date'], 'balance': r['total_balance']} for r in forecast_rows]
+
+    # Drag-and-drop list: all types in withdrawal order, annotated with whether they have accounts
+    withdrawal_order_display = [
+        {
+            'code': t,
+            'label': ACCOUNT_TYPE_LABELS.get(t, t),
+            'has_accounts': t in existing_types,
+        }
+        for t in withdrawal_order
+    ]
+
+    context = {
+        'form': form,
+        'settings': settings_obj,
+        'investment_accounts': investment_accounts,
+        'pension_accounts': pension_accounts,
+        'annual_rows': annual_rows,
+        'ordered_withdrawal_types': ordered_types_with_accounts,
+        'ordered_type_labels': [ACCOUNT_TYPE_LABELS.get(t, t) for t in ordered_types_with_accounts],
+        'withdrawal_order_display': withdrawal_order_display,
+        'chart_data': json.dumps(chart_data, cls=DjangoJSONEncoder),
+        'withdrawal_order_json': json.dumps(withdrawal_order),
+    }
+    request.otel_page_summary = {"page": "portfolio_forecast"}
+    return render(request, 'financial/portfolio_forecast.html', context)
+
+
+def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_order):
+    current_age = float(settings.current_age)
+    max_age = settings.max_age
+    base_spending = float(settings.monthly_spending)
+    spending_inflation = float(settings.spending_inflation_rate)
+    ss_benefit_today = float(settings.ss_monthly_benefit)
+    ss_inflation = float(settings.ss_inflation_rate)
+    ss_start_age = float(settings.ss_start_age)
+
+    balances = {a['id']: a['balance'] for a in investment_accounts}
+    total_months = max(0, int((max_age - current_age) * 12))
+
+    accounts_by_type = {}
+    for acct in investment_accounts:
+        accounts_by_type.setdefault(acct['account_type'], []).append(acct)
+    for t in accounts_by_type:
+        accounts_by_type[t].sort(key=lambda x: x['name'])
+
+    today = date_type.today()
+    rows = []
+
+    for m in range(total_months):
+        age = current_age + m / 12.0
+        year_offset = m / 12.0
+        year = today.year + (today.month - 1 + m) // 12
+        month = (today.month - 1 + m) % 12 + 1
+
+        monthly_spending = base_spending * ((1 + spending_inflation) ** year_offset)
+
+        ss_income = 0.0
+        if age >= ss_start_age:
+            ss_income = ss_benefit_today * ((1 + ss_inflation) ** year_offset)
+
+        pension_income = 0.0
+        for pa in pension_accounts:
+            if pa['pension_benefit_age'] and age >= pa['pension_benefit_age']:
+                pension_income += pa['pension_monthly_benefit'] * ((1 + ss_inflation) ** year_offset)
+
+        # Apply monthly growth before withdrawal
+        for acct in investment_accounts:
+            monthly_rate = (1 + acct['annual_growth_rate']) ** (1 / 12) - 1
+            balances[acct['id']] = balances[acct['id']] * (1 + monthly_rate)
+
+        net_need = monthly_spending - ss_income - pension_income
+        remaining = max(0.0, net_need)
+        withdrawal_by_type = {}
+
+        for acct_type in withdrawal_order:
+            if remaining <= 0:
+                break
+            for acct in accounts_by_type.get(acct_type, []):
+                if remaining <= 0:
+                    break
+                available = max(0.0, balances[acct['id']])
+                withdraw = min(available, remaining)
+                balances[acct['id']] -= withdraw
+                remaining -= withdraw
+                if withdraw > 0:
+                    withdrawal_by_type[acct_type] = withdrawal_by_type.get(acct_type, 0.0) + withdraw
+
+        shortfall = max(0.0, remaining)
+        total_balance = max(0.0, sum(balances.values()))
+
+        rows.append({
+            'date': f"{year}-{month:02d}",
+            'month_num': m,
+            'month_of_year': month,
+            'age': round(age, 1),
+            'monthly_spending': round(monthly_spending, 2),
+            'ss_income': round(ss_income, 2),
+            'pension_income': round(pension_income, 2),
+            'net_need': round(max(0.0, net_need), 2),
+            'total_balance': round(total_balance, 2),
+            'withdrawal_by_type': {k: round(v, 2) for k, v in withdrawal_by_type.items()},
+            'shortfall': round(shortfall, 2),
+        })
+
+        if total_balance <= 0 and net_need > 0:
+            break
+
+    return rows
 

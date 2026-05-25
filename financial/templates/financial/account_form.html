@@ -56,6 +56,35 @@
                 {% endif %}
             </div>
 
+            <div>
+                <label for="{{ form.annual_growth_rate.id_for_label }}" class="block text-gray-300 mb-2">{{ form.annual_growth_rate.label }}</label>
+                {{ form.annual_growth_rate }}
+                {% if form.annual_growth_rate.errors %}
+                <p class="text-red-400 text-sm mt-1">{{ form.annual_growth_rate.errors.0 }}</p>
+                {% endif %}
+                <p class="text-gray-400 text-sm mt-1">Used for Portfolio Forecast. E.g. 0.07 = 7% annual growth.</p>
+            </div>
+
+            <!-- Pension fields: shown only when tax_treatment=PENSION -->
+            <div id="pension-fields" class="hidden space-y-4 bg-gray-700 rounded-lg p-4">
+                <h4 class="text-orange-400 font-semibold">Pension Income Settings</h4>
+                <div>
+                    <label for="{{ form.pension_benefit_age.id_for_label }}" class="block text-gray-300 mb-2">{{ form.pension_benefit_age.label }}</label>
+                    {{ form.pension_benefit_age }}
+                    {% if form.pension_benefit_age.errors %}
+                    <p class="text-red-400 text-sm mt-1">{{ form.pension_benefit_age.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.pension_monthly_benefit.id_for_label }}" class="block text-gray-300 mb-2">{{ form.pension_monthly_benefit.label }}</label>
+                    {{ form.pension_monthly_benefit }}
+                    {% if form.pension_monthly_benefit.errors %}
+                    <p class="text-red-400 text-sm mt-1">{{ form.pension_monthly_benefit.errors.0 }}</p>
+                    {% endif %}
+                    <p class="text-gray-400 text-sm mt-1">Amount in today's dollars. Inflation-adjusted in forecast.</p>
+                </div>
+            </div>
+
             <div class="flex items-center space-x-2">
                 {{ form.is_active }}
                 <label for="{{ form.is_active.id_for_label }}" class="text-gray-300">{{ form.is_active.label }}</label>
@@ -86,5 +115,17 @@
         </div>
     </form>
 </div>
+
+<script>
+(function() {
+    const taxSelect = document.getElementById('id_tax_treatment');
+    const pensionFields = document.getElementById('pension-fields');
+    function toggle() {
+        pensionFields.classList.toggle('hidden', taxSelect.value !== 'PENSION');
+    }
+    taxSelect.addEventListener('change', toggle);
+    toggle();
+})();
+</script>
 
 {% endblock %}

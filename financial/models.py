@@ -1,5 +1,10 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from decimal import Decimal
+
+
+def _default_withdrawal_order():
+    return ['CASH', 'ROTH_IRA', 'ROTH_401K', 'TRADITIONAL_IRA', '401K', 'HSA', 'BROKERAGE', 'OTHER']
 
 
 class PortfolioAccount(models.Model):
@@ -44,6 +49,19 @@ class PortfolioAccount(models.Model):
 
     is_active = models.BooleanField(default=True, help_text="Uncheck to hide this account from portfolio view")
     notes = models.TextField(blank=True, help_text="Optional notes about this account")
+
+    annual_growth_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, default=Decimal('0.0700'),
+        help_text="Expected annual growth rate for forecasting (e.g., 0.07 for 7%)"
+    )
+    pension_benefit_age = models.IntegerField(
+        null=True, blank=True,
+        help_text="Age when pension benefits begin (pension accounts only)"
+    )
+    pension_monthly_benefit = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Monthly pension benefit in today's dollars (pension accounts only)"
+    )
     created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)
 
@@ -269,3 +287,45 @@ class NetWorth(models.Model):
 
     def __str__(self):
         return f"{self.date.strftime('%B %Y')} - ${self.net_worth:,.2f}"
+
+
+class ForecastSettings(models.Model):
+    """Singleton settings for the Portfolio Forecast page."""
+
+    monthly_spending = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('5000.00'),
+        help_text="Target monthly spending in today's dollars"
+    )
+    spending_inflation_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, default=Decimal('0.0300'),
+        help_text="Annual inflation rate applied to spending (e.g., 0.03)"
+    )
+    ss_monthly_benefit = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        help_text="Expected Social Security monthly benefit in today's dollars"
+    )
+    ss_inflation_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, default=Decimal('0.0200'),
+        help_text="Annual COLA adjustment for Social Security (e.g., 0.02)"
+    )
+    ss_start_age = models.DecimalField(
+        max_digits=4, decimal_places=1, default=Decimal('67.0'),
+        help_text="Age to start receiving Social Security"
+    )
+    current_age = models.DecimalField(
+        max_digits=4, decimal_places=1, default=Decimal('50.0'),
+        help_text="Your current age"
+    )
+    max_age = models.IntegerField(default=95, help_text="Maximum age for forecast horizon")
+    withdrawal_order = models.JSONField(
+        default=_default_withdrawal_order,
+        help_text="Ordered list of account type codes for portfolio withdrawals"
+    )
+    created_date = models.DateTimeField(auto_now_add=True)
+    updated_date = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Forecast Settings"
+
+    def __str__(self):
+        return "Forecast Settings"

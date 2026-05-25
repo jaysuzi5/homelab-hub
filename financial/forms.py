@@ -1,6 +1,6 @@
 from django import forms
 from config.utils import get_config
-from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth
+from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth, ForecastSettings
 
 SS_BENEFITS_62 = get_config("SS_BENEFITS_62",0)
 SS_BENEFITS_65 = get_config("SS_BENEFITS_65",0)
@@ -120,19 +120,34 @@ class RetirementForm(forms.Form):
                 self.add_error("target_success", "Target success rate is required when using Target Success mode.")
 
 
+INPUT_CLASS = 'bg-gray-700 text-white px-3 py-2 rounded w-full'
+
+
 class PortfolioAccountForm(forms.ModelForm):
     """Form for creating and editing portfolio accounts."""
 
     class Meta:
         model = PortfolioAccount
-        fields = ['name', 'account_type', 'institution', 'tax_treatment', 'is_active', 'notes']
+        fields = [
+            'name', 'account_type', 'institution', 'tax_treatment',
+            'annual_growth_rate', 'pension_benefit_age', 'pension_monthly_benefit',
+            'is_active', 'notes',
+        ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
-            'account_type': forms.Select(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
-            'institution': forms.TextInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
-            'tax_treatment': forms.Select(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
+            'name': forms.TextInput(attrs={'class': INPUT_CLASS}),
+            'account_type': forms.Select(attrs={'class': INPUT_CLASS}),
+            'institution': forms.TextInput(attrs={'class': INPUT_CLASS}),
+            'tax_treatment': forms.Select(attrs={'class': INPUT_CLASS, 'id': 'id_tax_treatment'}),
+            'annual_growth_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.0001'}),
+            'pension_benefit_age': forms.NumberInput(attrs={'class': INPUT_CLASS}),
+            'pension_monthly_benefit': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.01'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'bg-gray-700 text-white'}),
-            'notes': forms.Textarea(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'rows': 3}),
+            'notes': forms.Textarea(attrs={'class': INPUT_CLASS, 'rows': 3}),
+        }
+        labels = {
+            'annual_growth_rate': 'Annual Growth Rate (e.g., 0.07 for 7%)',
+            'pension_benefit_age': 'Pension Benefit Start Age',
+            'pension_monthly_benefit': 'Monthly Pension Benefit ($)',
         }
 
 
@@ -194,4 +209,34 @@ class NetWorthForm(forms.ModelForm):
         }
         labels = {
             'net_worth': 'Net Worth ($)',
+        }
+
+
+class ForecastSettingsForm(forms.ModelForm):
+    """Form for portfolio forecast parameters."""
+
+    class Meta:
+        model = ForecastSettings
+        fields = [
+            'current_age', 'max_age',
+            'monthly_spending', 'spending_inflation_rate',
+            'ss_monthly_benefit', 'ss_inflation_rate', 'ss_start_age',
+        ]
+        widgets = {
+            'current_age': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.1'}),
+            'max_age': forms.NumberInput(attrs={'class': INPUT_CLASS}),
+            'monthly_spending': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '1'}),
+            'spending_inflation_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.001'}),
+            'ss_monthly_benefit': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '1'}),
+            'ss_inflation_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.001'}),
+            'ss_start_age': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.5'}),
+        }
+        labels = {
+            'current_age': 'Current Age',
+            'max_age': 'Maximum Age (forecast horizon)',
+            'monthly_spending': 'Monthly Spending Today ($)',
+            'spending_inflation_rate': 'Spending Inflation Rate (e.g., 0.03)',
+            'ss_monthly_benefit': 'Social Security Monthly Benefit Today ($)',
+            'ss_inflation_rate': 'SS COLA Rate (e.g., 0.02)',
+            'ss_start_age': 'Social Security Start Age',
         }

@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Portfolio Forecast</h2>
+    <div class="flex items-center space-x-3">
+        <a href="{% url 'portfolio_overview' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+            Portfolio Overview
+        </a>
+        <a href="{% url 'account_list' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+            Manage Accounts
+        </a>
+    </div>
+</div>
+
+<!-- Settings Form -->
+<form method="post" id="forecast-form">
+    {% csrf_token %}
+    <input type="hidden" name="withdrawal_order_json" id="withdrawal_order_json" value="{{ withdrawal_order_json }}">
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+        <!-- Left: Spending + SS + Age -->
+        <div class="bg-gray-800 rounded-2xl shadow p-6 space-y-4">
+            <h3 class="text-xl font-bold mb-2">Forecast Parameters</h3>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-300 text-sm mb-1">{{ form.current_age.label }}</label>
+                    {{ form.current_age }}
+                    {% if form.current_age.errors %}<p class="text-red-400 text-xs mt-1">{{ form.current_age.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-gray-300 text-sm mb-1">{{ form.max_age.label }}</label>
+                    {{ form.max_age }}
+                    {% if form.max_age.errors %}<p class="text-red-400 text-xs mt-1">{{ form.max_age.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div class="border-t border-gray-700 pt-4">
+                <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Spending</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.monthly_spending.label }}</label>
+                        {{ form.monthly_spending }}
+                        {% if form.monthly_spending.errors %}<p class="text-red-400 text-xs mt-1">{{ form.monthly_spending.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.spending_inflation_rate.label }}</label>
+                        {{ form.spending_inflation_rate }}
+                        {% if form.spending_inflation_rate.errors %}<p class="text-red-400 text-xs mt-1">{{ form.spending_inflation_rate.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-700 pt-4">
+                <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Social Security</p>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.ss_monthly_benefit.label }}</label>
+                        {{ form.ss_monthly_benefit }}
+                        {% if form.ss_monthly_benefit.errors %}<p class="text-red-400 text-xs mt-1">{{ form.ss_monthly_benefit.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.ss_inflation_rate.label }}</label>
+                        {{ form.ss_inflation_rate }}
+                        {% if form.ss_inflation_rate.errors %}<p class="text-red-400 text-xs mt-1">{{ form.ss_inflation_rate.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.ss_start_age.label }}</label>
+                        {{ form.ss_start_age }}
+                        {% if form.ss_start_age.errors %}<p class="text-red-400 text-xs mt-1">{{ form.ss_start_age.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if pension_accounts %}
+            <div class="border-t border-gray-700 pt-4">
+                <p class="text-gray-400 text-xs uppercase tracking-wide mb-2">Pension Accounts (Income Streams)</p>
+                {% for pa in pension_accounts %}
+                <div class="flex items-center justify-between text-sm py-1">
+                    <span class="text-orange-400">{{ pa.name }}</span>
+                    <span class="text-gray-300">
+                        {% if pa.pension_benefit_age %}
+                            ${{ pa.pension_monthly_benefit|floatformat:0|intcomma }}/mo starting age {{ pa.pension_benefit_age }}
+                        {% else %}
+                            <span class="text-yellow-400">— Configure benefit age/amount on account</span>
+                        {% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right: Withdrawal Order -->
+        <div class="bg-gray-800 rounded-2xl shadow p-6">
+            <h3 class="text-xl font-bold mb-2">Withdrawal Order</h3>
+            <p class="text-gray-400 text-sm mb-4">Drag to reorder. Portfolio is drawn from top first.</p>
+            <ul id="withdrawal-order-list" class="space-y-2">
+                {% for item in withdrawal_order_display %}
+                <li data-type="{{ item.code }}"
+                    class="flex items-center justify-between bg-gray-700 rounded-lg px-4 py-2 cursor-grab active:cursor-grabbing select-none">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-gray-400 drag-handle">&#9776;</span>
+                        <span class="{% if item.has_accounts %}text-white{% else %}text-gray-500{% endif %}">
+                            {{ item.label }}
+                        </span>
+                    </div>
+                    {% if item.has_accounts %}
+                    <span class="text-xs bg-green-800 text-green-300 px-2 py-0.5 rounded-full">has accounts</span>
+                    {% else %}
+                    <span class="text-xs text-gray-600">no accounts</span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="flex justify-end mb-6">
+        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded-lg font-semibold transition">
+            Run Forecast
+        </button>
+    </div>
+</form>
+
+{% if annual_rows %}
+
+<!-- Chart -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6" style="min-height: 28rem;">
+    <h3 class="text-xl font-bold mb-4">Portfolio Balance Over Time</h3>
+    <div class="w-full h-96">
+        <canvas id="forecastChart" class="w-full h-full"></canvas>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+{% with last=annual_rows|last first=annual_rows|first %}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-4">
+        <p class="text-gray-400 text-sm">Starting Balance</p>
+        <p class="text-2xl font-bold text-green-400">${{ first.total_balance|floatformat:0|intcomma }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-4">
+        <p class="text-gray-400 text-sm">Ending Balance (Age {{ last.age }})</p>
+        <p class="text-2xl font-bold {% if last.total_balance > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+            ${{ last.total_balance|floatformat:0|intcomma }}
+        </p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-4">
+        <p class="text-gray-400 text-sm">Monthly Spending (Today)</p>
+        <p class="text-2xl font-bold text-blue-400">${{ settings.monthly_spending|floatformat:0|intcomma }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-4">
+        <p class="text-gray-400 text-sm">SS + Pension Income (Today)</p>
+        <p class="text-2xl font-bold text-orange-400">
+            ${{ settings.ss_monthly_benefit|floatformat:0|intcomma }}/mo
+        </p>
+    </div>
+</div>
+{% endwith %}
+
+<!-- Annual Forecast Table -->
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold">Annual Forecast</h3>
+        <p class="text-gray-400 text-sm">One row per year (January). All dollar amounts in nominal (inflation-adjusted) terms.</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm table-auto whitespace-nowrap">
+            <thead>
+                <tr class="text-gray-400 border-b border-gray-700">
+                    <th class="px-3 py-2">Date</th>
+                    <th class="px-3 py-2">Age</th>
+                    <th class="px-3 py-2 text-right">Spending</th>
+                    <th class="px-3 py-2 text-right">SS</th>
+                    <th class="px-3 py-2 text-right">Pension</th>
+                    <th class="px-3 py-2 text-right">Net Need</th>
+                    {% for label in ordered_type_labels %}
+                    <th class="px-3 py-2 text-right text-xs">{{ label }}</th>
+                    {% endfor %}
+                    <th class="px-3 py-2 text-right">Shortfall</th>
+                    <th class="px-3 py-2 text-right font-semibold">Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in annual_rows %}
+                <tr class="border-b border-gray-700 hover:bg-gray-750 {% if row.shortfall > 0 %}bg-red-900 bg-opacity-20{% endif %}">
+                    <td class="px-3 py-2 text-gray-300">{{ row.date }}</td>
+                    <td class="px-3 py-2 text-gray-300">{{ row.age }}</td>
+                    <td class="px-3 py-2 text-right text-gray-200">${{ row.monthly_spending|floatformat:0|intcomma }}</td>
+                    <td class="px-3 py-2 text-right text-green-400">
+                        {% if row.ss_income > 0 %}${{ row.ss_income|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right text-orange-400">
+                        {% if row.pension_income > 0 %}${{ row.pension_income|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right text-yellow-300">${{ row.net_need|floatformat:0|intcomma }}</td>
+                    {% for amt in row.withdrawal_columns %}
+                    <td class="px-3 py-2 text-right text-gray-300">
+                        {% if amt > 0 %}${{ amt|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="px-3 py-2 text-right">
+                        {% if row.shortfall > 0 %}
+                        <span class="text-red-400 font-semibold">-${{ row.shortfall|floatformat:0|intcomma }}</span>
+                        {% else %}
+                        <span class="text-gray-600">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right font-semibold {% if row.total_balance > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                        ${{ row.total_balance|floatformat:0|intcomma }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<div class="bg-gray-800 rounded-2xl shadow p-12 text-center">
+    <p class="text-gray-400 text-lg mb-2">No forecast data yet.</p>
+    <p class="text-gray-500 text-sm">Add accounts with balances, set your parameters above, then click Run Forecast.</p>
+</div>
+{% endif %}
+
+<!-- SortableJS for drag-and-drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Drag-and-drop withdrawal order
+const list = document.getElementById('withdrawal-order-list');
+const hiddenInput = document.getElementById('withdrawal_order_json');
+
+Sortable.create(list, {
+    animation: 150,
+    handle: '.drag-handle',
+    onEnd: function() {
+        const order = Array.from(list.querySelectorAll('li')).map(li => li.dataset.type);
+        hiddenInput.value = JSON.stringify(order);
+    }
+});
+
+{% if annual_rows %}
+// Forecast chart
+const chartData = {{ chart_data|safe }};
+const ctx = document.getElementById('forecastChart').getContext('2d');
+
+// Sample to ~120 points max for readability
+let labels, balances;
+if (chartData.length > 120) {
+    const step = Math.ceil(chartData.length / 120);
+    const sampled = chartData.filter((_, i) => i % step === 0 || i === chartData.length - 1);
+    labels = sampled.map(d => d.date);
+    balances = sampled.map(d => d.balance);
+} else {
+    labels = chartData.map(d => d.date);
+    balances = chartData.map(d => d.balance);
+}
+
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Portfolio Balance',
+            data: balances,
+            fill: true,
+            borderColor: 'rgba(34,197,94,1)',
+            backgroundColor: 'rgba(34,197,94,0.15)',
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+            x: {
+                ticks: { color: 'rgba(255,255,255,0.6)', font: { size: 11 }, maxTicksLimit: 20 },
+                grid: { color: 'rgba(255,255,255,0.1)' }
+            },
+            y: {
+                ticks: {
+                    color: 'rgba(255,255,255,0.6)',
+                    font: { size: 11 },
+                    callback: v => '$' + (v / 1000000 >= 1 ? (v/1000000).toFixed(1) + 'M' : (v/1000).toFixed(0) + 'K')
+                },
+                grid: { color: 'rgba(255,255,255,0.1)' },
+                beginAtZero: true
+            }
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: ctx => '$' + ctx.parsed.y.toLocaleString()
+                }
+            }
+        }
+    }
+});
+{% endif %}
+</script>
+
+{% endblock %}
