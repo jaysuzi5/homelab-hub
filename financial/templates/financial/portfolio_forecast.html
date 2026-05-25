@@ -21,15 +21,19 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
-        <!-- Left: Spending + SS + Age -->
+        <!-- Left: Parameters -->
         <div class="bg-gray-800 rounded-2xl shadow p-6 space-y-4">
             <h3 class="text-xl font-bold mb-2">Forecast Parameters</h3>
 
+            <!-- DOB + Max Age -->
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-gray-300 text-sm mb-1">{{ form.current_age.label }}</label>
-                    {{ form.current_age }}
-                    {% if form.current_age.errors %}<p class="text-red-400 text-xs mt-1">{{ form.current_age.errors.0 }}</p>{% endif %}
+                    <label class="block text-gray-300 text-sm mb-1">{{ form.date_of_birth.label }}</label>
+                    {{ form.date_of_birth }}
+                    {% if form.date_of_birth.errors %}<p class="text-red-400 text-xs mt-1">{{ form.date_of_birth.errors.0 }}</p>{% endif %}
+                    <p id="age-display" class="text-green-400 text-xs mt-1">
+                        {% if current_age_display %}Current age: {{ current_age_display }}{% endif %}
+                    </p>
                 </div>
                 <div>
                     <label class="block text-gray-300 text-sm mb-1">{{ form.max_age.label }}</label>
@@ -38,6 +42,7 @@
                 </div>
             </div>
 
+            <!-- Spending -->
             <div class="border-t border-gray-700 pt-4">
                 <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Spending</p>
                 <div class="grid grid-cols-2 gap-4">
@@ -54,8 +59,9 @@
                 </div>
             </div>
 
+            <!-- Social Security -->
             <div class="border-t border-gray-700 pt-4">
-                <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Social Security</p>
+                <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Social Security <span class="text-gray-500 normal-case">(in today's dollars, COLA-adjusted in forecast)</span></p>
                 <div class="grid grid-cols-3 gap-4">
                     <div>
                         <label class="block text-gray-300 text-sm mb-1">{{ form.ss_monthly_benefit.label }}</label>
@@ -75,19 +81,39 @@
                 </div>
             </div>
 
+            <!-- Tax Rate -->
+            <div class="border-t border-gray-700 pt-4">
+                <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Taxes</p>
+                <div class="grid grid-cols-2 gap-4 items-start">
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.effective_tax_rate.label }}</label>
+                        {{ form.effective_tax_rate }}
+                        {% if form.effective_tax_rate.errors %}<p class="text-red-400 text-xs mt-1">{{ form.effective_tax_rate.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div class="bg-gray-700 rounded-lg p-3 text-xs text-gray-400 leading-relaxed mt-5">
+                        Applied to: SS income, pension income, Pre-Tax (401k/IRA) withdrawals, and Taxable brokerage withdrawals. Roth, Cash, and HSA are not grossed up.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pension Accounts -->
             {% if pension_accounts %}
             <div class="border-t border-gray-700 pt-4">
-                <p class="text-gray-400 text-xs uppercase tracking-wide mb-2">Pension Accounts (Income Streams)</p>
+                <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Pension Accounts <span class="text-gray-500 normal-case">(income streams — not withdrawal pool)</span></p>
                 {% for pa in pension_accounts %}
-                <div class="flex items-center justify-between text-sm py-1">
-                    <span class="text-orange-400">{{ pa.name }}</span>
-                    <span class="text-gray-300">
-                        {% if pa.pension_benefit_age %}
+                <div class="flex items-center justify-between bg-gray-700 rounded-lg px-4 py-3 mb-2">
+                    <div>
+                        <p class="text-orange-400 font-semibold text-sm">{{ pa.name }}</p>
+                        {% if pa.pension_benefit_age and pa.pension_monthly_benefit %}
+                        <p class="text-gray-300 text-xs mt-0.5">
                             ${{ pa.pension_monthly_benefit|floatformat:0|intcomma }}/mo starting age {{ pa.pension_benefit_age }}
+                            <span class="text-gray-500 ml-1">(today's dollars, COLA-adjusted)</span>
+                        </p>
                         {% else %}
-                            <span class="text-yellow-400">— Configure benefit age/amount on account</span>
+                        <p class="text-yellow-400 text-xs mt-0.5">Monthly benefit and start age not configured</p>
                         {% endif %}
-                    </span>
+                    </div>
+                    <a href="{% url 'account_edit' pa.id %}" class="text-blue-400 hover:text-blue-300 text-xs ml-4 whitespace-nowrap">Edit</a>
                 </div>
                 {% endfor %}
             </div>
@@ -97,7 +123,7 @@
         <!-- Right: Withdrawal Order -->
         <div class="bg-gray-800 rounded-2xl shadow p-6">
             <h3 class="text-xl font-bold mb-2">Withdrawal Order</h3>
-            <p class="text-gray-400 text-sm mb-4">Drag to reorder. Portfolio is drawn from top first.</p>
+            <p class="text-gray-400 text-sm mb-4">Drag to reorder. Portfolio drawn from top first after SS and pension income.</p>
             <ul id="withdrawal-order-list" class="space-y-2">
                 {% for item in withdrawal_order_display %}
                 <li data-type="{{ item.code }}"
@@ -154,10 +180,9 @@
         <p class="text-2xl font-bold text-blue-400">${{ settings.monthly_spending|floatformat:0|intcomma }}</p>
     </div>
     <div class="bg-gray-800 rounded-2xl shadow p-4">
-        <p class="text-gray-400 text-sm">SS + Pension Income (Today)</p>
-        <p class="text-2xl font-bold text-orange-400">
-            ${{ settings.ss_monthly_benefit|floatformat:0|intcomma }}/mo
-        </p>
+        <p class="text-gray-400 text-sm">Effective Tax Rate</p>
+        <p class="text-2xl font-bold text-yellow-400">{% widthratio settings.effective_tax_rate 1 100 %}%</p>
+        <p class="text-xs text-gray-500 mt-1">on taxable income</p>
     </div>
 </div>
 {% endwith %}
@@ -166,7 +191,7 @@
 <div class="bg-gray-800 rounded-2xl shadow p-6">
     <div class="flex items-center justify-between mb-4">
         <h3 class="text-xl font-bold">Annual Forecast</h3>
-        <p class="text-gray-400 text-sm">One row per year (January). All dollar amounts in nominal (inflation-adjusted) terms.</p>
+        <p class="text-gray-400 text-sm">Dollar amounts are nominal (inflation-adjusted). Withdrawals shown gross (pre-tax). SS and pension shown gross.</p>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left text-sm table-auto whitespace-nowrap">
@@ -174,13 +199,14 @@
                 <tr class="text-gray-400 border-b border-gray-700">
                     <th class="px-3 py-2">Date</th>
                     <th class="px-3 py-2">Age</th>
-                    <th class="px-3 py-2 text-right">Spending</th>
-                    <th class="px-3 py-2 text-right">SS</th>
-                    <th class="px-3 py-2 text-right">Pension</th>
-                    <th class="px-3 py-2 text-right">Net Need</th>
+                    <th class="px-3 py-2 text-right">Spending<br><span class="font-normal text-xs text-gray-500">(net target)</span></th>
+                    <th class="px-3 py-2 text-right">SS<br><span class="font-normal text-xs text-gray-500">(gross)</span></th>
+                    <th class="px-3 py-2 text-right">Pension<br><span class="font-normal text-xs text-gray-500">(gross)</span></th>
+                    <th class="px-3 py-2 text-right">Net Need<br><span class="font-normal text-xs text-gray-500">(from accts)</span></th>
                     {% for label in ordered_type_labels %}
-                    <th class="px-3 py-2 text-right text-xs">{{ label }}</th>
+                    <th class="px-3 py-2 text-right text-xs">{{ label }}<br><span class="font-normal text-gray-500">(gross)</span></th>
                     {% endfor %}
+                    <th class="px-3 py-2 text-right text-yellow-400">Est. Taxes</th>
                     <th class="px-3 py-2 text-right">Shortfall</th>
                     <th class="px-3 py-2 text-right font-semibold">Balance</th>
                 </tr>
@@ -197,12 +223,15 @@
                     <td class="px-3 py-2 text-right text-orange-400">
                         {% if row.pension_income > 0 %}${{ row.pension_income|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
                     </td>
-                    <td class="px-3 py-2 text-right text-yellow-300">${{ row.net_need|floatformat:0|intcomma }}</td>
+                    <td class="px-3 py-2 text-right text-blue-300">${{ row.net_need|floatformat:0|intcomma }}</td>
                     {% for amt in row.withdrawal_columns %}
                     <td class="px-3 py-2 text-right text-gray-300">
                         {% if amt > 0 %}${{ amt|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
                     </td>
                     {% endfor %}
+                    <td class="px-3 py-2 text-right text-yellow-400">
+                        {% if row.monthly_taxes > 0 %}${{ row.monthly_taxes|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
+                    </td>
                     <td class="px-3 py-2 text-right">
                         {% if row.shortfall > 0 %}
                         <span class="text-red-400 font-semibold">-${{ row.shortfall|floatformat:0|intcomma }}</span>
@@ -223,18 +252,16 @@
 {% else %}
 <div class="bg-gray-800 rounded-2xl shadow p-12 text-center">
     <p class="text-gray-400 text-lg mb-2">No forecast data yet.</p>
-    <p class="text-gray-500 text-sm">Add accounts with balances, set your parameters above, then click Run Forecast.</p>
+    <p class="text-gray-500 text-sm">Enter your date of birth, set parameters above, then click Run Forecast.</p>
 </div>
 {% endif %}
 
-<!-- SortableJS for drag-and-drop -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Drag-and-drop withdrawal order
 const list = document.getElementById('withdrawal-order-list');
 const hiddenInput = document.getElementById('withdrawal_order_json');
-
 Sortable.create(list, {
     animation: 150,
     handle: '.drag-handle',
@@ -244,12 +271,26 @@ Sortable.create(list, {
     }
 });
 
+// Live age display from DOB
+const dobInput = document.querySelector('input[name="date_of_birth"]');
+const ageDisplay = document.getElementById('age-display');
+if (dobInput) {
+    dobInput.addEventListener('input', function() {
+        const dob = new Date(this.value);
+        if (!isNaN(dob)) {
+            const ageDays = (Date.now() - dob) / (1000 * 60 * 60 * 24);
+            const age = (ageDays / 365.25).toFixed(1);
+            ageDisplay.textContent = 'Current age: ' + age;
+        } else {
+            ageDisplay.textContent = '';
+        }
+    });
+}
+
 {% if annual_rows %}
 // Forecast chart
 const chartData = {{ chart_data|safe }};
 const ctx = document.getElementById('forecastChart').getContext('2d');
-
-// Sample to ~120 points max for readability
 let labels, balances;
 if (chartData.length > 120) {
     const step = Math.ceil(chartData.length / 120);
@@ -260,11 +301,10 @@ if (chartData.length > 120) {
     labels = chartData.map(d => d.date);
     balances = chartData.map(d => d.balance);
 }
-
 new Chart(ctx, {
     type: 'line',
     data: {
-        labels: labels,
+        labels,
         datasets: [{
             label: 'Portfolio Balance',
             data: balances,
@@ -287,9 +327,8 @@ new Chart(ctx, {
             },
             y: {
                 ticks: {
-                    color: 'rgba(255,255,255,0.6)',
-                    font: { size: 11 },
-                    callback: v => '$' + (v / 1000000 >= 1 ? (v/1000000).toFixed(1) + 'M' : (v/1000).toFixed(0) + 'K')
+                    color: 'rgba(255,255,255,0.6)', font: { size: 11 },
+                    callback: v => '$' + (v >= 1000000 ? (v/1000000).toFixed(1) + 'M' : (v/1000).toFixed(0) + 'K')
                 },
                 grid: { color: 'rgba(255,255,255,0.1)' },
                 beginAtZero: true
@@ -297,11 +336,7 @@ new Chart(ctx, {
         },
         plugins: {
             legend: { display: false },
-            tooltip: {
-                callbacks: {
-                    label: ctx => '$' + ctx.parsed.y.toLocaleString()
-                }
-            }
+            tooltip: { callbacks: { label: ctx => '$' + ctx.parsed.y.toLocaleString() } }
         }
     }
 });

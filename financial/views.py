@@ -594,7 +594,15 @@ def portfolio_forecast(request):
         if t not in withdrawal_order:
             withdrawal_order.append(t)
 
-    forecast_rows = _run_forecast(investment_accounts, pension_accounts, settings_obj, withdrawal_order)
+    # Calculate current age dynamically from DOB
+    current_age = None
+    current_age_display = None
+    if settings_obj.date_of_birth:
+        today_date = date_type.today()
+        current_age = (today_date - settings_obj.date_of_birth).days / 365.25
+        current_age_display = round(current_age, 1)
+
+    forecast_rows = _run_forecast(investment_accounts, pension_accounts, settings_obj, withdrawal_order, current_age)
 
     # Build the ordered list of account types that actually have accounts (for table columns)
     ordered_types_with_accounts = [t for t in withdrawal_order if t in existing_types]
@@ -606,10 +614,8 @@ def portfolio_forecast(request):
             row['withdrawal_columns'] = [row['withdrawal_by_type'].get(t, 0.0) for t in ordered_types_with_accounts]
             annual_rows.append(row)
 
-    # Chart: monthly data, sample labels every 12 months for readability
     chart_data = [{'date': r['date'], 'balance': r['total_balance']} for r in forecast_rows]
 
-    # Drag-and-drop list: all types in withdrawal order, annotated with whether they have accounts
     withdrawal_order_display = [
         {
             'code': t,
@@ -622,6 +628,7 @@ def portfolio_forecast(request):
     context = {
         'form': form,
         'settings': settings_obj,
+        'current_age_display': current_age_display,
         'investment_accounts': investment_accounts,
         'pension_accounts': pension_accounts,
         'annual_rows': annual_rows,
@@ -635,14 +642,25 @@ def portfolio_forecast(request):
     return render(request, 'financial/portfolio_forecast.html', context)
 
 
-def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_order):
-    current_age = float(settings.current_age)
+# Account tax treatments that require grossing up withdrawals
+_TAXABLE_TREATMENTS = frozenset(['PRE_TAX', 'TAXABLE'])
+
+
+def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_order, current_age=None):
+    if current_age is None:
+        if settings.date_of_birth:
+            current_age = (date_type.today() - settings.date_of_birth).days / 365.25
+        else:
+            return []
+
     max_age = settings.max_age
     base_spending = float(settings.monthly_spending)
     spending_inflation = float(settings.spending_inflation_rate)
     ss_benefit_today = float(settings.ss_monthly_benefit)
     ss_inflation = float(settings.ss_inflation_rate)
     ss_start_age = float(settings.ss_start_age)
+    tax_rate = float(settings.effective_tax_rate)
+    tax_net = 1.0 - tax_rate  # net multiplier after tax
 
     balances = {a['id']: a['balance'] for a in investment_accounts}
     total_months = max(0, int((max_age - current_age) * 12))
@@ -664,38 +682,57 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
 
         monthly_spending = base_spending * ((1 + spending_inflation) ** year_offset)
 
-        ss_income = 0.0
+        # Gross income — SS and pension are taxable ordinary income
+        ss_gross = 0.0
         if age >= ss_start_age:
-            ss_income = ss_benefit_today * ((1 + ss_inflation) ** year_offset)
+            ss_gross = ss_benefit_today * ((1 + ss_inflation) ** year_offset)
 
-        pension_income = 0.0
+        pension_gross = 0.0
         for pa in pension_accounts:
             if pa['pension_benefit_age'] and age >= pa['pension_benefit_age']:
-                pension_income += pa['pension_monthly_benefit'] * ((1 + ss_inflation) ** year_offset)
+                pension_gross += pa['pension_monthly_benefit'] * ((1 + ss_inflation) ** year_offset)
+
+        # Net income after estimated tax on SS + pension
+        ss_net = ss_gross * tax_net
+        pension_net = pension_gross * tax_net
+        taxes_on_income = (ss_gross + pension_gross) * tax_rate
 
         # Apply monthly growth before withdrawal
         for acct in investment_accounts:
             monthly_rate = (1 + acct['annual_growth_rate']) ** (1 / 12) - 1
             balances[acct['id']] = balances[acct['id']] * (1 + monthly_rate)
 
-        net_need = monthly_spending - ss_income - pension_income
-        remaining = max(0.0, net_need)
+        # Net spending still needed from accounts after income
+        remaining_net = max(0.0, monthly_spending - ss_net - pension_net)
         withdrawal_by_type = {}
+        taxes_on_withdrawals = 0.0
 
         for acct_type in withdrawal_order:
-            if remaining <= 0:
+            if remaining_net <= 0:
                 break
             for acct in accounts_by_type.get(acct_type, []):
-                if remaining <= 0:
+                if remaining_net <= 0:
                     break
                 available = max(0.0, balances[acct['id']])
-                withdraw = min(available, remaining)
-                balances[acct['id']] -= withdraw
-                remaining -= withdraw
-                if withdraw > 0:
-                    withdrawal_by_type[acct_type] = withdrawal_by_type.get(acct_type, 0.0) + withdraw
+                is_taxable = acct['tax_treatment'] in _TAXABLE_TREATMENTS
 
-        shortfall = max(0.0, remaining)
+                if is_taxable and tax_rate > 0:
+                    # Gross up: need remaining_net / tax_net gross to receive remaining_net net
+                    gross_needed = remaining_net / tax_net
+                    gross_withdraw = min(available, gross_needed)
+                    net_received = gross_withdraw * tax_net
+                    taxes_on_withdrawals += gross_withdraw * tax_rate
+                else:
+                    gross_withdraw = min(available, remaining_net)
+                    net_received = gross_withdraw
+
+                balances[acct['id']] -= gross_withdraw
+                remaining_net -= net_received
+                if gross_withdraw > 0:
+                    withdrawal_by_type[acct_type] = withdrawal_by_type.get(acct_type, 0.0) + gross_withdraw
+
+        shortfall = max(0.0, remaining_net)
+        monthly_taxes = taxes_on_income + taxes_on_withdrawals
         total_balance = max(0.0, sum(balances.values()))
 
         rows.append({
@@ -704,15 +741,16 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
             'month_of_year': month,
             'age': round(age, 1),
             'monthly_spending': round(monthly_spending, 2),
-            'ss_income': round(ss_income, 2),
-            'pension_income': round(pension_income, 2),
-            'net_need': round(max(0.0, net_need), 2),
+            'ss_income': round(ss_gross, 2),
+            'pension_income': round(pension_gross, 2),
+            'net_need': round(max(0.0, monthly_spending - ss_net - pension_net), 2),
+            'monthly_taxes': round(monthly_taxes, 2),
             'total_balance': round(total_balance, 2),
             'withdrawal_by_type': {k: round(v, 2) for k, v in withdrawal_by_type.items()},
             'shortfall': round(shortfall, 2),
         })
 
-        if total_balance <= 0 and net_need > 0:
+        if total_balance <= 0 and remaining_net > 0:
             break
 
     return rows

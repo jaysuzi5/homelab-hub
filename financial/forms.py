@@ -218,25 +218,28 @@ class ForecastSettingsForm(forms.ModelForm):
     class Meta:
         model = ForecastSettings
         fields = [
-            'current_age', 'max_age',
+            'date_of_birth', 'max_age',
             'monthly_spending', 'spending_inflation_rate',
             'ss_monthly_benefit', 'ss_inflation_rate', 'ss_start_age',
+            'effective_tax_rate',
         ]
         widgets = {
-            'current_age': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.1'}),
+            'date_of_birth': forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
             'max_age': forms.NumberInput(attrs={'class': INPUT_CLASS}),
             'monthly_spending': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '1'}),
             'spending_inflation_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.001'}),
             'ss_monthly_benefit': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '1'}),
             'ss_inflation_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.001'}),
             'ss_start_age': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.5'}),
+            'effective_tax_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.001'}),
         }
         labels = {
-            'current_age': 'Current Age',
+            'date_of_birth': 'Date of Birth',
             'max_age': 'Maximum Age (forecast horizon)',
             'monthly_spending': 'Monthly Spending Today ($)',
             'spending_inflation_rate': 'Spending Inflation Rate (e.g., 0.03)',
             'ss_monthly_benefit': 'Social Security Monthly Benefit Today ($)',
             'ss_inflation_rate': 'SS COLA Rate (e.g., 0.02)',
             'ss_start_age': 'Social Security Start Age',
+            'effective_tax_rate': 'Effective Tax Rate on Taxable Income (e.g., 0.22)',
         }

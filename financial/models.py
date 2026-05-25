@@ -312,11 +312,15 @@ class ForecastSettings(models.Model):
         max_digits=4, decimal_places=1, default=Decimal('67.0'),
         help_text="Age to start receiving Social Security"
     )
-    current_age = models.DecimalField(
-        max_digits=4, decimal_places=1, default=Decimal('50.0'),
-        help_text="Your current age"
+    date_of_birth = models.DateField(
+        null=True, blank=True,
+        help_text="Your date of birth — current age is calculated dynamically"
     )
     max_age = models.IntegerField(default=95, help_text="Maximum age for forecast horizon")
+    effective_tax_rate = models.DecimalField(
+        max_digits=5, decimal_places=4, default=Decimal('0.2200'),
+        help_text="Estimated effective tax rate on taxable withdrawals and income (e.g., 0.22 for 22%)"
+    )
     withdrawal_order = models.JSONField(
         default=_default_withdrawal_order,
         help_text="Ordered list of account type codes for portfolio withdrawals"
