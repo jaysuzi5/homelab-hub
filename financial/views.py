@@ -735,6 +735,8 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
         monthly_taxes = taxes_on_income + taxes_on_withdrawals
         total_balance = max(0.0, sum(balances.values()))
 
+        total_gross_withdrawals = sum(withdrawal_by_type.values())
+
         rows.append({
             'date': f"{year}-{month:02d}",
             'month_num': m,
@@ -745,6 +747,7 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
             'pension_income': round(pension_gross, 2),
             'net_need': round(max(0.0, monthly_spending - ss_net - pension_net), 2),
             'monthly_taxes': round(monthly_taxes, 2),
+            'total_gross_withdrawals': round(total_gross_withdrawals, 2),
             'total_balance': round(total_balance, 2),
             'withdrawal_by_type': {k: round(v, 2) for k, v in withdrawal_by_type.items()},
             'shortfall': round(shortfall, 2),
