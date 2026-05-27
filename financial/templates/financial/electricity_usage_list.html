@@ -9,27 +9,27 @@
 </div>
 
 <!-- Summary Stats -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-    <div class="bg-gray-800 rounded-2xl shadow p-6">
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
         <p class="text-gray-400 text-sm">Total Records</p>
-        <p class="text-4xl font-bold text-white">{{ total_records }}</p>
+        <p class="text-3xl font-bold text-white">{{ total_records }}</p>
     </div>
-    <div class="bg-gray-800 rounded-2xl shadow p-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
         <p class="text-gray-400 text-sm">{{ current_year }} kWh Consumed</p>
-        <p class="text-4xl font-bold text-yellow-400">{{ year_kwh|floatformat:0|intcomma }}</p>
+        <p class="text-3xl font-bold text-yellow-400">{{ year_kwh|floatformat:0|intcomma }}</p>
     </div>
-    <div class="bg-gray-800 rounded-2xl shadow p-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
         <p class="text-gray-400 text-sm">{{ current_year }} Solar Produced</p>
-        <p class="text-4xl font-bold text-green-400">{{ year_produced|floatformat:0|intcomma }}</p>
-        <p class="text-gray-400 text-xs mt-2">kWh</p>
+        <p class="text-3xl font-bold text-green-400">{{ year_produced|floatformat:0|intcomma }}</p>
+        <p class="text-gray-400 text-xs mt-1">kWh</p>
     </div>
-    <div class="bg-gray-800 rounded-2xl shadow p-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
         <p class="text-gray-400 text-sm">{{ current_year }} Total Cost</p>
-        <p class="text-4xl font-bold text-red-400">${{ year_cost|floatformat:0|intcomma }}</p>
+        <p class="text-3xl font-bold text-red-400">${{ year_cost|floatformat:0|intcomma }}</p>
     </div>
-    <div class="bg-gray-800 rounded-2xl shadow p-6 md:col-span-4">
-        <p class="text-gray-400 text-sm">{{ current_year }} Total Savings+Credits</p>
-        <p class="text-4xl font-bold text-green-400">${{ year_savings|floatformat:2|intcomma }}</p>
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-sm">{{ current_year }} Savings+Credits</p>
+        <p class="text-3xl font-bold text-green-400">${{ year_savings|floatformat:2|intcomma }}</p>
     </div>
 </div>
 
@@ -51,55 +51,53 @@
 
 <!-- Data Table -->
 <div class="bg-gray-800 rounded-2xl shadow p-6">
-    <h3 class="text-xl font-bold mb-4">All Records</h3>
+    <h3 class="text-xl font-bold mb-4">All Records <span class="text-sm font-normal text-gray-400 ml-2">— click column header to sort</span></h3>
     <div class="overflow-x-auto">
-        <table class="text-left table-auto whitespace-nowrap text-xs">
+        <table id="elecTable" class="w-full text-left table-auto whitespace-nowrap text-xs">
             <thead>
                 <tr class="text-gray-400 border-b border-gray-700">
-                    <th class="px-3 py-2">Date</th>
-                    <th class="px-3 py-2 text-right">KwH</th>
-                    <th class="px-3 py-2 text-right">Sent</th>
-                    <th class="px-3 py-2 text-right">Net KwH</th>
-                    <th class="px-3 py-2 text-right">Total Cost</th>
-                    <th class="px-3 py-2 text-right">Cost/KwH</th>
-                    <th class="px-3 py-2 text-right">Rcvd/KwH</th>
-                    <th class="px-3 py-2 text-right">Produced</th>
-                    <th class="px-3 py-2 text-right">Combined</th>
-                    <th class="px-3 py-2 text-right">% Solar</th>
-                    <th class="px-3 py-2 text-right">Savings</th>
-                    <th class="px-3 py-2 text-right">Credits</th>
-                    <th class="px-3 py-2 text-right">Svgs+Crd</th>
-                    <th class="px-3 py-2 text-right">EV Mi</th>
-                    <th class="px-3 py-2 text-right">EV M/K</th>
-                    <th class="px-3 py-2 text-right">EV Usage</th>
-                    <th class="px-3 py-2 text-right">Prod-EV</th>
-                    <th class="px-3 py-2 text-right">Net Bill</th>
-                    <th class="px-3 py-2">Comments</th>
+                    <th class="px-3 py-2 cursor-pointer hover:text-white select-none" onclick="sortTable(0,'date')">Date <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(1,'num')">KwH <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(2,'num')">Sent <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(3,'num')">Net KwH <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(4,'num')">Total Cost <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(5,'num')">Cost/KwH <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(6,'num')">Rcvd/KwH <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(7,'num')">Produced <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(8,'num')">Combined <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(9,'num')">% Solar <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(10,'num')">Savings <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(11,'num')">Credits <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(12,'num')">Svgs+Crd <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(13,'num')">EV Mi <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(14,'num')">EV M/K <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(15,'num')">EV Usage <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(16,'num')">Prod-EV <span class="sort-icon">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTable(17,'num')">Net Bill <span class="sort-icon">↕</span></th>
                     <th class="px-3 py-2 text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="elecTbody">
                 {% for record in records %}
                 <tr class="text-gray-200 border-b border-gray-700 hover:bg-gray-700">
-                    <td class="px-3 py-2 font-semibold">{{ record.date|date:"M Y" }}</td>
-                    <td class="px-3 py-2 text-right">{{ record.kwh_consumed|floatformat:0|intcomma|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{{ record.kwh_sent|floatformat:0|intcomma|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{{ record.net_kwh|floatformat:0|intcomma|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{% if record.total_cost %}${{ record.total_cost|floatformat:2 }}{% else %}—{% endif %}</td>
-                    <td class="px-3 py-2 text-right">{% if record.cost_per_kwh %}${{ record.cost_per_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
-                    <td class="px-3 py-2 text-right">{% if record.received_per_kwh %}${{ record.received_per_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
-                    <td class="px-3 py-2 text-right text-green-400">{{ record.produced_kwh|floatformat:0|intcomma|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{{ record.kwh_combined|floatformat:0|intcomma|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{% if record.percent_from_solar %}{{ record.percent_from_solar|floatformat:1 }}%{% else %}—{% endif %}</td>
-                    <td class="px-3 py-2 text-right text-green-400">{% if record.savings %}${{ record.savings|floatformat:2 }}{% else %}—{% endif %}</td>
-                    <td class="px-3 py-2 text-right text-green-400">{% if record.credits %}${{ record.credits|floatformat:2 }}{% else %}—{% endif %}</td>
-                    <td class="px-3 py-2 text-right text-green-400">{% if record.savings_plus_credits %}${{ record.savings_plus_credits|floatformat:2 }}{% else %}—{% endif %}</td>
-                    <td class="px-3 py-2 text-right">{{ record.ev_mileage|floatformat:0|intcomma|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{{ record.ev_miles_per_kwh|floatformat:1|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{{ record.ev_usage_kwh|floatformat:1|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{{ record.produced_minus_ev|floatformat:1|default:"—" }}</td>
-                    <td class="px-3 py-2 text-right">{% if record.net_bill_minus_credits %}${{ record.net_bill_minus_credits|floatformat:2 }}{% else %}—{% endif %}</td>
-                    <td class="px-3 py-2 text-gray-400 max-w-xs truncate">{{ record.comments|default:"—" }}</td>
+                    <td class="px-3 py-2 font-semibold" data-val="{{ record.date|date:'Y-m-d' }}">{{ record.date|date:"M Y" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.kwh_consumed|default:'' }}">{{ record.kwh_consumed|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.kwh_sent|default:'' }}">{{ record.kwh_sent|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.net_kwh|default:'' }}">{{ record.net_kwh|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.total_cost|default:'' }}">{% if record.total_cost %}${{ record.total_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.cost_per_kwh|default:'' }}">{% if record.cost_per_kwh %}${{ record.cost_per_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.received_per_kwh|default:'' }}">{% if record.received_per_kwh %}${{ record.received_per_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right text-green-400" data-val="{{ record.produced_kwh|default:'' }}">{{ record.produced_kwh|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.kwh_combined|default:'' }}">{{ record.kwh_combined|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.percent_from_solar|default:'' }}">{% if record.percent_from_solar %}{% widthratio record.percent_from_solar 1 100 %}%{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right text-green-400" data-val="{{ record.savings|default:'' }}">{% if record.savings %}${{ record.savings|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right text-green-400" data-val="{{ record.credits|default:'' }}">{% if record.credits %}${{ record.credits|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right text-green-400" data-val="{{ record.savings_plus_credits|default:'' }}">{% if record.savings_plus_credits %}${{ record.savings_plus_credits|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.ev_mileage|default:'' }}">{{ record.ev_mileage|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.ev_miles_per_kwh|default:'' }}">{{ record.ev_miles_per_kwh|floatformat:1|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.ev_usage_kwh|default:'' }}">{{ record.ev_usage_kwh|floatformat:1|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.produced_minus_ev|default:'' }}">{{ record.produced_minus_ev|floatformat:1|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right" data-val="{{ record.net_bill_minus_credits|default:'' }}">{% if record.net_bill_minus_credits %}${{ record.net_bill_minus_credits|floatformat:2 }}{% else %}—{% endif %}</td>
                     <td class="px-3 py-2 text-center">
                         <a href="{% url 'electricity_usage_edit' record.pk %}" class="text-blue-400 hover:underline mr-2">Edit</a>
                         <a href="{% url 'electricity_usage_delete' record.pk %}" class="text-red-400 hover:underline">Del</a>
@@ -107,7 +105,7 @@
                 </tr>
                 {% empty %}
                 <tr class="text-gray-400">
-                    <td colspan="20" class="px-4 py-4 text-center">
+                    <td colspan="19" class="px-4 py-4 text-center">
                         No records yet. <a href="{% url 'electricity_usage_create' %}" class="text-blue-400 hover:underline">Add your first record</a>
                     </td>
                 </tr>
@@ -119,6 +117,45 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    // --- Table sorting ---
+    let sortState = {col: -1, asc: true};
+
+    function sortTable(colIdx, type) {
+        const tbody = document.getElementById('elecTbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const asc = (sortState.col === colIdx) ? !sortState.asc : true;
+        sortState = {col: colIdx, asc};
+
+        rows.sort((a, b) => {
+            const aCell = a.cells[colIdx];
+            const bCell = b.cells[colIdx];
+            if (!aCell || !bCell) return 0;
+            const aRaw = (aCell.dataset.val || '').trim();
+            const bRaw = (bCell.dataset.val || '').trim();
+
+            // Empty values always last
+            if (aRaw === '' && bRaw === '') return 0;
+            if (aRaw === '') return 1;
+            if (bRaw === '') return -1;
+
+            let cmp;
+            if (type === 'num') {
+                cmp = parseFloat(aRaw) - parseFloat(bRaw);
+            } else {
+                cmp = aRaw.localeCompare(bRaw);
+            }
+            return asc ? cmp : -cmp;
+        });
+
+        // Update sort icons
+        document.querySelectorAll('#elecTable th .sort-icon').forEach((el, i) => {
+            el.textContent = (i === colIdx) ? (asc ? '↑' : '↓') : '↕';
+        });
+
+        rows.forEach(r => tbody.appendChild(r));
+    }
+
+    // --- Charts ---
     const chartData = {{ chart_data|safe }};
 
     if (chartData && chartData.length > 0) {

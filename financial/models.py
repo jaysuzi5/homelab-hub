@@ -271,7 +271,7 @@ class ElectricityUsage(models.Model):
         self.net_kwh = (kwh - sent) if kwh is not None else None
         self.cost_per_kwh = (total / self.net_kwh) if (total is not None and self.net_kwh) else None
         self.kwh_combined = (kwh + produced) if (kwh is not None and produced is not None) else kwh
-        self.percent_from_solar = ((produced / self.kwh_combined) * 100) if (produced is not None and self.kwh_combined) else None
+        self.percent_from_solar = (produced / self.kwh_combined) if (produced is not None and self.kwh_combined) else None
         self.savings = (recv * produced) if (recv is not None and produced is not None) else None
         self.savings_plus_credits = (
             (self.savings + cred) if (self.savings is not None and cred is not None)
