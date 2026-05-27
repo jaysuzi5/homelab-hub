@@ -7,6 +7,7 @@ import json
 from .forms import RetirementForm, PortfolioAccountForm, PortfolioSnapshotForm, ElectricityUsageForm, NetWorthForm, ForecastSettingsForm
 from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth, ForecastSettings
 from .calculator import monte_carlo_simulation, find_max_withdrawal
+from .tax import compute_annual_tax, get_marginal_rate, get_rmd_factor, get_aca_monthly_premium, RMD_START_AGE
 from config.utils import get_config
 
 SS_BENEFITS_62 = get_config("SS_BENEFITS_62",0)
@@ -322,6 +323,8 @@ def electricity_usage_list(request):
             'produced_kwh': float(record.produced_kwh) if record.produced_kwh else 0,
             'net_kwh': float(record.net_kwh) if record.net_kwh else 0,
             'total_cost': float(record.total_cost) if record.total_cost else 0,
+            'net_bill_minus_credits': float(record.net_bill_minus_credits) if record.net_bill_minus_credits else 0,
+            'savings_plus_credits': float(record.savings_plus_credits) if record.savings_plus_credits else 0,
         })
 
     # Calculate summary stats
@@ -334,6 +337,7 @@ def electricity_usage_list(request):
     year_kwh = sum(r.kwh_consumed or 0 for r in year_records)
     year_produced = sum(r.produced_kwh or 0 for r in year_records)
     year_cost = sum(r.total_cost or 0 for r in year_records)
+    year_savings = sum(r.savings_plus_credits or 0 for r in year_records)
 
     context = {
         'records': records,
@@ -344,6 +348,7 @@ def electricity_usage_list(request):
         'year_kwh': year_kwh,
         'year_produced': year_produced,
         'year_cost': year_cost,
+        'year_savings': year_savings,
     }
 
     return render(request, "financial/electricity_usage_list.html", context)
@@ -559,6 +564,12 @@ def portfolio_forecast(request):
                 settings_obj.withdrawal_order = parsed if isinstance(parsed, list) else DEFAULT_WITHDRAWAL_ORDER
             except (json.JSONDecodeError, ValueError):
                 settings_obj.withdrawal_order = DEFAULT_WITHDRAWAL_ORDER
+            rc_raw = request.POST.get('roth_conversions_json', '[]')
+            try:
+                rc_parsed = json.loads(rc_raw)
+                settings_obj.roth_conversions = rc_parsed if isinstance(rc_parsed, list) else []
+            except (json.JSONDecodeError, ValueError):
+                settings_obj.roth_conversions = []
             settings_obj.save()
     else:
         form = ForecastSettingsForm(instance=settings_obj)
@@ -585,6 +596,10 @@ def portfolio_forecast(request):
             pension_accounts.append(acct_data)
         else:
             investment_accounts.append(acct_data)
+
+    # HSA and Brokerage are excluded from the normal withdrawal pool
+    _FORECAST_EXCLUDED = {'HSA', 'BROKERAGE'}
+    investment_accounts = [a for a in investment_accounts if a['account_type'] not in _FORECAST_EXCLUDED]
 
     withdrawal_order = settings_obj.withdrawal_order or DEFAULT_WITHDRAWAL_ORDER
 
@@ -616,6 +631,14 @@ def portfolio_forecast(request):
 
     chart_data = [{'date': r['date'], 'balance': r['total_balance']} for r in forecast_rows]
 
+    # Lifetime tax summary stats
+    total_taxes_lifetime = sum(r['monthly_taxes'] for r in forecast_rows)
+    total_gross_income = sum(
+        r['ss_income'] + r['pension_income'] + r['total_gross_withdrawals']
+        for r in forecast_rows
+    )
+    avg_effective_rate = (total_taxes_lifetime / total_gross_income * 100) if total_gross_income > 0 else 0.0
+
     withdrawal_order_display = [
         {
             'code': t,
@@ -623,6 +646,7 @@ def portfolio_forecast(request):
             'has_accounts': t in existing_types,
         }
         for t in withdrawal_order
+        if t not in _FORECAST_EXCLUDED
     ]
 
     context = {
@@ -637,13 +661,12 @@ def portfolio_forecast(request):
         'withdrawal_order_display': withdrawal_order_display,
         'chart_data': json.dumps(chart_data, cls=DjangoJSONEncoder),
         'withdrawal_order_json': json.dumps(withdrawal_order),
+        'roth_conversions_json': json.dumps(settings_obj.roth_conversions or []),
+        'total_taxes_lifetime': round(total_taxes_lifetime),
+        'avg_effective_rate': round(avg_effective_rate, 1),
     }
     request.otel_page_summary = {"page": "portfolio_forecast"}
     return render(request, 'financial/portfolio_forecast.html', context)
-
-
-# Account tax treatments that require grossing up withdrawals
-_TAXABLE_TREATMENTS = frozenset(['PRE_TAX', 'TAXABLE'])
 
 
 def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_order, current_age=None):
@@ -659,8 +682,13 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
     ss_benefit_today = float(settings.ss_monthly_benefit)
     ss_inflation = float(settings.ss_inflation_rate)
     ss_start_age = float(settings.ss_start_age)
-    tax_rate = float(settings.effective_tax_rate)
-    tax_net = 1.0 - tax_rate  # net multiplier after tax
+
+    # Tax configuration
+    filing_status = settings.filing_status
+    std_deduction = float(settings.federal_standard_deduction)
+    brackets = settings.federal_brackets
+    pa_rate = float(settings.pa_flat_rate)
+    pa_retirement_age = float(settings.pa_retirement_age)
 
     balances = {a['id']: a['balance'] for a in investment_accounts}
     total_months = max(0, int((max_age - current_age) * 12))
@@ -674,11 +702,42 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
     today = date_type.today()
     rows = []
 
+    # Roth conversion schedule
+    roth_conversions = settings.roth_conversions or []
+    roth_account_ids = [a['id'] for a in investment_accounts if a['tax_treatment'] == 'ROTH']
+
+    # RMD tracking — applies to PRE_TAX accounts only (Traditional IRA, 401k)
+    # Roth accounts have no lifetime RMD obligation.
+    _RMD_TREATMENTS = frozenset(['PRE_TAX'])
+    current_sim_year = today.year
+    prior_year_pre_tax_balance = sum(
+        a['balance'] for a in investment_accounts if a['tax_treatment'] in _RMD_TREATMENTS
+    )
+    if current_age >= RMD_START_AGE:
+        _f = get_rmd_factor(int(current_age))
+        annual_rmd = prior_year_pre_tax_balance / _f if _f > 0 else 0.0
+    else:
+        annual_rmd = 0.0
+
     for m in range(total_months):
         age = current_age + m / 12.0
         year_offset = m / 12.0
         year = today.year + (today.month - 1 + m) // 12
         month = (today.month - 1 + m) % 12 + 1
+
+        # At each new calendar year: snapshot prior-year PRE_TAX balance and recompute annual RMD
+        if year > current_sim_year:
+            current_sim_year = year
+            prior_year_pre_tax_balance = sum(
+                balances[a['id']] for a in investment_accounts if a['tax_treatment'] in _RMD_TREATMENTS
+            )
+            if age >= RMD_START_AGE:
+                _f = get_rmd_factor(int(age))
+                annual_rmd = prior_year_pre_tax_balance / _f if _f > 0 else 0.0
+            else:
+                annual_rmd = 0.0
+
+        monthly_rmd = annual_rmd / 12
 
         monthly_spending = base_spending * ((1 + spending_inflation) ** year_offset)
 
@@ -692,20 +751,80 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
             if pa['pension_benefit_age'] and age >= pa['pension_benefit_age']:
                 pension_gross += pa['pension_monthly_benefit']
 
-        # Net income after estimated tax on SS + pension
-        ss_net = ss_gross * tax_net
-        pension_net = pension_gross * tax_net
-        taxes_on_income = (ss_gross + pension_gross) * tax_rate
+        # Annualized income for tax calculation
+        ss_annual = ss_gross * 12
+        pension_annual = pension_gross * 12
+
+        # Tax on base income (SS + pension only, no withdrawals yet)
+        base_tax = compute_annual_tax(
+            ss_annual=ss_annual,
+            pension_annual=pension_annual,
+            pre_tax_annual=0.0,
+            taxable_annual=0.0,
+            filing_status=filing_status,
+            standard_deduction=std_deduction,
+            brackets=brackets,
+            pa_flat_rate=pa_rate,
+            pa_retirement_age=pa_retirement_age,
+            age=age,
+        )
+        base_monthly_tax = base_tax['total_tax'] / 12
+        net_income = ss_gross + pension_gross - base_monthly_tax
+
+        # Net spending still needed from accounts
+        remaining_net = max(0.0, monthly_spending - net_income)
+        net_need_for_row = remaining_net
+
+        # Marginal federal rate at base income level — used to gross up withdrawals
+        marginal_fed = get_marginal_rate(base_tax['federal_taxable_income'], brackets)
+
+        # Roth conversion for this month
+        monthly_conversion = sum(
+            float(c.get('annual_amount', 0)) / 12
+            for c in roth_conversions
+            if int(c.get('start_year', 9999)) <= year <= int(c.get('end_year', 0))
+        )
+
+        conversion_done = 0.0
+        if monthly_conversion > 0:
+            # Pull from PRE_TAX accounts (in investment_accounts order)
+            for acct in investment_accounts:
+                if conversion_done >= monthly_conversion:
+                    break
+                if acct['tax_treatment'] != 'PRE_TAX':
+                    continue
+                available = max(0.0, balances[acct['id']])
+                take = min(available, monthly_conversion - conversion_done)
+                if take > 0:
+                    balances[acct['id']] -= take
+                    conversion_done += take
+
+            # Deposit conversion proceeds into ROTH accounts (pro-rata by balance)
+            if conversion_done > 0 and roth_account_ids:
+                roth_total = sum(max(0.0, balances[rid]) for rid in roth_account_ids)
+                if roth_total > 0:
+                    for rid in roth_account_ids:
+                        share = max(0.0, balances[rid]) / roth_total
+                        balances[rid] += conversion_done * share
+                else:
+                    balances[roth_account_ids[0]] += conversion_done
+
+            # Conversion creates taxable income — taxes must be funded from accounts
+            # Add estimated tax cost to spending need (funded via withdrawal loop)
+            if conversion_done > 0:
+                pa_conv = pa_rate if age < pa_retirement_age else 0.0
+                conv_tax_rate = marginal_fed + pa_conv
+                remaining_net += conversion_done * conv_tax_rate
+                net_need_for_row = remaining_net  # update to reflect conversion tax cost
 
         # Apply monthly growth before withdrawal
         for acct in investment_accounts:
             monthly_rate = (1 + acct['annual_growth_rate']) ** (1 / 12) - 1
             balances[acct['id']] = balances[acct['id']] * (1 + monthly_rate)
 
-        # Net spending still needed from accounts after income
-        remaining_net = max(0.0, monthly_spending - ss_net - pension_net)
         withdrawal_by_type = {}
-        taxes_on_withdrawals = 0.0
+        pre_tax_gross_total = 0.0
+        taxable_gross_total = 0.0
 
         for acct_type in withdrawal_order:
             if remaining_net <= 0:
@@ -714,14 +833,21 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
                 if remaining_net <= 0:
                     break
                 available = max(0.0, balances[acct['id']])
-                is_taxable = acct['tax_treatment'] in _TAXABLE_TREATMENTS
+                treatment = acct['tax_treatment']
 
-                if is_taxable and tax_rate > 0:
-                    # Gross up: need remaining_net / tax_net gross to receive remaining_net net
-                    gross_needed = remaining_net / tax_net
+                # Per-treatment gross-up rate
+                if treatment == 'PRE_TAX':
+                    pa_portion = pa_rate if age < pa_retirement_age else 0.0
+                    gross_up_rate = marginal_fed + pa_portion
+                elif treatment == 'TAXABLE':
+                    gross_up_rate = marginal_fed + pa_rate
+                else:
+                    gross_up_rate = 0.0
+
+                if gross_up_rate > 0:
+                    gross_needed = remaining_net / (1.0 - gross_up_rate)
                     gross_withdraw = min(available, gross_needed)
-                    net_received = gross_withdraw * tax_net
-                    taxes_on_withdrawals += gross_withdraw * tax_rate
+                    net_received = gross_withdraw * (1.0 - gross_up_rate)
                 else:
                     gross_withdraw = min(available, remaining_net)
                     net_received = gross_withdraw
@@ -730,11 +856,62 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
                 remaining_net -= net_received
                 if gross_withdraw > 0:
                     withdrawal_by_type[acct_type] = withdrawal_by_type.get(acct_type, 0.0) + gross_withdraw
+                    if treatment == 'PRE_TAX':
+                        pre_tax_gross_total += gross_withdraw
+                    elif treatment == 'TAXABLE':
+                        taxable_gross_total += gross_withdraw
+
+        # Enforce RMD: if PRE_TAX withdrawals this month fall short of the monthly
+        # minimum, force the remaining amount from PRE_TAX accounts regardless of
+        # spending need. The surplus net-of-tax amount is not added back to the
+        # portfolio (conservative; simulates spending or gifting the excess).
+        pre_tax_before_rmd = pre_tax_gross_total
+        rmd_gap = max(0.0, monthly_rmd - pre_tax_gross_total)
+        if rmd_gap > 0:
+            for acct in investment_accounts:
+                if rmd_gap <= 0:
+                    break
+                if acct['tax_treatment'] not in _RMD_TREATMENTS:
+                    continue
+                available = max(0.0, balances[acct['id']])
+                force = min(available, rmd_gap)
+                if force > 0:
+                    balances[acct['id']] -= force
+                    pre_tax_gross_total += force
+                    rmd_gap -= force
+                    withdrawal_by_type[acct['account_type']] = (
+                        withdrawal_by_type.get(acct['account_type'], 0.0) + force
+                    )
+
+        # Gross overage: extra pulled from PRE_TAX accounts due to RMD above spending need
+        rmd_overage = pre_tax_gross_total - pre_tax_before_rmd
+
+        # Conversion is taxable as ordinary income — include in final tax calculation
+        pre_tax_gross_total += conversion_done
+
+        # Recompute actual total tax with all income components
+        actual_tax = compute_annual_tax(
+            ss_annual=ss_annual,
+            pension_annual=pension_annual,
+            pre_tax_annual=pre_tax_gross_total * 12,
+            taxable_annual=taxable_gross_total * 12,
+            filing_status=filing_status,
+            standard_deduction=std_deduction,
+            brackets=brackets,
+            pa_flat_rate=pa_rate,
+            pa_retirement_age=pa_retirement_age,
+            age=age,
+        )
+        monthly_taxes = actual_tax['total_tax'] / 12
 
         shortfall = max(0.0, remaining_net)
-        monthly_taxes = taxes_on_income + taxes_on_withdrawals
+        overage = rmd_overage if shortfall == 0 else 0.0
         total_balance = max(0.0, sum(balances.values()))
 
+        # ACA health insurance estimate — SS + pension + all pre-tax income (incl. conversions)
+        # Cash and Roth withdrawals do not count toward ACA MAGI
+        aca_magi_annual = (ss_gross + pension_gross + pre_tax_gross_total) * 12
+        expected_premium = get_aca_monthly_premium(aca_magi_annual) if age < 65.0 else 0.0
         total_gross_withdrawals = sum(withdrawal_by_type.values())
 
         rows.append({
@@ -745,12 +922,16 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
             'monthly_spending': round(monthly_spending, 2),
             'ss_income': round(ss_gross, 2),
             'pension_income': round(pension_gross, 2),
-            'net_need': round(max(0.0, monthly_spending - ss_net - pension_net), 2),
+            'net_need': round(net_need_for_row, 2),
+            'expected_premium': round(expected_premium, 0),
+            'monthly_conversion': round(conversion_done, 2),
+            'monthly_rmd': round(monthly_rmd, 2),
             'monthly_taxes': round(monthly_taxes, 2),
             'total_gross_withdrawals': round(total_gross_withdrawals, 2),
             'total_balance': round(total_balance, 2),
             'withdrawal_by_type': {k: round(v, 2) for k, v in withdrawal_by_type.items()},
             'shortfall': round(shortfall, 2),
+            'overage': round(overage, 2),
         })
 
         if total_balance <= 0 and remaining_net > 0:

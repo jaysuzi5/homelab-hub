@@ -7,7 +7,7 @@
     </a>
 </div>
 
-<div class="bg-gray-800 rounded-2xl shadow p-6 max-w-2xl">
+<div class="bg-gray-800 rounded-2xl shadow p-6 max-w-3xl">
     <form method="post">
         {% csrf_token %}
 
@@ -17,89 +17,113 @@
         </div>
         {% endif %}
 
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">User Input Fields</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Date -->
             <div>
-                <label class="block text-gray-300 mb-2">{{ form.date.label }}</label>
+                <label class="block text-gray-300 mb-2">Date</label>
                 {{ form.date }}
-                {% if form.date.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.date.errors }}</p>
-                {% endif %}
-                <p class="text-gray-400 text-xs mt-1">First day of the month</p>
+                {% if form.date.errors %}<p class="text-red-400 text-sm mt-1">{{ form.date.errors }}</p>{% endif %}
+                <p class="text-gray-400 text-xs mt-1">Auto-rounded to first of month</p>
             </div>
 
-            <!-- kWh Consumed -->
             <div>
                 <label class="block text-gray-300 mb-2">{{ form.kwh_consumed.label }}</label>
                 {{ form.kwh_consumed }}
-                {% if form.kwh_consumed.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.kwh_consumed.errors }}</p>
-                {% endif %}
+                {% if form.kwh_consumed.errors %}<p class="text-red-400 text-sm mt-1">{{ form.kwh_consumed.errors }}</p>{% endif %}
             </div>
 
-            <!-- kWh Sent -->
             <div>
                 <label class="block text-gray-300 mb-2">{{ form.kwh_sent.label }}</label>
                 {{ form.kwh_sent }}
-                {% if form.kwh_sent.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.kwh_sent.errors }}</p>
-                {% endif %}
+                {% if form.kwh_sent.errors %}<p class="text-red-400 text-sm mt-1">{{ form.kwh_sent.errors }}</p>{% endif %}
             </div>
 
-            <!-- Net kWh -->
-            <div>
-                <label class="block text-gray-300 mb-2">{{ form.net_kwh.label }}</label>
-                {{ form.net_kwh }}
-                {% if form.net_kwh.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.net_kwh.errors }}</p>
-                {% endif %}
-            </div>
-
-            <!-- Total Cost -->
             <div>
                 <label class="block text-gray-300 mb-2">{{ form.total_cost.label }}</label>
                 {{ form.total_cost }}
-                {% if form.total_cost.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.total_cost.errors }}</p>
-                {% endif %}
+                {% if form.total_cost.errors %}<p class="text-red-400 text-sm mt-1">{{ form.total_cost.errors }}</p>{% endif %}
             </div>
 
-            <!-- Solar Produced -->
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.received_per_kwh.label }}</label>
+                {{ form.received_per_kwh }}
+                {% if form.received_per_kwh.errors %}<p class="text-red-400 text-sm mt-1">{{ form.received_per_kwh.errors }}</p>{% endif %}
+            </div>
+
             <div>
                 <label class="block text-gray-300 mb-2">{{ form.produced_kwh.label }}</label>
                 {{ form.produced_kwh }}
-                {% if form.produced_kwh.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.produced_kwh.errors }}</p>
-                {% endif %}
+                {% if form.produced_kwh.errors %}<p class="text-red-400 text-sm mt-1">{{ form.produced_kwh.errors }}</p>{% endif %}
             </div>
 
-            <!-- Total Combined -->
             <div>
-                <label class="block text-gray-300 mb-2">{{ form.kwh_combined.label }}</label>
-                {{ form.kwh_combined }}
-                {% if form.kwh_combined.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.kwh_combined.errors }}</p>
-                {% endif %}
+                <label class="block text-gray-300 mb-2">{{ form.credits.label }}</label>
+                {{ form.credits }}
+                {% if form.credits.errors %}<p class="text-red-400 text-sm mt-1">{{ form.credits.errors }}</p>{% endif %}
             </div>
 
-            <!-- EV Mileage -->
             <div>
                 <label class="block text-gray-300 mb-2">{{ form.ev_mileage.label }}</label>
                 {{ form.ev_mileage }}
-                {% if form.ev_mileage.errors %}
-                <p class="text-red-400 text-sm mt-1">{{ form.ev_mileage.errors }}</p>
-                {% endif %}
+                {% if form.ev_mileage.errors %}<p class="text-red-400 text-sm mt-1">{{ form.ev_mileage.errors }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-gray-300 mb-2">{{ form.ev_miles_per_kwh.label }}</label>
+                {{ form.ev_miles_per_kwh }}
+                {% if form.ev_miles_per_kwh.errors %}<p class="text-red-400 text-sm mt-1">{{ form.ev_miles_per_kwh.errors }}</p>{% endif %}
             </div>
         </div>
 
-        <!-- Comments -->
         <div class="mt-6">
             <label class="block text-gray-300 mb-2">{{ form.comments.label }}</label>
             {{ form.comments }}
-            {% if form.comments.errors %}
-            <p class="text-red-400 text-sm mt-1">{{ form.comments.errors }}</p>
-            {% endif %}
+            {% if form.comments.errors %}<p class="text-red-400 text-sm mt-1">{{ form.comments.errors }}</p>{% endif %}
         </div>
+
+        {% if record %}
+        <div class="mt-8 border-t border-gray-700 pt-6">
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Calculated Fields (from last save)</h3>
+            <div class="grid grid-cols-3 gap-3 text-sm">
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">Net KwH</p>
+                    <p class="text-white font-semibold">{{ record.net_kwh|floatformat:0|default:"—" }}</p>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">Cost/KwH</p>
+                    <p class="text-white font-semibold">{% if record.cost_per_kwh %}${{ record.cost_per_kwh|floatformat:4 }}{% else %}—{% endif %}</p>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">KwH Combined</p>
+                    <p class="text-white font-semibold">{{ record.kwh_combined|floatformat:0|default:"—" }}</p>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">% from Solar</p>
+                    <p class="text-white font-semibold">{% if record.percent_from_solar %}{{ record.percent_from_solar|floatformat:1 }}%{% else %}—{% endif %}</p>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">Savings</p>
+                    <p class="text-green-400 font-semibold">{% if record.savings %}${{ record.savings|floatformat:2 }}{% else %}—{% endif %}</p>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">Savings+Credits</p>
+                    <p class="text-green-400 font-semibold">{% if record.savings_plus_credits %}${{ record.savings_plus_credits|floatformat:2 }}{% else %}—{% endif %}</p>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">EV Usage (kWh)</p>
+                    <p class="text-white font-semibold">{% if record.ev_usage_kwh %}{{ record.ev_usage_kwh|floatformat:1 }}{% else %}—{% endif %}</p>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">Produced-EV</p>
+                    <p class="text-white font-semibold">{% if record.produced_minus_ev %}{{ record.produced_minus_ev|floatformat:1 }}{% else %}—{% endif %}</p>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                    <p class="text-gray-400 text-xs">Net Bill-Credits</p>
+                    <p class="text-white font-semibold">{% if record.net_bill_minus_credits %}${{ record.net_bill_minus_credits|floatformat:2 }}{% else %}—{% endif %}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <div class="mt-6 flex space-x-4">
             <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition">

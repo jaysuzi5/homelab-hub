@@ -9,7 +9,7 @@
 </div>
 
 <!-- Summary Stats -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
     <div class="bg-gray-800 rounded-2xl shadow p-6">
         <p class="text-gray-400 text-sm">Total Records</p>
         <p class="text-4xl font-bold text-white">{{ total_records }}</p>
@@ -27,21 +27,22 @@
         <p class="text-gray-400 text-sm">{{ current_year }} Total Cost</p>
         <p class="text-4xl font-bold text-red-400">${{ year_cost|floatformat:0|intcomma }}</p>
     </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-6 md:col-span-4">
+        <p class="text-gray-400 text-sm">{{ current_year }} Total Savings+Credits</p>
+        <p class="text-4xl font-bold text-green-400">${{ year_savings|floatformat:2|intcomma }}</p>
+    </div>
 </div>
 
 <!-- Charts -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <!-- kWh Chart -->
     <div class="bg-gray-800 rounded-2xl shadow p-6" style="min-height: 24rem;">
         <h3 class="text-xl font-bold mb-4">Energy Usage (kWh)</h3>
         <div class="w-full h-80">
             <canvas id="kwhChart" class="w-full h-full"></canvas>
         </div>
     </div>
-
-    <!-- Cost Chart -->
     <div class="bg-gray-800 rounded-2xl shadow p-6" style="min-height: 24rem;">
-        <h3 class="text-xl font-bold mb-4">Monthly Cost ($)</h3>
+        <h3 class="text-xl font-bold mb-4">Monthly Cost vs Net Bill ($)</h3>
         <div class="w-full h-80">
             <canvas id="costChart" class="w-full h-full"></canvas>
         </div>
@@ -52,49 +53,61 @@
 <div class="bg-gray-800 rounded-2xl shadow p-6">
     <h3 class="text-xl font-bold mb-4">All Records</h3>
     <div class="overflow-x-auto">
-        <table class="w-full text-left table-auto">
+        <table class="text-left table-auto whitespace-nowrap text-xs">
             <thead>
-                <tr class="text-gray-300 text-sm border-b border-gray-700">
-                    <th class="px-4 py-2">Date</th>
-                    <th class="px-4 py-2 text-right">kWh Consumed</th>
-                    <th class="px-4 py-2 text-right">Solar Produced</th>
-                    <th class="px-4 py-2 text-right">Net kWh</th>
-                    <th class="px-4 py-2 text-right">Total Cost</th>
-                    <th class="px-4 py-2 text-right">Cost/kWh</th>
-                    <th class="px-4 py-2">Comments</th>
-                    <th class="px-4 py-2 text-center">Actions</th>
+                <tr class="text-gray-400 border-b border-gray-700">
+                    <th class="px-3 py-2">Date</th>
+                    <th class="px-3 py-2 text-right">KwH</th>
+                    <th class="px-3 py-2 text-right">Sent</th>
+                    <th class="px-3 py-2 text-right">Net KwH</th>
+                    <th class="px-3 py-2 text-right">Total Cost</th>
+                    <th class="px-3 py-2 text-right">Cost/KwH</th>
+                    <th class="px-3 py-2 text-right">Rcvd/KwH</th>
+                    <th class="px-3 py-2 text-right">Produced</th>
+                    <th class="px-3 py-2 text-right">Combined</th>
+                    <th class="px-3 py-2 text-right">% Solar</th>
+                    <th class="px-3 py-2 text-right">Savings</th>
+                    <th class="px-3 py-2 text-right">Credits</th>
+                    <th class="px-3 py-2 text-right">Svgs+Crd</th>
+                    <th class="px-3 py-2 text-right">EV Mi</th>
+                    <th class="px-3 py-2 text-right">EV M/K</th>
+                    <th class="px-3 py-2 text-right">EV Usage</th>
+                    <th class="px-3 py-2 text-right">Prod-EV</th>
+                    <th class="px-3 py-2 text-right">Net Bill</th>
+                    <th class="px-3 py-2">Comments</th>
+                    <th class="px-3 py-2 text-center">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for record in records %}
-                <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700">
-                    <td class="px-4 py-2">{{ record.date|date:"M Y" }}</td>
-                    <td class="px-4 py-2 text-right font-semibold">{{ record.kwh_consumed|floatformat:0|intcomma }}</td>
-                    <td class="px-4 py-2 text-right font-semibold text-green-400">{{ record.produced_kwh|floatformat:0|intcomma|default:"—" }}</td>
-                    <td class="px-4 py-2 text-right">{{ record.net_kwh|floatformat:0|intcomma|default:"—" }}</td>
-                    <td class="px-4 py-2 text-right font-semibold">${{ record.total_cost|floatformat:2|intcomma|default:"—" }}</td>
-                    <td class="px-4 py-2 text-right">
-                        {% if record.cost_per_kwh %}
-                        ${{ record.cost_per_kwh|floatformat:4 }}
-                        {% else %}
-                        —
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-2 text-gray-400">
-                        {% if record.comments %}
-                        {{ record.comments|truncatewords:10 }}
-                        {% else %}
-                        —
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-2 text-center">
-                        <a href="{% url 'electricity_usage_edit' record.pk %}" class="text-blue-400 hover:underline mr-3">Edit</a>
-                        <a href="{% url 'electricity_usage_delete' record.pk %}" class="text-red-400 hover:underline">Delete</a>
+                <tr class="text-gray-200 border-b border-gray-700 hover:bg-gray-700">
+                    <td class="px-3 py-2 font-semibold">{{ record.date|date:"M Y" }}</td>
+                    <td class="px-3 py-2 text-right">{{ record.kwh_consumed|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{{ record.kwh_sent|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{{ record.net_kwh|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{% if record.total_cost %}${{ record.total_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right">{% if record.cost_per_kwh %}${{ record.cost_per_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right">{% if record.received_per_kwh %}${{ record.received_per_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right text-green-400">{{ record.produced_kwh|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{{ record.kwh_combined|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{% if record.percent_from_solar %}{{ record.percent_from_solar|floatformat:1 }}%{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right text-green-400">{% if record.savings %}${{ record.savings|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right text-green-400">{% if record.credits %}${{ record.credits|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right text-green-400">{% if record.savings_plus_credits %}${{ record.savings_plus_credits|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-right">{{ record.ev_mileage|floatformat:0|intcomma|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{{ record.ev_miles_per_kwh|floatformat:1|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{{ record.ev_usage_kwh|floatformat:1|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{{ record.produced_minus_ev|floatformat:1|default:"—" }}</td>
+                    <td class="px-3 py-2 text-right">{% if record.net_bill_minus_credits %}${{ record.net_bill_minus_credits|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td class="px-3 py-2 text-gray-400 max-w-xs truncate">{{ record.comments|default:"—" }}</td>
+                    <td class="px-3 py-2 text-center">
+                        <a href="{% url 'electricity_usage_edit' record.pk %}" class="text-blue-400 hover:underline mr-2">Edit</a>
+                        <a href="{% url 'electricity_usage_delete' record.pk %}" class="text-red-400 hover:underline">Del</a>
                     </td>
                 </tr>
                 {% empty %}
-                <tr class="text-gray-400 text-sm">
-                    <td colspan="8" class="px-4 py-4 text-center">
+                <tr class="text-gray-400">
+                    <td colspan="20" class="px-4 py-4 text-center">
                         No records yet. <a href="{% url 'electricity_usage_create' %}" class="text-blue-400 hover:underline">Add your first record</a>
                     </td>
                 </tr>
@@ -109,7 +122,6 @@
     const chartData = {{ chart_data|safe }};
 
     if (chartData && chartData.length > 0) {
-        // kWh Chart
         const kwhCtx = document.getElementById('kwhChart').getContext('2d');
         new Chart(kwhCtx, {
             type: 'line',
@@ -121,90 +133,77 @@
                         data: chartData.map(d => d.kwh_consumed),
                         borderColor: 'rgba(250,204,21,1)',
                         backgroundColor: 'rgba(250,204,21,0.2)',
-                        fill: true,
-                        tension: 0.2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
+                        fill: true, tension: 0.2, pointRadius: 3, pointHoverRadius: 5
                     },
                     {
                         label: 'Solar Produced',
                         data: chartData.map(d => d.produced_kwh),
                         borderColor: 'rgba(34,197,94,1)',
                         backgroundColor: 'rgba(34,197,94,0.2)',
-                        fill: true,
-                        tension: 0.2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
+                        fill: true, tension: 0.2, pointRadius: 3, pointHoverRadius: 5
                     }
                 ]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 scales: {
-                    x: {
-                        ticks: { color: 'white', font: { size: 12 } },
-                        grid: { color: 'rgba(255,255,255,0.2)' }
-                    },
+                    x: { ticks: { color: 'white', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.1)' } },
                     y: {
-                        title: { display: true, text: 'kWh', color: 'white', font: { size: 14, weight: 'bold' } },
-                        ticks: { color: 'white', font: { size: 12 } },
-                        grid: { color: 'rgba(255,255,255,0.2)' },
-                        beginAtZero: true
+                        title: { display: true, text: 'kWh', color: 'white', font: { size: 13, weight: 'bold' } },
+                        ticks: { color: 'white', font: { size: 11 } },
+                        grid: { color: 'rgba(255,255,255,0.1)' }, beginAtZero: true
                     }
                 },
-                plugins: {
-                    legend: { labels: { color: 'white', font: { size: 12 } } }
-                }
+                plugins: { legend: { labels: { color: 'white', font: { size: 11 } } } }
             }
         });
 
-        // Cost Chart
         const costCtx = document.getElementById('costChart').getContext('2d');
         new Chart(costCtx, {
             type: 'line',
             data: {
                 labels: chartData.map(d => d.date),
-                datasets: [{
-                    label: 'Total Cost',
-                    data: chartData.map(d => d.total_cost),
-                    borderColor: 'rgba(239,68,68,1)',
-                    backgroundColor: 'rgba(239,68,68,0.2)',
-                    fill: true,
-                    tension: 0.2,
-                    pointRadius: 3,
-                    pointHoverRadius: 5
-                }]
+                datasets: [
+                    {
+                        label: 'Total Cost',
+                        data: chartData.map(d => d.total_cost),
+                        borderColor: 'rgba(239,68,68,1)',
+                        backgroundColor: 'rgba(239,68,68,0.15)',
+                        fill: true, tension: 0.2, pointRadius: 3, pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Net Bill-Credits',
+                        data: chartData.map(d => d.net_bill_minus_credits),
+                        borderColor: 'rgba(168,85,247,1)',
+                        backgroundColor: 'rgba(168,85,247,0.15)',
+                        fill: true, tension: 0.2, pointRadius: 3, pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Savings+Credits',
+                        data: chartData.map(d => d.savings_plus_credits),
+                        borderColor: 'rgba(34,197,94,1)',
+                        backgroundColor: 'rgba(34,197,94,0.15)',
+                        fill: true, tension: 0.2, pointRadius: 3, pointHoverRadius: 5
+                    }
+                ]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 scales: {
-                    x: {
-                        ticks: { color: 'white', font: { size: 12 } },
-                        grid: { color: 'rgba(255,255,255,0.2)' }
-                    },
+                    x: { ticks: { color: 'white', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.1)' } },
                     y: {
-                        title: { display: true, text: 'Cost ($)', color: 'white', font: { size: 14, weight: 'bold' } },
+                        title: { display: true, text: 'Cost ($)', color: 'white', font: { size: 13, weight: 'bold' } },
                         ticks: {
-                            color: 'white',
-                            font: { size: 12 },
-                            callback: function(value) {
-                                return '$' + value.toLocaleString();
-                            }
+                            color: 'white', font: { size: 11 },
+                            callback: function(value) { return '$' + value.toLocaleString(); }
                         },
-                        grid: { color: 'rgba(255,255,255,0.2)' },
-                        beginAtZero: true
+                        grid: { color: 'rgba(255,255,255,0.1)' }, beginAtZero: true
                     }
                 },
                 plugins: {
-                    legend: { display: false },
+                    legend: { labels: { color: 'white', font: { size: 11 } } },
                     tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return '$' + context.parsed.y.toFixed(2);
-                            }
-                        }
+                        callbacks: { label: function(c) { return c.dataset.label + ': $' + c.parsed.y.toFixed(2); } }
                     }
                 }
             }

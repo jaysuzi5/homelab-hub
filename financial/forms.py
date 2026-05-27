@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from config.utils import get_config
 from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth, ForecastSettings
@@ -171,29 +173,38 @@ class ElectricityUsageForm(forms.ModelForm):
     class Meta:
         model = ElectricityUsage
         fields = [
-            'date', 'kwh_consumed', 'kwh_sent', 'net_kwh', 'total_cost',
-            'produced_kwh', 'kwh_combined', 'ev_mileage', 'comments'
+            'date', 'kwh_consumed', 'kwh_sent', 'total_cost',
+            'received_per_kwh', 'produced_kwh', 'credits',
+            'ev_mileage', 'ev_miles_per_kwh', 'comments',
         ]
         widgets = {
             'date': forms.DateInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'type': 'date'}),
             'kwh_consumed': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
             'kwh_sent': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
-            'net_kwh': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
             'total_cost': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'received_per_kwh': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.000001'}),
             'produced_kwh': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
-            'kwh_combined': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'credits': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
             'ev_mileage': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
+            'ev_miles_per_kwh': forms.NumberInput(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': '0.01'}),
             'comments': forms.Textarea(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'rows': 2}),
         }
         labels = {
-            'kwh_consumed': 'kWh Consumed',
-            'kwh_sent': 'kWh Sent to Grid',
-            'net_kwh': 'Net kWh',
+            'kwh_consumed': 'KwH',
+            'kwh_sent': 'Sent',
             'total_cost': 'Total Cost ($)',
-            'produced_kwh': 'Solar Produced (kWh)',
-            'kwh_combined': 'Total Combined (kWh)',
+            'received_per_kwh': 'Cost Received/KwH ($/kWh)',
+            'produced_kwh': 'Produced KwH',
+            'credits': 'Credits ($)',
             'ev_mileage': 'EV Mileage (miles)',
+            'ev_miles_per_kwh': 'EV M/KwH',
         }
+
+    def clean_date(self):
+        date = self.cleaned_data.get('date')
+        if date:
+            return date.replace(day=1)
+        return date
 
 
 class NetWorthForm(forms.ModelForm):
@@ -215,13 +226,24 @@ class NetWorthForm(forms.ModelForm):
 class ForecastSettingsForm(forms.ModelForm):
     """Form for portfolio forecast parameters."""
 
+    federal_brackets = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full font-mono text-xs',
+            'rows': 9,
+        }),
+        label='Federal Tax Brackets (JSON)',
+        help_text='List of [threshold, rate] pairs — taxable income thresholds after standard deduction',
+    )
+
     class Meta:
         model = ForecastSettings
         fields = [
             'date_of_birth', 'max_age',
             'monthly_spending', 'spending_inflation_rate',
             'ss_monthly_benefit', 'ss_inflation_rate', 'ss_start_age',
-            'effective_tax_rate',
+            'filing_status', 'federal_standard_deduction',
+            'pa_flat_rate', 'pa_retirement_age',
+            'federal_brackets',
         ]
         widgets = {
             'date_of_birth': forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
@@ -231,7 +253,10 @@ class ForecastSettingsForm(forms.ModelForm):
             'ss_monthly_benefit': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '1'}),
             'ss_inflation_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.001'}),
             'ss_start_age': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.5'}),
-            'effective_tax_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.001'}),
+            'filing_status': forms.Select(attrs={'class': INPUT_CLASS}),
+            'federal_standard_deduction': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '100'}),
+            'pa_flat_rate': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.0001'}),
+            'pa_retirement_age': forms.NumberInput(attrs={'class': INPUT_CLASS, 'step': '0.5'}),
         }
         labels = {
             'date_of_birth': 'Date of Birth',
@@ -241,5 +266,30 @@ class ForecastSettingsForm(forms.ModelForm):
             'ss_monthly_benefit': 'Social Security Monthly Benefit Today ($)',
             'ss_inflation_rate': 'SS COLA Rate (e.g., 0.02)',
             'ss_start_age': 'Social Security Start Age',
-            'effective_tax_rate': 'Effective Tax Rate on Taxable Income (e.g., 0.22)',
+            'filing_status': 'Filing Status',
+            'federal_standard_deduction': 'Federal Standard Deduction ($)',
+            'pa_flat_rate': 'PA Flat Tax Rate (e.g., 0.0307)',
+            'pa_retirement_age': 'PA Retirement Age for IRA/401k Exemption',
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = kwargs.get('instance')
+        if instance and instance.federal_brackets:
+            self.fields['federal_brackets'].initial = json.dumps(instance.federal_brackets, indent=2)
+
+    def clean_federal_brackets(self):
+        value = self.cleaned_data.get('federal_brackets', '')
+        if isinstance(value, list):
+            return value
+        try:
+            parsed = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            raise forms.ValidationError('Invalid JSON — must be a list like [[0, 0.10], [24800, 0.12], ...]')
+        if not isinstance(parsed, list) or not all(
+            isinstance(b, (list, tuple)) and len(b) == 2
+            and isinstance(b[0], (int, float)) and isinstance(b[1], (int, float))
+            for b in parsed
+        ):
+            raise forms.ValidationError('Each entry must be a [threshold, rate] pair of numbers')
+        return parsed

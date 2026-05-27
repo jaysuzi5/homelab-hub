@@ -7,6 +7,18 @@ def _default_withdrawal_order():
     return ['CASH', 'ROTH_IRA', 'ROTH_401K', 'TRADITIONAL_IRA', '401K', 'HSA', 'BROKERAGE', 'OTHER']
 
 
+def _default_federal_brackets():
+    return [
+        [0, 0.10],
+        [24800, 0.12],
+        [100800, 0.22],
+        [211400, 0.24],
+        [403550, 0.32],
+        [512450, 0.35],
+        [768700, 0.37],
+    ]
+
+
 class PortfolioAccount(models.Model):
     """Represents an investment or savings account."""
 
@@ -244,6 +256,36 @@ class ElectricityUsage(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        ZERO = Decimal('0')
+
+        kwh = self.kwh_consumed
+        sent = self.kwh_sent or ZERO
+        total = self.total_cost
+        recv = self.received_per_kwh
+        produced = self.produced_kwh
+        cred = self.credits
+        ev_mi = self.ev_mileage
+        ev_mpk = self.ev_miles_per_kwh
+
+        self.net_kwh = (kwh - sent) if kwh is not None else None
+        self.cost_per_kwh = (total / self.net_kwh) if (total is not None and self.net_kwh) else None
+        self.kwh_combined = (kwh + produced) if (kwh is not None and produced is not None) else kwh
+        self.percent_from_solar = ((produced / self.kwh_combined) * 100) if (produced is not None and self.kwh_combined) else None
+        self.savings = (recv * produced) if (recv is not None and produced is not None) else None
+        self.savings_plus_credits = (
+            (self.savings + cred) if (self.savings is not None and cred is not None)
+            else self.savings
+        )
+        self.ev_usage_kwh = (ev_mi / ev_mpk) if (ev_mi is not None and ev_mpk and ev_mpk != ZERO) else None
+        self.produced_minus_ev = (produced - self.ev_usage_kwh) if (produced is not None and self.ev_usage_kwh is not None) else None
+        self.net_bill_minus_credits = (
+            (total - cred) if (total is not None and cred is not None)
+            else total
+        )
+
+        super().save(*args, **kwargs)
+
     class Meta:
         ordering = ['-date']
         verbose_name = "Electricity Usage"
@@ -317,13 +359,36 @@ class ForecastSettings(models.Model):
         help_text="Your date of birth — current age is calculated dynamically"
     )
     max_age = models.IntegerField(default=95, help_text="Maximum age for forecast horizon")
-    effective_tax_rate = models.DecimalField(
-        max_digits=5, decimal_places=4, default=Decimal('0.2200'),
-        help_text="Estimated effective tax rate on taxable withdrawals and income (e.g., 0.22 for 22%)"
+
+    filing_status = models.CharField(
+        max_length=10,
+        choices=[('MFJ', 'Married Filing Jointly'), ('SINGLE', 'Single')],
+        default='MFJ',
     )
+    federal_standard_deduction = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('32200.00'),
+        help_text="Standard deduction (2026 MFJ default: $32,200)"
+    )
+    federal_brackets = models.JSONField(
+        default=_default_federal_brackets,
+        help_text="List of [threshold, rate] pairs for federal income tax brackets (taxable income thresholds)"
+    )
+    pa_flat_rate = models.DecimalField(
+        max_digits=6, decimal_places=4, default=Decimal('0.0307'),
+        help_text="Pennsylvania flat income tax rate (default 3.07%)"
+    )
+    pa_retirement_age = models.DecimalField(
+        max_digits=4, decimal_places=1, default=Decimal('59.5'),
+        help_text="Age at which PA exempts traditional IRA/401k withdrawals"
+    )
+
     withdrawal_order = models.JSONField(
         default=_default_withdrawal_order,
         help_text="Ordered list of account type codes for portfolio withdrawals"
+    )
+    roth_conversions = models.JSONField(
+        default=list,
+        help_text='List of Roth conversion periods: [{"label":"...", "start_year":2026, "end_year":2030, "annual_amount":30000}]',
     )
     created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)
