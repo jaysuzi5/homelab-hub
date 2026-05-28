@@ -960,7 +960,7 @@ def heating_list(request):
     season_fuel_details = {}
     for r in records:
         sm = season_month_totals.setdefault(r.season, {})
-        sm[r.month] = float(sm.get(r.month, 0) + (r.total_cost or 0))
+        sm[r.month] = sm.get(r.month, 0.0) + float(r.total_cost or 0)
         sf = season_fuel_details.setdefault(r.season, {})
         mf = sf.setdefault(r.month, {})
         mf[r.fuel_type] = r
