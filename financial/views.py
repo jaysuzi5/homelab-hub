@@ -4,8 +4,8 @@ from django.db.models import Sum, Max
 from django.core.serializers.json import DjangoJSONEncoder
 from datetime import datetime, timedelta, date as date_type
 import json
-from .forms import RetirementForm, PortfolioAccountForm, PortfolioSnapshotForm, ElectricityUsageForm, NetWorthForm, ForecastSettingsForm
-from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth, ForecastSettings
+from .forms import RetirementForm, PortfolioAccountForm, PortfolioSnapshotForm, ElectricityUsageForm, NetWorthForm, ForecastSettingsForm, HeatingRecordForm
+from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth, ForecastSettings, HeatingRecord, HEATING_SEASON_MONTH_ORDER
 from .calculator import monte_carlo_simulation, find_max_withdrawal
 from .tax import compute_annual_tax, get_marginal_rate, get_rmd_factor, get_aca_monthly_premium, RMD_START_AGE
 from config.utils import get_config
@@ -938,4 +938,112 @@ def _run_forecast(investment_accounts, pension_accounts, settings, withdrawal_or
             break
 
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Heating Costs
+# ---------------------------------------------------------------------------
+
+MONTH_NAMES = {
+    1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+    7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec',
+}
+
+
+@login_required
+def heating_list(request):
+    records = HeatingRecord.objects.all()
+    seasons = sorted(records.values_list('season', flat=True).distinct())
+
+    # Build per-season per-month totals (summed across all fuel types)
+    season_month_totals = {}
+    season_fuel_details = {}
+    for r in records:
+        sm = season_month_totals.setdefault(r.season, {})
+        sm[r.month] = float(sm.get(r.month, 0) + (r.total_cost or 0))
+        sf = season_fuel_details.setdefault(r.season, {})
+        mf = sf.setdefault(r.month, {})
+        mf[r.fuel_type] = r
+
+    # Season totals
+    season_totals = {s: sum(v.values()) for s, v in season_month_totals.items()}
+
+    # Chart: one dataset per season, x = months in heating order
+    month_labels = [MONTH_NAMES[m] for m in HEATING_SEASON_MONTH_ORDER]
+    chart_datasets = []
+    colors = [
+        '#facc15', '#4ade80', '#60a5fa', '#f87171', '#c084fc',
+        '#fb923c', '#34d399', '#a78bfa', '#f472b6', '#38bdf8',
+        '#a3e635', '#fbbf24', '#2dd4bf', '#818cf8', '#e879f9',
+        '#fb7185', '#86efac', '#93c5fd', '#fde68a', '#d9f99d',
+    ]
+    for i, season in enumerate(seasons):
+        monthly = season_month_totals.get(season, {})
+        data = [float(monthly.get(m, 0)) or None for m in HEATING_SEASON_MONTH_ORDER]
+        color = colors[i % len(colors)]
+        chart_datasets.append({
+            'label': season,
+            'data': data,
+            'borderColor': color,
+            'backgroundColor': color + '33',
+            'tension': 0.2,
+            'pointRadius': 4,
+            'pointHoverRadius': 6,
+            'fill': False,
+            'spanGaps': True,
+        })
+
+    chart_data = json.dumps({
+        'labels': month_labels,
+        'datasets': chart_datasets,
+    }, cls=DjangoJSONEncoder)
+
+    context = {
+        'seasons': seasons,
+        'season_month_totals': season_month_totals,
+        'season_fuel_details': season_fuel_details,
+        'season_totals': season_totals,
+        'chart_data': chart_data,
+        'month_order': HEATING_SEASON_MONTH_ORDER,
+        'month_names': MONTH_NAMES,
+        'all_records': records.order_by('-season', 'month', 'fuel_type'),
+    }
+    return render(request, 'financial/heating_list.html', context)
+
+
+@login_required
+def heating_create(request):
+    if request.method == 'POST':
+        form = HeatingRecordForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('heating_list')
+    else:
+        # Default to current heating season
+        today = datetime.now()
+        yr = today.year if today.month >= 10 else today.year - 1
+        form = HeatingRecordForm(initial={'season': f'{yr}-{yr+1}', 'month': today.month})
+    return render(request, 'financial/heating_form.html', {'form': form, 'action': 'Add'})
+
+
+@login_required
+def heating_edit(request, pk):
+    record = get_object_or_404(HeatingRecord, pk=pk)
+    if request.method == 'POST':
+        form = HeatingRecordForm(request.POST, instance=record)
+        if form.is_valid():
+            form.save()
+            return redirect('heating_list')
+    else:
+        form = HeatingRecordForm(instance=record)
+    return render(request, 'financial/heating_form.html', {'form': form, 'action': 'Edit', 'record': record})
+
+
+@login_required
+def heating_delete(request, pk):
+    record = get_object_or_404(HeatingRecord, pk=pk)
+    if request.method == 'POST':
+        record.delete()
+        return redirect('heating_list')
+    return render(request, 'financial/heating_confirm_delete.html', {'record': record})
 

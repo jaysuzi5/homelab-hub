@@ -331,6 +331,59 @@ class NetWorth(models.Model):
         return f"{self.date.strftime('%B %Y')} - ${self.net_worth:,.2f}"
 
 
+HEATING_MONTH_CHOICES = [
+    (1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'),
+    (5, 'May'), (6, 'June'), (7, 'July'), (8, 'August'),
+    (9, 'September'), (10, 'October'), (11, 'November'), (12, 'December'),
+]
+
+HEATING_SEASON_MONTH_ORDER = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+
+class HeatingRecord(models.Model):
+    FUEL_CORN = 'corn'
+    FUEL_PELLETS = 'pellets'
+    FUEL_PROPANE = 'propane'
+    FUEL_TYPES = [
+        (FUEL_CORN, 'Corn'),
+        (FUEL_PELLETS, 'Pellets'),
+        (FUEL_PROPANE, 'Propane'),
+    ]
+
+    season = models.CharField(max_length=9, db_index=True, help_text="Heating season, e.g. 2024-2025")
+    month = models.IntegerField(choices=HEATING_MONTH_CHOICES)
+    fuel_type = models.CharField(max_length=10, choices=FUEL_TYPES)
+    quantity = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True,
+                                   help_text="lbs (corn), bags (pellets), gallons (propane)")
+    cost_per_unit = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True,
+                                        help_text="$/lb, $/bag, or $/gallon")
+    total_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    created_date = models.DateTimeField(auto_now_add=True)
+    updated_date = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.quantity is not None and self.cost_per_unit is not None:
+            self.total_cost = self.quantity * self.cost_per_unit
+        super().save(*args, **kwargs)
+
+    @property
+    def quantity_label(self):
+        return {'corn': 'lbs', 'pellets': 'bags', 'propane': 'gallons'}.get(self.fuel_type, '')
+
+    @property
+    def unit_label(self):
+        return {'corn': '$/lb', 'pellets': '$/bag', 'propane': '$/gal'}.get(self.fuel_type, '')
+
+    class Meta:
+        unique_together = [('season', 'month', 'fuel_type')]
+        ordering = ['season', 'month']
+        verbose_name = "Heating Record"
+        verbose_name_plural = "Heating Records"
+
+    def __str__(self):
+        return f"{self.season} {self.get_month_display()} {self.get_fuel_type_display()}"
+
+
 class ForecastSettings(models.Model):
     """Singleton settings for the Portfolio Forecast page."""
 

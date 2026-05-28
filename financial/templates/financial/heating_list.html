@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load humanize financials.form_tags %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Heating Costs</h2>
+    <a href="{% url 'heating_create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+        + Add Record
+    </a>
+</div>
+
+<!-- Chart -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6" style="min-height: 28rem;">
+    <h3 class="text-xl font-bold mb-4">Monthly Cost by Season</h3>
+    <div class="w-full h-96">
+        <canvas id="heatingChart" class="w-full h-full"></canvas>
+    </div>
+</div>
+
+<!-- Season Summary Table -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">Season Summary</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead>
+                <tr class="text-gray-400 border-b border-gray-700">
+                    <th class="px-3 py-2">Season</th>
+                    {% for m in month_order %}
+                    <th class="px-3 py-2 text-right">{{ month_names|get_item:m }}</th>
+                    {% endfor %}
+                    <th class="px-3 py-2 text-right font-semibold">Total</th>
+                    <th class="px-3 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for season in seasons %}
+                <tr class="text-gray-200 border-b border-gray-700 hover:bg-gray-700">
+                    <td class="px-3 py-2 font-semibold">{{ season }}</td>
+                    {% for m in month_order %}
+                    <td class="px-3 py-2 text-right">
+                        {% with val=season_month_totals|get_item:season %}
+                        {% if val %}{% with mv=val|get_item:m %}{% if mv and mv > 0 %}<span class="text-yellow-300">${{ mv|floatformat:0 }}</span>{% else %}—{% endif %}{% endwith %}{% else %}—{% endif %}
+                        {% endwith %}
+                    </td>
+                    {% endfor %}
+                    <td class="px-3 py-2 text-right font-bold text-white">
+                        ${{ season_totals|get_item:season|floatformat:2|default:"—" }}
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                        <a href="{% url 'heating_create' %}?season={{ season }}" class="text-blue-400 hover:underline text-xs">+ Add</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="text-gray-400">
+                    <td colspan="15" class="px-4 py-4 text-center">
+                        No records yet. <a href="{% url 'heating_create' %}" class="text-blue-400 hover:underline">Add your first record</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Detail Records -->
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4">All Records</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead>
+                <tr class="text-gray-400 border-b border-gray-700">
+                    <th class="px-3 py-2">Season</th>
+                    <th class="px-3 py-2">Month</th>
+                    <th class="px-3 py-2">Fuel</th>
+                    <th class="px-3 py-2 text-right">Quantity</th>
+                    <th class="px-3 py-2 text-right">Cost/Unit</th>
+                    <th class="px-3 py-2 text-right">Total Cost</th>
+                    <th class="px-3 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in all_records %}
+                <tr class="text-gray-200 border-b border-gray-700 hover:bg-gray-700">
+                    <td class="px-3 py-2 font-semibold">{{ record.season }}</td>
+                    <td class="px-3 py-2">{{ record.get_month_display }}</td>
+                    <td class="px-3 py-2">
+                        {% if record.fuel_type == 'corn' %}<span class="text-yellow-400">Corn</span>
+                        {% elif record.fuel_type == 'pellets' %}<span class="text-orange-400">Pellets</span>
+                        {% else %}<span class="text-blue-400">Propane</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                        {% if record.quantity %}{{ record.quantity|floatformat:1 }} <span class="text-gray-400">{{ record.quantity_label }}</span>{% else %}—{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                        {% if record.cost_per_unit %}${{ record.cost_per_unit|floatformat:4 }} <span class="text-gray-400">{{ record.unit_label }}</span>{% else %}—{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right font-semibold text-yellow-300">
+                        {% if record.total_cost %}${{ record.total_cost|floatformat:2 }}{% else %}—{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                        <a href="{% url 'heating_edit' record.pk %}" class="text-blue-400 hover:underline mr-2">Edit</a>
+                        <a href="{% url 'heating_delete' record.pk %}" class="text-red-400 hover:underline">Del</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="text-gray-400">
+                    <td colspan="7" class="px-4 py-4 text-center">No records.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const chartData = {{ chart_data|safe }};
+
+if (chartData && chartData.datasets && chartData.datasets.length > 0) {
+    const ctx = document.getElementById('heatingChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: {
+                    ticks: { color: 'white', font: { size: 11 } },
+                    grid: { color: 'rgba(255,255,255,0.1)' }
+                },
+                y: {
+                    title: { display: true, text: 'Monthly Cost ($)', color: 'white', font: { size: 13, weight: 'bold' } },
+                    ticks: {
+                        color: 'white', font: { size: 11 },
+                        callback: v => '$' + v.toLocaleString()
+                    },
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: 'white', font: { size: 10 }, boxWidth: 12 },
+                    position: 'right'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: c => c.dataset.label + ': $' + (c.parsed.y || 0).toFixed(2)
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+
+{% endblock %}

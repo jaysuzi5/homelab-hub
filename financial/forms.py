@@ -2,7 +2,7 @@ import json
 
 from django import forms
 from config.utils import get_config
-from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth, ForecastSettings
+from .models import PortfolioAccount, PortfolioSnapshot, ElectricityUsage, NetWorth, ForecastSettings, HeatingRecord, HEATING_MONTH_CHOICES
 
 SS_BENEFITS_62 = get_config("SS_BENEFITS_62",0)
 SS_BENEFITS_65 = get_config("SS_BENEFITS_65",0)
@@ -220,6 +220,45 @@ class NetWorthForm(forms.ModelForm):
         }
         labels = {
             'net_worth': 'Net Worth ($)',
+        }
+
+
+W = lambda: {'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}
+WN = lambda step='0.01': {'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full', 'step': step}
+
+
+def _season_choices():
+    choices = []
+    for y in range(2007, 2030):
+        s = f"{y}-{y+1}"
+        choices.append((s, s))
+    return choices
+
+
+class HeatingRecordForm(forms.ModelForm):
+    season = forms.ChoiceField(
+        choices=_season_choices,
+        widget=forms.Select(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
+    )
+
+    class Meta:
+        model = HeatingRecord
+        fields = ['season', 'month', 'fuel_type', 'quantity', 'cost_per_unit']
+        widgets = {
+            'month': forms.Select(attrs={'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full'}),
+            'fuel_type': forms.Select(attrs={
+                'class': 'bg-gray-700 text-white px-3 py-2 rounded w-full',
+                'onchange': 'updateHeatingLabels(this.value)',
+            }),
+            'quantity': forms.NumberInput(attrs={**WN('0.001'), 'id': 'id_quantity'}),
+            'cost_per_unit': forms.NumberInput(attrs={**WN('0.000001'), 'id': 'id_cost_per_unit'}),
+        }
+        labels = {
+            'season': 'Season',
+            'month': 'Month',
+            'fuel_type': 'Fuel Type',
+            'quantity': 'Quantity',
+            'cost_per_unit': 'Cost per Unit',
         }
 
 

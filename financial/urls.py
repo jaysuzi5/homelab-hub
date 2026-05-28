@@ -21,4 +21,8 @@ urlpatterns = [
     path('networth/<int:pk>/edit/', views.networth_edit, name='networth_edit'),
     path('networth/<int:pk>/delete/', views.networth_delete, name='networth_delete'),
     path('forecast/', views.portfolio_forecast, name='portfolio_forecast'),
+    path('heating/', views.heating_list, name='heating_list'),
+    path('heating/create/', views.heating_create, name='heating_create'),
+    path('heating/<int:pk>/edit/', views.heating_edit, name='heating_edit'),
+    path('heating/<int:pk>/delete/', views.heating_delete, name='heating_delete'),
 ]

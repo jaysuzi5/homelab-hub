@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">{{ action }} Heating Record</h2>
+    <a href="{% url 'heating_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+        ← Back
+    </a>
+</div>
+
+<div class="bg-gray-800 rounded-2xl shadow p-6 max-w-xl">
+    <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="bg-red-900 text-red-200 px-4 py-3 rounded mb-4">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-gray-300 mb-2">Season</label>
+                {{ form.season }}
+                {% if form.season.errors %}<p class="text-red-400 text-sm mt-1">{{ form.season.errors }}</p>{% endif %}
+            </div>
+            <div>
+                <label class="block text-gray-300 mb-2">Month</label>
+                {{ form.month }}
+                {% if form.month.errors %}<p class="text-red-400 text-sm mt-1">{{ form.month.errors }}</p>{% endif %}
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-gray-300 mb-2">Fuel Type</label>
+                {{ form.fuel_type }}
+                {% if form.fuel_type.errors %}<p class="text-red-400 text-sm mt-1">{{ form.fuel_type.errors }}</p>{% endif %}
+            </div>
+            <div>
+                <label class="block text-gray-300 mb-2" id="qty-label">Quantity</label>
+                {{ form.quantity }}
+                <p class="text-gray-400 text-xs mt-1" id="qty-hint"></p>
+                {% if form.quantity.errors %}<p class="text-red-400 text-sm mt-1">{{ form.quantity.errors }}</p>{% endif %}
+            </div>
+            <div>
+                <label class="block text-gray-300 mb-2" id="unit-label">Cost per Unit</label>
+                {{ form.cost_per_unit }}
+                {% if form.cost_per_unit.errors %}<p class="text-red-400 text-sm mt-1">{{ form.cost_per_unit.errors }}</p>{% endif %}
+            </div>
+        </div>
+
+        {% if record and record.total_cost %}
+        <div class="mt-6 bg-gray-700 rounded-lg p-4">
+            <p class="text-gray-400 text-xs mb-1">Calculated Total Cost</p>
+            <p class="text-2xl font-bold text-yellow-300">${{ record.total_cost|floatformat:2 }}</p>
+        </div>
+        {% endif %}
+
+        <div class="mt-6 flex space-x-4">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition">
+                Save
+            </button>
+            <a href="{% url 'heating_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition inline-block">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+const FUEL_CONFIG = {
+    corn:    { qty: 'Used (lbs)', hint: '1 bucket = 25 lbs', unit: 'Cost per lb ($/lb)' },
+    pellets: { qty: 'Used (bags)', hint: '40 lb bags', unit: 'Cost per bag ($/bag)' },
+    propane: { qty: 'Gallons', hint: '', unit: 'Cost per gallon ($/gal)' },
+};
+
+function updateHeatingLabels(fuelType) {
+    const cfg = FUEL_CONFIG[fuelType] || {};
+    document.getElementById('qty-label').textContent = cfg.qty || 'Quantity';
+    document.getElementById('qty-hint').textContent = cfg.hint || '';
+    document.getElementById('unit-label').textContent = cfg.unit || 'Cost per Unit';
+}
+
+// Init on load
+const fuelSelect = document.getElementById('id_fuel_type');
+if (fuelSelect) {
+    updateHeatingLabels(fuelSelect.value);
+}
+</script>
+{% endblock %}
