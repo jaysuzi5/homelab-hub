@@ -16,6 +16,36 @@
     </div>
 </div>
 
+<!-- Summary Stats by Type -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-sm">Total All Fuels</p>
+        <p class="text-3xl font-bold text-white">${{ grand_total|floatformat:2 }}</p>
+        <p class="text-gray-400 text-xs mt-1">{{ seasons|length }} seasons</p>
+    </div>
+    {% with s=type_stats.corn %}{% if s %}
+    <div class="bg-gray-800 rounded-2xl shadow p-5 border-t-2 border-yellow-400">
+        <p class="text-gray-400 text-sm">Corn Total</p>
+        <p class="text-3xl font-bold text-yellow-400">${{ s.total|floatformat:2 }}</p>
+        <p class="text-gray-400 text-xs mt-1">avg ${{ s.avg_per_season|floatformat:2 }}/season &bull; {{ s.seasons }} seasons</p>
+    </div>
+    {% endif %}{% endwith %}
+    {% with s=type_stats.pellets %}{% if s %}
+    <div class="bg-gray-800 rounded-2xl shadow p-5 border-t-2 border-orange-400">
+        <p class="text-gray-400 text-sm">Pellets Total</p>
+        <p class="text-3xl font-bold text-orange-400">${{ s.total|floatformat:2 }}</p>
+        <p class="text-gray-400 text-xs mt-1">avg ${{ s.avg_per_season|floatformat:2 }}/season &bull; {{ s.seasons }} seasons</p>
+    </div>
+    {% endif %}{% endwith %}
+    {% with s=type_stats.propane %}{% if s %}
+    <div class="bg-gray-800 rounded-2xl shadow p-5 border-t-2 border-blue-400">
+        <p class="text-gray-400 text-sm">Propane Total</p>
+        <p class="text-3xl font-bold text-blue-400">${{ s.total|floatformat:2 }}</p>
+        <p class="text-gray-400 text-xs mt-1">avg ${{ s.avg_per_season|floatformat:2 }}/season &bull; {{ s.seasons }} seasons</p>
+    </div>
+    {% endif %}{% endwith %}
+</div>
+
 <!-- Season Summary Table -->
 <div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
     <h3 class="text-xl font-bold mb-2">Season Summary <span class="text-sm font-normal text-gray-400 ml-2">— click header to sort</span></h3>
@@ -65,7 +95,16 @@
 
 <!-- Detail Records -->
 <div class="bg-gray-800 rounded-2xl shadow p-6">
-    <h3 class="text-xl font-bold mb-2">All Records <span class="text-sm font-normal text-gray-400 ml-2">— click header to sort</span></h3>
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+        <h3 class="text-xl font-bold">All Records</h3>
+        <span class="text-sm text-gray-400">— click header to sort, filter by type:</span>
+        <div class="flex gap-2">
+            <button onclick="filterFuel('all')" id="filter-all" class="fuel-btn px-3 py-1 rounded text-xs font-semibold bg-gray-600 text-white hover:bg-gray-500 ring-2 ring-white">All</button>
+            <button onclick="filterFuel('corn')" id="filter-corn" class="fuel-btn px-3 py-1 rounded text-xs font-semibold bg-yellow-700 text-yellow-200 hover:bg-yellow-600">Corn</button>
+            <button onclick="filterFuel('pellets')" id="filter-pellets" class="fuel-btn px-3 py-1 rounded text-xs font-semibold bg-orange-700 text-orange-200 hover:bg-orange-600">Pellets</button>
+            <button onclick="filterFuel('propane')" id="filter-propane" class="fuel-btn px-3 py-1 rounded text-xs font-semibold bg-blue-700 text-blue-200 hover:bg-blue-600">Propane</button>
+        </div>
+    </div>
     <div class="overflow-x-auto">
         <table id="detailTable" class="w-full text-left text-xs whitespace-nowrap">
             <thead>
@@ -81,7 +120,7 @@
             </thead>
             <tbody>
                 {% for record in all_records %}
-                <tr class="text-gray-200 border-b border-gray-700 hover:bg-gray-700">
+                <tr class="text-gray-200 border-b border-gray-700 hover:bg-gray-700" data-fuel="{{ record.fuel_type }}">
                     <td class="px-3 py-2 font-semibold" data-val="{{ record.season }}">{{ record.season }}</td>
                     <td class="px-3 py-2" data-val="{{ record.month }}">{{ record.get_month_display }}</td>
                     <td class="px-3 py-2" data-val="{{ record.fuel_type }}">
@@ -139,6 +178,18 @@ function sortTbl(tableId, colIdx, type) {
         el.textContent = (i === colIdx) ? (asc ? '↑' : '↓') : '↕';
     });
     rows.forEach(r => tbody.appendChild(r));
+}
+
+// --- Fuel type filter ---
+function filterFuel(type) {
+    document.querySelectorAll('#detailTable tbody tr[data-fuel]').forEach(row => {
+        row.style.display = (type === 'all' || row.dataset.fuel === type) ? '' : 'none';
+    });
+    document.querySelectorAll('.fuel-btn').forEach(btn => {
+        const active = btn.id === 'filter-' + type;
+        btn.classList.toggle('ring-2', active);
+        btn.classList.toggle('ring-white', active);
+    });
 }
 
 // --- Stacked Bar Chart ---

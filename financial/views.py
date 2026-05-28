@@ -991,6 +991,23 @@ def heating_list(request):
         'datasets': chart_datasets,
     }, cls=DjangoJSONEncoder)
 
+    # Per-type totals and averages
+    type_data = {}
+    for r in records:
+        ft = r.fuel_type
+        td = type_data.setdefault(ft, {'total': 0.0, 'seasons': set()})
+        td['total'] += float(r.total_cost or 0)
+        td['seasons'].add(r.season)
+    type_stats = {
+        ft: {
+            'total': td['total'],
+            'seasons': len(td['seasons']),
+            'avg_per_season': td['total'] / len(td['seasons']) if td['seasons'] else 0,
+        }
+        for ft, td in type_data.items()
+    }
+    grand_total = sum(td['total'] for td in type_data.values())
+
     context = {
         'seasons': seasons,
         'season_month_totals': season_month_totals,
@@ -999,6 +1016,8 @@ def heating_list(request):
         'month_order': HEATING_SEASON_MONTH_ORDER,
         'month_names': MONTH_NAMES,
         'all_records': records.order_by('-season', 'month', 'fuel_type'),
+        'type_stats': type_stats,
+        'grand_total': grand_total,
     }
     return render(request, 'financial/heating_list.html', context)
 
