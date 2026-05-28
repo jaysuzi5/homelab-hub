@@ -1,3 +1,5 @@
+import hashlib
+
 from django.conf import settings
 from django.db import models
 
@@ -73,7 +75,8 @@ class Book(models.Model):
     def cover_image_url(self):
         if self.cover_local:
             from django.core.files.storage import default_storage
-            return default_storage.url(self.cover_local)
+            buster = hashlib.md5(self.cover_url.encode()).hexdigest()[:8]
+            return f"{default_storage.url(self.cover_local)}?v={buster}"
         return self.cover_url
 
     def __str__(self):

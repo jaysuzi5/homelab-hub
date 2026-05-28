@@ -81,19 +81,59 @@
                 </div>
             </div>
 
-            <!-- Tax Rate -->
+            <!-- Tax Settings -->
             <div class="border-t border-gray-700 pt-4">
-                <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Taxes</p>
-                <div class="grid grid-cols-2 gap-4 items-start">
+                <p class="text-gray-400 text-xs uppercase tracking-wide mb-3">Tax Settings</p>
+                <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-gray-300 text-sm mb-1">{{ form.effective_tax_rate.label }}</label>
-                        {{ form.effective_tax_rate }}
-                        {% if form.effective_tax_rate.errors %}<p class="text-red-400 text-xs mt-1">{{ form.effective_tax_rate.errors.0 }}</p>{% endif %}
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.filing_status.label }}</label>
+                        {{ form.filing_status }}
+                        {% if form.filing_status.errors %}<p class="text-red-400 text-xs mt-1">{{ form.filing_status.errors.0 }}</p>{% endif %}
                     </div>
-                    <div class="bg-gray-700 rounded-lg p-3 text-xs text-gray-400 leading-relaxed mt-5">
-                        Applied to: SS income, pension income, Pre-Tax (401k/IRA) withdrawals, and Taxable brokerage withdrawals. Roth, Cash, and HSA are not grossed up.
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.federal_standard_deduction.label }}</label>
+                        {{ form.federal_standard_deduction }}
+                        {% if form.federal_standard_deduction.errors %}<p class="text-red-400 text-xs mt-1">{{ form.federal_standard_deduction.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.pa_flat_rate.label }}</label>
+                        {{ form.pa_flat_rate }}
+                        {% if form.pa_flat_rate.errors %}<p class="text-red-400 text-xs mt-1">{{ form.pa_flat_rate.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 text-sm mb-1">{{ form.pa_retirement_age.label }}</label>
+                        {{ form.pa_retirement_age }}
+                        {% if form.pa_retirement_age.errors %}<p class="text-red-400 text-xs mt-1">{{ form.pa_retirement_age.errors.0 }}</p>{% endif %}
                     </div>
                 </div>
+                <!-- Tax rules summary -->
+                <div class="bg-gray-700 rounded-lg p-3 text-xs text-gray-400 leading-relaxed mt-3 space-y-1">
+                    <p class="text-gray-300 font-semibold mb-1">Rules applied:</p>
+                    <p>Federal: progressive brackets on SS (0/50/85% via provisional income) + pension + pre-tax IRA/401k + taxable brokerage</p>
+                    <p>PA {{ settings.pa_flat_rate }}%: brokerage income always taxable; pre-tax IRA/401k taxable before age {{ settings.pa_retirement_age }}</p>
+                    <p>PA exempt: Social Security, pension, IRA/401k after age {{ settings.pa_retirement_age }}, Roth, Cash, HSA</p>
+                </div>
+                <!-- Advanced: brackets JSON -->
+                <details class="mt-3">
+                    <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300 select-none">Federal tax brackets (advanced — update when tax law changes)</summary>
+                    <div class="mt-2">
+                        {{ form.federal_brackets }}
+                        {% if form.federal_brackets.errors %}<p class="text-red-400 text-xs mt-1">{{ form.federal_brackets.errors.0 }}</p>{% endif %}
+                        <p class="text-gray-500 text-xs mt-1">Each row: [taxable income threshold, marginal rate]. Thresholds apply after the standard deduction.</p>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Roth Conversions -->
+            <div class="border-t border-gray-700 pt-4">
+                <p class="text-gray-400 text-xs uppercase tracking-wide mb-1">Roth Conversions <span class="text-gray-500 normal-case">(optional)</span></p>
+                <p class="text-gray-500 text-xs mb-3">Converts pre-tax IRA/401k to Roth during specified years. Conversion is taxable income; taxes are funded from other accounts. Reduces future RMDs.</p>
+                <div id="roth-conversions-list" class="space-y-2 mb-3"></div>
+                <button type="button" id="add-roth-conversion"
+                    class="text-xs bg-blue-700 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg transition">
+                    + Add Conversion Period
+                </button>
+                <input type="hidden" name="roth_conversions_json" id="roth_conversions_json" value="{{ roth_conversions_json }}">
             </div>
 
             <!-- Pension Accounts -->
@@ -120,7 +160,10 @@
             {% endif %}
         </div>
 
-        <!-- Right: Withdrawal Order -->
+        <!-- Right column -->
+        <div class="space-y-6">
+
+        <!-- Withdrawal Order -->
         <div class="bg-gray-800 rounded-2xl shadow p-6">
             <h3 class="text-xl font-bold mb-2">Withdrawal Order</h3>
             <p class="text-gray-400 text-sm mb-4">Drag to reorder. Portfolio drawn from top first after SS and pension income.</p>
@@ -143,6 +186,37 @@
                 {% endfor %}
             </ul>
         </div>
+
+        <!-- Health Insurance (Pre-Medicare) -->
+        <div class="bg-gray-800 rounded-2xl shadow p-6">
+            <h3 class="text-lg font-bold mb-1">ACA Health Insurance <span class="text-gray-400 text-sm font-normal">(before age 65)</span></h3>
+            <p class="text-gray-500 text-xs mb-3">Premium driven by household MAGI. Roth &amp; cash withdrawals <em>not</em> counted; 401k withdrawals and Roth conversions <em>are</em> counted. Current $8,000/mo spending assumes full (unsubsidized) premiums.</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left whitespace-nowrap">
+                    <thead>
+                        <tr class="text-gray-400 border-b border-gray-700">
+                            <th class="px-2 py-1.5">Household MAGI</th>
+                            <th class="px-2 py-1.5 text-right">~FPL</th>
+                            <th class="px-2 py-1.5 text-right">Est. Monthly Premium</th>
+                            <th class="px-2 py-1.5 text-right">Subsidy</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700">
+                        <tr class="text-gray-300"><td class="px-2 py-1">$0–$21k</td><td class="px-2 py-1 text-right text-gray-500">&lt;100%</td><td class="px-2 py-1 text-right text-gray-500">Medicaid</td><td class="px-2 py-1 text-right text-green-400">—</td></tr>
+                        <tr class="text-gray-300"><td class="px-2 py-1">$25,000</td><td class="px-2 py-1 text-right">~118%</td><td class="px-2 py-1 text-right">~$85–$250</td><td class="px-2 py-1 text-right text-green-400">Very large</td></tr>
+                        <tr class="text-gray-300"><td class="px-2 py-1">$35,000</td><td class="px-2 py-1 text-right">~165%</td><td class="px-2 py-1 text-right">~$165–$375</td><td class="px-2 py-1 text-right text-green-400">Very large</td></tr>
+                        <tr class="text-gray-300"><td class="px-2 py-1">$45,000</td><td class="px-2 py-1 text-right">~213%</td><td class="px-2 py-1 text-right">~$335–$540</td><td class="px-2 py-1 text-right text-green-300">Large</td></tr>
+                        <tr class="text-gray-300"><td class="px-2 py-1">$55,000</td><td class="px-2 py-1 text-right">~260%</td><td class="px-2 py-1 text-right">~$500–$750</td><td class="px-2 py-1 text-right text-yellow-400">Moderate</td></tr>
+                        <tr class="text-gray-300"><td class="px-2 py-1">$65,000</td><td class="px-2 py-1 text-right">~307%</td><td class="px-2 py-1 text-right">~$665–$915</td><td class="px-2 py-1 text-right text-yellow-500">Smaller</td></tr>
+                        <tr class="text-gray-300"><td class="px-2 py-1">$75,000</td><td class="px-2 py-1 text-right">~355%</td><td class="px-2 py-1 text-right">~$750–$1,085</td><td class="px-2 py-1 text-right text-orange-400">Small</td></tr>
+                        <tr class="text-gray-300"><td class="px-2 py-1">$84,000</td><td class="px-2 py-1 text-right">~398%</td><td class="px-2 py-1 text-right">~$835–$1,250</td><td class="px-2 py-1 text-right text-orange-500">Minimal</td></tr>
+                        <tr class="text-gray-300 font-semibold"><td class="px-2 py-1 text-red-400">&gt;$84,600</td><td class="px-2 py-1 text-right text-red-400">&gt;400%</td><td class="px-2 py-1 text-right text-red-400">~$2,000–$2,650</td><td class="px-2 py-1 text-right text-red-400">None</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        </div><!-- end right column -->
     </div>
 
     <div class="flex justify-end mb-6">
@@ -164,7 +238,7 @@
 
 <!-- Summary Stats -->
 {% with last=annual_rows|last first=annual_rows|first %}
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
     <div class="bg-gray-800 rounded-2xl shadow p-4">
         <p class="text-gray-400 text-sm">Starting Balance</p>
         <p class="text-2xl font-bold text-green-400">${{ first.total_balance|floatformat:0|intcomma }}</p>
@@ -180,9 +254,14 @@
         <p class="text-2xl font-bold text-blue-400">${{ settings.monthly_spending|floatformat:0|intcomma }}</p>
     </div>
     <div class="bg-gray-800 rounded-2xl shadow p-4">
-        <p class="text-gray-400 text-sm">Effective Tax Rate</p>
-        <p class="text-2xl font-bold text-yellow-400">{% widthratio settings.effective_tax_rate 1 100 %}%</p>
-        <p class="text-xs text-gray-500 mt-1">on taxable income</p>
+        <p class="text-gray-400 text-sm">Avg. Effective Tax Rate</p>
+        <p class="text-2xl font-bold text-yellow-400">{{ avg_effective_rate }}%</p>
+        <p class="text-xs text-gray-500 mt-1">lifetime average (federal + PA)</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-4">
+        <p class="text-gray-400 text-sm">Total Taxes (Lifetime)</p>
+        <p class="text-2xl font-bold text-yellow-400">${{ total_taxes_lifetime|intcomma }}</p>
+        <p class="text-xs text-gray-500 mt-1">federal + PA over forecast</p>
     </div>
 </div>
 {% endwith %}
@@ -207,8 +286,11 @@
                     <th class="px-3 py-2 text-right text-xs">{{ label }}<br><span class="font-normal text-gray-500">(gross)</span></th>
                     {% endfor %}
                     <th class="px-3 py-2 text-right text-white font-semibold text-xs">Total Withdrawn<br><span class="font-normal text-gray-500">(gross)</span></th>
+                    <th class="px-3 py-2 text-right text-purple-400 text-xs">Roth Conv.<br><span class="font-normal text-gray-500">(gross)</span></th>
+                    <th class="px-3 py-2 text-right text-cyan-400 text-xs">Exp. Premium<br><span class="font-normal text-gray-500">(health ins.)</span></th>
+                    <th class="px-3 py-2 text-right text-orange-300 text-xs">RMD Due<br><span class="font-normal text-gray-500">(monthly min)</span></th>
                     <th class="px-3 py-2 text-right text-yellow-400">Est. Taxes</th>
-                    <th class="px-3 py-2 text-right">Shortfall</th>
+                    <th class="px-3 py-2 text-right text-xs">Shortage /<br>Overage</th>
                     <th class="px-3 py-2 text-right font-semibold">Balance</th>
                 </tr>
             </thead>
@@ -233,12 +315,23 @@
                     <td class="px-3 py-2 text-right font-semibold text-white">
                         {% if row.total_gross_withdrawals > 0 %}${{ row.total_gross_withdrawals|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
                     </td>
+                    <td class="px-3 py-2 text-right text-purple-400">
+                        {% if row.monthly_conversion > 0 %}${{ row.monthly_conversion|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right text-cyan-400">
+                        {% if row.expected_premium > 0 %}${{ row.expected_premium|floatformat:0|intcomma }}{% elif row.age >= 65 %}<span class="text-gray-500 text-xs">Medicare</span>{% else %}<span class="text-gray-600">—</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right text-orange-300">
+                        {% if row.monthly_rmd > 0 %}${{ row.monthly_rmd|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
+                    </td>
                     <td class="px-3 py-2 text-right text-yellow-400">
                         {% if row.monthly_taxes > 0 %}${{ row.monthly_taxes|floatformat:0|intcomma }}{% else %}<span class="text-gray-600">—</span>{% endif %}
                     </td>
                     <td class="px-3 py-2 text-right">
                         {% if row.shortfall > 0 %}
                         <span class="text-red-400 font-semibold">-${{ row.shortfall|floatformat:0|intcomma }}</span>
+                        {% elif row.overage > 0 %}
+                        <span class="text-green-400">+${{ row.overage|floatformat:0|intcomma }}</span>
                         {% else %}
                         <span class="text-gray-600">—</span>
                         {% endif %}
@@ -290,6 +383,78 @@ if (dobInput) {
         }
     });
 }
+
+// Roth Conversions UI
+(function() {
+    const listEl = document.getElementById('roth-conversions-list');
+    const hiddenInput = document.getElementById('roth_conversions_json');
+    const addBtn = document.getElementById('add-roth-conversion');
+    let conversions = [];
+
+    try { conversions = JSON.parse(hiddenInput.value) || []; } catch(e) { conversions = []; }
+
+    const INPUT = 'bg-gray-600 text-white text-xs px-2 py-1 rounded border border-gray-500 focus:outline-none focus:border-blue-400';
+
+    function save() {
+        hiddenInput.value = JSON.stringify(conversions);
+    }
+
+    function renderRow(idx) {
+        const c = conversions[idx];
+        const row = document.createElement('div');
+        row.className = 'flex flex-wrap gap-2 items-center bg-gray-700 rounded-lg px-3 py-2';
+        row.innerHTML = `
+            <input type="text" placeholder="Label (optional)" value="${c.label||''}"
+                class="${INPUT} w-36" data-field="label" data-idx="${idx}">
+            <div class="flex items-center gap-1">
+                <span class="text-gray-400 text-xs">Start</span>
+                <input type="number" placeholder="Year" value="${c.start_year||''}"
+                    class="${INPUT} w-20" data-field="start_year" data-idx="${idx}" min="2020" max="2100">
+            </div>
+            <div class="flex items-center gap-1">
+                <span class="text-gray-400 text-xs">End</span>
+                <input type="number" placeholder="Year" value="${c.end_year||''}"
+                    class="${INPUT} w-20" data-field="end_year" data-idx="${idx}" min="2020" max="2100">
+            </div>
+            <div class="flex items-center gap-1">
+                <span class="text-gray-400 text-xs">$/yr</span>
+                <input type="number" placeholder="Annual amount" value="${c.annual_amount||''}"
+                    class="${INPUT} w-28" data-field="annual_amount" data-idx="${idx}" min="0" step="1000">
+            </div>
+            <button type="button" class="text-red-400 hover:text-red-300 text-xs px-2 py-1 rounded"
+                data-remove="${idx}">✕ Remove</button>
+        `;
+        row.querySelectorAll('input[data-field]').forEach(inp => {
+            inp.addEventListener('input', function() {
+                const field = this.dataset.field;
+                const i = parseInt(this.dataset.idx);
+                const v = this.value;
+                conversions[i][field] = (field === 'start_year' || field === 'end_year' || field === 'annual_amount')
+                    ? (v === '' ? '' : Number(v)) : v;
+                save();
+            });
+        });
+        row.querySelector('[data-remove]').addEventListener('click', function() {
+            conversions.splice(parseInt(this.dataset.remove), 1);
+            render();
+        });
+        return row;
+    }
+
+    function render() {
+        listEl.innerHTML = '';
+        conversions.forEach((_, idx) => listEl.appendChild(renderRow(idx)));
+        save();
+    }
+
+    addBtn.addEventListener('click', function() {
+        const currentYear = new Date().getFullYear();
+        conversions.push({ label: '', start_year: currentYear, end_year: currentYear + 4, annual_amount: 0 });
+        render();
+    });
+
+    render();
+})();
 
 {% if annual_rows %}
 // Forecast chart

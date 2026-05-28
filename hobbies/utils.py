@@ -16,7 +16,7 @@ def download_cover(cover_url: str, book_id: int) -> str:
     storage_path = f"book_covers/{book_id}{ext}"
 
     try:
-        req = urllib.request.Request(cover_url, headers={'User-Agent': 'HomeLab-Hub/1.0'})
+        req = urllib.request.Request(cover_url, headers={'User-Agent': 'HomelabHub/1.0 (jaysuzi5@gmail.com)'})
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = resp.read()
         if default_storage.exists(storage_path):
