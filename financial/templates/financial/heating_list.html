@@ -18,33 +18,35 @@
 
 <!-- Season Summary Table -->
 <div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
-    <h3 class="text-xl font-bold mb-4">Season Summary</h3>
+    <h3 class="text-xl font-bold mb-2">Season Summary <span class="text-sm font-normal text-gray-400 ml-2">— click header to sort</span></h3>
     <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs whitespace-nowrap">
+        <table id="summaryTable" class="w-full text-left text-xs whitespace-nowrap">
             <thead>
                 <tr class="text-gray-400 border-b border-gray-700">
-                    <th class="px-3 py-2">Season</th>
+                    <th class="px-3 py-2 cursor-pointer hover:text-white select-none" onclick="sortTbl('summaryTable',0,'str')">Season <span class="si">↕</span></th>
                     {% for m in month_order %}
-                    <th class="px-3 py-2 text-right">{{ month_names|get_item:m }}</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTbl('summaryTable',{{ forloop.counter }},'num')">{{ month_names|get_item:m }} <span class="si">↕</span></th>
                     {% endfor %}
-                    <th class="px-3 py-2 text-right font-semibold">Total</th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTbl('summaryTable',13,'num')">Total <span class="si">↕</span></th>
                     <th class="px-3 py-2 text-center">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for season in seasons %}
                 <tr class="text-gray-200 border-b border-gray-700 hover:bg-gray-700">
-                    <td class="px-3 py-2 font-semibold">{{ season }}</td>
+                    <td class="px-3 py-2 font-semibold" data-val="{{ season }}">{{ season }}</td>
                     {% for m in month_order %}
-                    <td class="px-3 py-2 text-right">
-                        {% with val=season_month_totals|get_item:season %}
-                        {% if val %}{% with mv=val|get_item:m %}{% if mv and mv > 0 %}<span class="text-yellow-300">${{ mv|floatformat:0 }}</span>{% else %}—{% endif %}{% endwith %}{% else %}—{% endif %}
-                        {% endwith %}
+                    {% with mv=season_month_totals|get_item:season|get_item:m %}
+                    <td class="px-3 py-2 text-right" data-val="{{ mv|default:'0' }}">
+                        {% if mv and mv > 0 %}<span class="text-yellow-300">${{ mv|floatformat:0 }}</span>{% else %}—{% endif %}
                     </td>
+                    {% endwith %}
                     {% endfor %}
-                    <td class="px-3 py-2 text-right font-bold text-white">
-                        ${{ season_totals|get_item:season|floatformat:2|default:"—" }}
+                    {% with tot=season_totals|get_item:season %}
+                    <td class="px-3 py-2 text-right font-bold text-white" data-val="{{ tot|default:'0' }}">
+                        ${{ tot|floatformat:2|default:"—" }}
                     </td>
+                    {% endwith %}
                     <td class="px-3 py-2 text-center">
                         <a href="{% url 'heating_create' %}?season={{ season }}" class="text-blue-400 hover:underline text-xs">+ Add</a>
                     </td>
@@ -63,37 +65,37 @@
 
 <!-- Detail Records -->
 <div class="bg-gray-800 rounded-2xl shadow p-6">
-    <h3 class="text-xl font-bold mb-4">All Records</h3>
+    <h3 class="text-xl font-bold mb-2">All Records <span class="text-sm font-normal text-gray-400 ml-2">— click header to sort</span></h3>
     <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs whitespace-nowrap">
+        <table id="detailTable" class="w-full text-left text-xs whitespace-nowrap">
             <thead>
                 <tr class="text-gray-400 border-b border-gray-700">
-                    <th class="px-3 py-2">Season</th>
-                    <th class="px-3 py-2">Month</th>
-                    <th class="px-3 py-2">Fuel</th>
-                    <th class="px-3 py-2 text-right">Quantity</th>
-                    <th class="px-3 py-2 text-right">Cost/Unit</th>
-                    <th class="px-3 py-2 text-right">Total Cost</th>
+                    <th class="px-3 py-2 cursor-pointer hover:text-white select-none" onclick="sortTbl('detailTable',0,'str')">Season <span class="si">↕</span></th>
+                    <th class="px-3 py-2 cursor-pointer hover:text-white select-none" onclick="sortTbl('detailTable',1,'num')">Month <span class="si">↕</span></th>
+                    <th class="px-3 py-2 cursor-pointer hover:text-white select-none" onclick="sortTbl('detailTable',2,'str')">Fuel <span class="si">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTbl('detailTable',3,'num')">Quantity <span class="si">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTbl('detailTable',4,'num')">Cost/Unit <span class="si">↕</span></th>
+                    <th class="px-3 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortTbl('detailTable',5,'num')">Total Cost <span class="si">↕</span></th>
                     <th class="px-3 py-2 text-center">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for record in all_records %}
                 <tr class="text-gray-200 border-b border-gray-700 hover:bg-gray-700">
-                    <td class="px-3 py-2 font-semibold">{{ record.season }}</td>
-                    <td class="px-3 py-2">{{ record.get_month_display }}</td>
-                    <td class="px-3 py-2">
+                    <td class="px-3 py-2 font-semibold" data-val="{{ record.season }}">{{ record.season }}</td>
+                    <td class="px-3 py-2" data-val="{{ record.month }}">{{ record.get_month_display }}</td>
+                    <td class="px-3 py-2" data-val="{{ record.fuel_type }}">
                         {% if record.fuel_type == 'corn' %}<span class="text-yellow-400">Corn</span>
                         {% elif record.fuel_type == 'pellets' %}<span class="text-orange-400">Pellets</span>
                         {% else %}<span class="text-blue-400">Propane</span>{% endif %}
                     </td>
-                    <td class="px-3 py-2 text-right">
+                    <td class="px-3 py-2 text-right" data-val="{{ record.quantity|default:'' }}">
                         {% if record.quantity %}{{ record.quantity|floatformat:1 }} <span class="text-gray-400">{{ record.quantity_label }}</span>{% else %}—{% endif %}
                     </td>
-                    <td class="px-3 py-2 text-right">
+                    <td class="px-3 py-2 text-right" data-val="{{ record.cost_per_unit|default:'' }}">
                         {% if record.cost_per_unit %}${{ record.cost_per_unit|floatformat:4 }} <span class="text-gray-400">{{ record.unit_label }}</span>{% else %}—{% endif %}
                     </td>
-                    <td class="px-3 py-2 text-right font-semibold text-yellow-300">
+                    <td class="px-3 py-2 text-right font-semibold text-yellow-300" data-val="{{ record.total_cost|default:'' }}">
                         {% if record.total_cost %}${{ record.total_cost|floatformat:2 }}{% else %}—{% endif %}
                     </td>
                     <td class="px-3 py-2 text-center">
@@ -113,24 +115,52 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// --- Sorting ---
+const sortState = {};
+function sortTbl(tableId, colIdx, type) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const key = tableId + ':' + colIdx;
+    const asc = sortState[key] === undefined ? true : !sortState[key];
+    sortState[key] = asc;
+
+    rows.sort((a, b) => {
+        const av = (a.cells[colIdx]?.dataset?.val || '').trim();
+        const bv = (b.cells[colIdx]?.dataset?.val || '').trim();
+        if (av === '' && bv === '') return 0;
+        if (av === '') return 1;
+        if (bv === '') return -1;
+        const cmp = type === 'num' ? parseFloat(av) - parseFloat(bv) : av.localeCompare(bv);
+        return asc ? cmp : -cmp;
+    });
+
+    table.querySelectorAll('th .si').forEach((el, i) => {
+        el.textContent = (i === colIdx) ? (asc ? '↑' : '↓') : '↕';
+    });
+    rows.forEach(r => tbody.appendChild(r));
+}
+
+// --- Stacked Bar Chart ---
 const chartData = {{ chart_data|safe }};
 
 if (chartData && chartData.datasets && chartData.datasets.length > 0) {
     const ctx = document.getElementById('heatingChart').getContext('2d');
     new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: chartData,
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
             scales: {
                 x: {
-                    ticks: { color: 'white', font: { size: 11 } },
+                    stacked: true,
+                    ticks: { color: 'white', font: { size: 10 }, maxRotation: 45 },
                     grid: { color: 'rgba(255,255,255,0.1)' }
                 },
                 y: {
-                    title: { display: true, text: 'Monthly Cost ($)', color: 'white', font: { size: 13, weight: 'bold' } },
+                    stacked: true,
+                    title: { display: true, text: 'Annual Cost ($)', color: 'white', font: { size: 13, weight: 'bold' } },
                     ticks: {
                         color: 'white', font: { size: 11 },
                         callback: v => '$' + v.toLocaleString()
@@ -142,11 +172,13 @@ if (chartData && chartData.datasets && chartData.datasets.length > 0) {
             plugins: {
                 legend: {
                     labels: { color: 'white', font: { size: 10 }, boxWidth: 12 },
-                    position: 'right'
+                    position: 'bottom'
                 },
                 tooltip: {
+                    mode: 'index',
                     callbacks: {
-                        label: c => c.dataset.label + ': $' + (c.parsed.y || 0).toFixed(2)
+                        label: c => c.dataset.label + ': $' + (c.parsed.y || 0).toFixed(2),
+                        footer: items => 'Total: $' + items.reduce((s, i) => s + (i.parsed.y || 0), 0).toFixed(2)
                     }
                 }
             }

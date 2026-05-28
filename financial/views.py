@@ -953,55 +953,47 @@ MONTH_NAMES = {
 @login_required
 def heating_list(request):
     records = HeatingRecord.objects.all()
-    seasons = sorted(records.values_list('season', flat=True).distinct())
-
     # Build per-season per-month totals (summed across all fuel types)
     season_month_totals = {}
-    season_fuel_details = {}
     for r in records:
         sm = season_month_totals.setdefault(r.season, {})
         sm[r.month] = sm.get(r.month, 0.0) + float(r.total_cost or 0)
-        sf = season_fuel_details.setdefault(r.season, {})
-        mf = sf.setdefault(r.month, {})
-        mf[r.fuel_type] = r
+
+    # Derive unique sorted seasons from the dict (avoids distinct() duplicates with multi-fuel)
+    seasons = sorted(season_month_totals.keys())
 
     # Season totals
     season_totals = {s: sum(v.values()) for s, v in season_month_totals.items()}
 
-    # Chart: one dataset per season, x = months in heating order
-    month_labels = [MONTH_NAMES[m] for m in HEATING_SEASON_MONTH_ORDER]
+    # Stacked bar chart: x = seasons, one dataset per month
+    month_colors = {
+        10: '#f97316', 11: '#a855f7', 12: '#3b82f6',
+        1: '#06b6d4',  2:  '#10b981', 3:  '#84cc16',
+        4: '#eab308',  5:  '#ef4444', 6:  '#f43f5e',
+        7: '#8b5cf6',  8:  '#14b8a6', 9:  '#f59e0b',
+    }
     chart_datasets = []
-    colors = [
-        '#facc15', '#4ade80', '#60a5fa', '#f87171', '#c084fc',
-        '#fb923c', '#34d399', '#a78bfa', '#f472b6', '#38bdf8',
-        '#a3e635', '#fbbf24', '#2dd4bf', '#818cf8', '#e879f9',
-        '#fb7185', '#86efac', '#93c5fd', '#fde68a', '#d9f99d',
-    ]
-    for i, season in enumerate(seasons):
-        monthly = season_month_totals.get(season, {})
-        data = [float(monthly.get(m, 0)) or None for m in HEATING_SEASON_MONTH_ORDER]
-        color = colors[i % len(colors)]
-        chart_datasets.append({
-            'label': season,
-            'data': data,
-            'borderColor': color,
-            'backgroundColor': color + '33',
-            'tension': 0.2,
-            'pointRadius': 4,
-            'pointHoverRadius': 6,
-            'fill': False,
-            'spanGaps': True,
-        })
+    for m in HEATING_SEASON_MONTH_ORDER:
+        data = [round(season_month_totals.get(s, {}).get(m, 0), 2) for s in seasons]
+        if any(v > 0 for v in data):
+            color = month_colors[m]
+            chart_datasets.append({
+                'label': MONTH_NAMES[m],
+                'data': data,
+                'backgroundColor': color + 'cc',
+                'borderColor': color,
+                'borderWidth': 1,
+                'stack': 'heating',
+            })
 
     chart_data = json.dumps({
-        'labels': month_labels,
+        'labels': seasons,
         'datasets': chart_datasets,
     }, cls=DjangoJSONEncoder)
 
     context = {
         'seasons': seasons,
         'season_month_totals': season_month_totals,
-        'season_fuel_details': season_fuel_details,
         'season_totals': season_totals,
         'chart_data': chart_data,
         'month_order': HEATING_SEASON_MONTH_ORDER,
