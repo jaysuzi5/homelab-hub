@@ -69,37 +69,37 @@
 <div class="bg-gray-800 rounded-2xl shadow p-6">
     <h3 class="text-xl font-bold mb-4">All Records</h3>
     <div class="overflow-x-auto">
-        <table class="w-full text-left table-auto">
+        <table id="nwTable" class="w-full text-left table-auto">
             <thead>
                 <tr class="text-gray-300 text-sm border-b border-gray-700">
-                    <th class="px-4 py-2">Date</th>
-                    <th class="px-4 py-2 text-right">Net Worth</th>
-                    <th class="px-4 py-2 text-right">Change from Previous</th>
-                    <th class="px-4 py-2 text-right">% Change</th>
-                    <th class="px-4 py-2">Comments</th>
+                    <th class="px-4 py-2 cursor-pointer select-none hover:text-white" data-col="0">Date <span class="sort-icon text-gray-500">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer select-none hover:text-white" data-col="1">Net Worth <span class="sort-icon text-gray-500">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer select-none hover:text-white" data-col="2">Change from Previous <span class="sort-icon text-gray-500">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer select-none hover:text-white" data-col="3">% Change <span class="sort-icon text-gray-500">↕</span></th>
+                    <th class="px-4 py-2 cursor-pointer select-none hover:text-white" data-col="4">Comments <span class="sort-icon text-gray-500">↕</span></th>
                     <th class="px-4 py-2 text-center">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in records_with_percent %}
                 <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700">
-                    <td class="px-4 py-2">{{ item.record.date|date:"M Y" }}</td>
-                    <td class="px-4 py-2 text-right font-semibold text-white">${{ item.record.net_worth|floatformat:0|intcomma }}</td>
-                    <td class="px-4 py-2 text-right font-semibold {% if item.record.change_from_previous %}{% if item.record.change_from_previous >= 0 %}text-green-400{% else %}text-red-400{% endif %}{% endif %}">
+                    <td class="px-4 py-2" data-sort="{{ item.record.date|date:'Y-m' }}">{{ item.record.date|date:"M Y" }}</td>
+                    <td class="px-4 py-2 text-right font-semibold text-white" data-sort="{{ item.record.net_worth }}">${{ item.record.net_worth|floatformat:0|intcomma }}</td>
+                    <td class="px-4 py-2 text-right font-semibold {% if item.record.change_from_previous %}{% if item.record.change_from_previous >= 0 %}text-green-400{% else %}text-red-400{% endif %}{% endif %}" data-sort="{% if item.record.change_from_previous %}{{ item.record.change_from_previous }}{% else %}{% endif %}">
                         {% if item.record.change_from_previous %}
                         {% if item.record.change_from_previous >= 0 %}+{% endif %}${{ item.record.change_from_previous|floatformat:0|intcomma }}
                         {% else %}
                         —
                         {% endif %}
                     </td>
-                    <td class="px-4 py-2 text-right {% if item.percent_display %}{% if item.percent_display >= 0 %}text-green-400{% else %}text-red-400{% endif %}{% endif %}">
+                    <td class="px-4 py-2 text-right {% if item.percent_display %}{% if item.percent_display >= 0 %}text-green-400{% else %}text-red-400{% endif %}{% endif %}" data-sort="{% if item.percent_display != None %}{{ item.percent_display }}{% else %}{% endif %}">
                         {% if item.percent_display != None %}
                         {% if item.percent_display >= 0 %}+{% endif %}{{ item.percent_display|floatformat:2 }}%
                         {% else %}
                         —
                         {% endif %}
                     </td>
-                    <td class="px-4 py-2 text-gray-400">
+                    <td class="px-4 py-2 text-gray-400" data-sort="{% if item.record.comments %}{{ item.record.comments }}{% else %}{% endif %}">
                         {% if item.record.comments %}
                         {{ item.record.comments|truncatewords:10 }}
                         {% else %}
@@ -227,6 +227,64 @@
             }
         });
     }
+</script>
+
+<script>
+(function() {
+    const table = document.getElementById('nwTable');
+    const headers = table.querySelectorAll('th[data-col]');
+    let sortCol = null, sortAsc = true;
+
+    headers.forEach(th => {
+        th.addEventListener('click', () => {
+            const col = parseInt(th.dataset.col);
+            if (sortCol === col) {
+                sortAsc = !sortAsc;
+            } else {
+                sortCol = col;
+                sortAsc = true;
+            }
+            sortTable(col, sortAsc);
+            updateIcons(th);
+        });
+    });
+
+    function sortTable(col, asc) {
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr[class]'));
+        rows.sort((a, b) => {
+            const aVal = a.querySelectorAll('td')[col]?.dataset.sort ?? '';
+            const bVal = b.querySelectorAll('td')[col]?.dataset.sort ?? '';
+            const aEmpty = aVal === '';
+            const bEmpty = bVal === '';
+            if (aEmpty && bEmpty) return 0;
+            if (aEmpty) return 1;
+            if (bEmpty) return -1;
+            const aNum = parseFloat(aVal);
+            const bNum = parseFloat(bVal);
+            let cmp;
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                cmp = aNum - bNum;
+            } else {
+                cmp = aVal.localeCompare(bVal);
+            }
+            return asc ? cmp : -cmp;
+        });
+        rows.forEach(r => tbody.appendChild(r));
+    }
+
+    function updateIcons(activeHeader) {
+        headers.forEach(th => {
+            th.querySelector('.sort-icon').textContent = '↕';
+            th.querySelector('.sort-icon').classList.add('text-gray-500');
+            th.querySelector('.sort-icon').classList.remove('text-white');
+        });
+        const icon = activeHeader.querySelector('.sort-icon');
+        icon.textContent = sortAsc ? '↑' : '↓';
+        icon.classList.remove('text-gray-500');
+        icon.classList.add('text-white');
+    }
+})();
 </script>
 
 {% endblock %}
