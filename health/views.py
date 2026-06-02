@@ -4,7 +4,7 @@ from collections import defaultdict
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .models import WeightEntry, ExerciseEntry, ACTIVITY_CHOICES, YARDS_PER_MILE
+from .models import WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, ACTIVITY_CHOICES, YARDS_PER_MILE
 
 ACTIVITIES = [a[0] for a in ACTIVITY_CHOICES]
 ACTIVITY_LABELS = dict(ACTIVITY_CHOICES)
@@ -83,9 +83,39 @@ def weight_list(request):
             )
         except (ValueError, TypeError):
             messages.error(request, 'Please enter a valid weight.')
-        return redirect('weight_list')
+        # Preserve chart range params on redirect
+        params = request.POST.get('_range_params', '')
+        return redirect(f"/health/weight/?{params}" if params else '/health/weight/')
 
     entries = list(WeightEntry.objects.filter(user=request.user).order_by('-date'))
+    goals = list(WeightGoal.objects.filter(user=request.user).order_by('target_date'))
+
+    # Saved chart start preference
+    try:
+        prefs = WeightChartPrefs.objects.get(user=request.user)
+        saved_start = prefs.chart_start_date
+    except WeightChartPrefs.DoesNotExist:
+        saved_start = None
+
+    # GET params override saved prefs / defaults
+    start_str = request.GET.get('start', '').strip()
+    end_str = request.GET.get('end', '').strip()
+
+    if not start_str:
+        if saved_start:
+            start_str = saved_start.isoformat()
+        elif entries:
+            start_str = str(entries[-1].date)  # oldest (list is -date order)
+        else:
+            start_str = date.today().isoformat()
+
+    if not end_str:
+        if goals:
+            end_str = str(goals[-1].target_date)
+        elif entries:
+            end_str = str(entries[0].date)  # newest
+        else:
+            end_str = date.today().isoformat()
 
     entries_with_change = []
     for i, entry in enumerate(entries):
@@ -100,6 +130,11 @@ def weight_list(request):
         for e in reversed(entries)
     ])
 
+    goals_data = json.dumps([
+        {'date': str(g.target_date), 'weight': float(g.target_weight), 'label': g.label}
+        for g in goals
+    ])
+
     latest = entries[0] if entries else None
     lowest = min(entries, key=lambda e: e.weight) if entries else None
     highest = max(entries, key=lambda e: e.weight) if entries else None
@@ -107,6 +142,10 @@ def weight_list(request):
     return render(request, 'health/weight.html', {
         'entries_with_change': entries_with_change,
         'chart_data': chart_data,
+        'goals_data': goals_data,
+        'goals': goals,
+        'chart_start': start_str,
+        'chart_end': end_str,
         'today': date.today().isoformat(),
         'latest': latest,
         'lowest': lowest,
@@ -120,6 +159,60 @@ def weight_delete(request, pk):
     entry = get_object_or_404(WeightEntry, pk=pk, user=request.user)
     if request.method == 'POST':
         entry.delete()
+    return redirect('weight_list')
+
+
+@login_required
+def weight_goal_add(request):
+    if request.method == 'POST':
+        target_date = request.POST.get('target_date', '').strip()
+        weight_raw = request.POST.get('target_weight', '').strip()
+        label = request.POST.get('label', '').strip()
+        try:
+            weight_val = float(weight_raw)
+            if weight_val <= 0:
+                raise ValueError
+            WeightGoal.objects.update_or_create(
+                user=request.user,
+                target_date=target_date,
+                defaults={'target_weight': weight_val, 'label': label},
+            )
+        except (ValueError, TypeError):
+            messages.error(request, 'Please enter a valid goal weight.')
+    params = request.POST.get('_range_params', '')
+    return redirect(f"/health/weight/?{params}" if params else '/health/weight/')
+
+
+@login_required
+def weight_goal_delete(request, pk):
+    goal = get_object_or_404(WeightGoal, pk=pk, user=request.user)
+    if request.method == 'POST':
+        goal.delete()
+    params = request.POST.get('_range_params', '')
+    return redirect(f"/health/weight/?{params}" if params else '/health/weight/')
+
+
+@login_required
+def weight_chart_prefs_save(request):
+    if request.method == 'POST':
+        start_str = request.POST.get('start', '').strip()
+        end_str = request.POST.get('end', '').strip()
+        if start_str:
+            try:
+                start_date = date.fromisoformat(start_str)
+                WeightChartPrefs.objects.update_or_create(
+                    user=request.user,
+                    defaults={'chart_start_date': start_date},
+                )
+            except ValueError:
+                pass
+        params = []
+        if start_str:
+            params.append(f"start={start_str}")
+        if end_str:
+            params.append(f"end={end_str}")
+        qs = '&'.join(params)
+        return redirect(f"/health/weight/?{qs}" if qs else '/health/weight/')
     return redirect('weight_list')
 
 

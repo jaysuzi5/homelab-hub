@@ -41,17 +41,45 @@
 </div>
 
 <!-- Chart -->
-<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6" style="min-height: 22rem;">
-    <h3 class="text-xl font-bold mb-4">Weight Over Time</h3>
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+        <h3 class="text-xl font-bold">Weight Over Time</h3>
+        <div class="flex flex-wrap items-center gap-3">
+            <!-- Date range filter (GET) -->
+            <form method="get" class="flex flex-wrap items-center gap-2">
+                <label class="text-gray-400 text-sm">From</label>
+                <input type="date" name="start" value="{{ chart_start }}"
+                    class="bg-gray-700 text-white text-sm rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label class="text-gray-400 text-sm">to</label>
+                <input type="date" name="end" value="{{ chart_end }}"
+                    class="bg-gray-700 text-white text-sm rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded-lg transition">
+                    Apply
+                </button>
+            </form>
+            <!-- Save default start (POST) -->
+            <form method="post" action="{% url 'weight_chart_prefs_save' %}">
+                {% csrf_token %}
+                <input type="hidden" name="start" value="{{ chart_start }}">
+                <input type="hidden" name="end" value="{{ chart_end }}">
+                <button type="submit"
+                    class="bg-gray-600 hover:bg-gray-500 text-white text-sm px-3 py-1 rounded-lg transition"
+                    title="Save current start date as default">
+                    Set Default Start
+                </button>
+            </form>
+        </div>
+    </div>
     <div class="w-full h-72">
         <canvas id="weightChart" class="w-full h-full"></canvas>
     </div>
 </div>
 
-<!-- Add Entry Form + Table side by side on large screens -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Log Weight / Goals / Data Table -->
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-    <!-- Add Entry Form -->
+    <!-- Log Weight -->
     <div class="bg-gray-800 rounded-2xl shadow p-6">
         <h3 class="text-xl font-bold mb-4">Log Weight</h3>
         {% if messages %}
@@ -59,8 +87,9 @@
         <div class="mb-3 text-sm text-red-400">{{ message }}</div>
         {% endfor %}
         {% endif %}
-        <form method="post">
+        <form method="post" action="{% url 'weight_list' %}">
             {% csrf_token %}
+            <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
             <div class="mb-4">
                 <label class="block text-gray-400 text-sm mb-1" for="date">Date</label>
                 <input type="date" id="date" name="date" value="{{ today }}" required
@@ -76,6 +105,57 @@
                 Save Entry
             </button>
         </form>
+    </div>
+
+    <!-- Goals -->
+    <div class="bg-gray-800 rounded-2xl shadow p-6">
+        <h3 class="text-xl font-bold mb-4">Goals</h3>
+        <form method="post" action="{% url 'weight_goal_add' %}">
+            {% csrf_token %}
+            <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
+            <div class="mb-3">
+                <label class="block text-gray-400 text-sm mb-1">Target Date</label>
+                <input type="date" name="target_date" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+            <div class="mb-3">
+                <label class="block text-gray-400 text-sm mb-1">Target Weight (lbs)</label>
+                <input type="number" name="target_weight" step="0.1" min="1" max="999" placeholder="e.g. 175.0" required
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-400 text-sm mb-1">Label <span class="text-gray-500">(optional)</span></label>
+                <input type="text" name="label" maxlength="100" placeholder="e.g. 6-month goal"
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+            <button type="submit"
+                class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 rounded-lg transition">
+                Add Goal
+            </button>
+        </form>
+
+        {% if goals %}
+        <div class="mt-4 space-y-2">
+            {% for goal in goals %}
+            <div class="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2 text-sm">
+                <div>
+                    <span class="text-orange-400 font-semibold">{{ goal.target_weight }} lbs</span>
+                    <span class="text-gray-400 ml-2">{{ goal.target_date|date:"M d, Y" }}</span>
+                    {% if goal.label %}
+                    <p class="text-gray-500 text-xs mt-0.5">{{ goal.label }}</p>
+                    {% endif %}
+                </div>
+                <form method="post" action="{% url 'weight_goal_delete' goal.pk %}" onsubmit="return confirm('Delete this goal?');" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
+                    <button type="submit" class="text-red-400 hover:underline text-xs ml-2">Delete</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm mt-4">No goals set yet.</p>
+        {% endif %}
     </div>
 
     <!-- Data Table -->
@@ -123,31 +203,57 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script>
     const chartData = {{ chart_data|safe }};
+    const goalsData = {{ goals_data|safe }};
+    const chartStart = '{{ chart_start }}';
+    const chartEnd = '{{ chart_end }}';
 
-    if (chartData && chartData.length > 0) {
+    if ((chartData && chartData.length > 0) || (goalsData && goalsData.length > 0)) {
         const ctx = document.getElementById('weightChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
             data: {
-                labels: chartData.map(d => d.date),
-                datasets: [{
-                    label: 'Weight (lbs)',
-                    data: chartData.map(d => d.weight),
-                    borderColor: 'rgba(59,130,246,1)',
-                    backgroundColor: 'rgba(59,130,246,0.15)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 3,
-                    pointHoverRadius: 5,
-                }]
+                datasets: [
+                    {
+                        label: 'Actual',
+                        data: chartData.map(d => ({x: d.date, y: d.weight})),
+                        borderColor: 'rgba(59,130,246,1)',
+                        backgroundColor: 'rgba(59,130,246,0.15)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        order: 2,
+                    },
+                    {
+                        label: 'Goal',
+                        data: goalsData.map(d => ({x: d.date, y: d.weight, goalLabel: d.label})),
+                        borderColor: 'rgba(249,115,22,1)',
+                        backgroundColor: 'rgba(249,115,22,0.15)',
+                        fill: false,
+                        tension: 0,
+                        borderDash: [8, 4],
+                        pointRadius: 7,
+                        pointStyle: 'rectRot',
+                        pointHoverRadius: 9,
+                        order: 1,
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
                     x: {
+                        type: 'time',
+                        time: {
+                            unit: 'month',
+                            displayFormats: { month: 'MMM yy' }
+                        },
+                        min: chartStart,
+                        max: chartEnd,
                         ticks: { color: 'white', font: { size: 11 } },
                         grid: { color: 'rgba(255,255,255,0.1)' }
                     },
@@ -159,11 +265,19 @@
                     }
                 },
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        display: goalsData.length > 0,
+                        labels: { color: 'white', usePointStyle: true }
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return context.parsed.y + ' lbs';
+                                const val = context.parsed.y;
+                                if (context.dataset.label === 'Goal') {
+                                    const gl = context.raw.goalLabel;
+                                    return gl ? `Goal (${gl}): ${val} lbs` : `Goal: ${val} lbs`;
+                                }
+                                return `${val} lbs`;
                             }
                         }
                     }

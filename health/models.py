@@ -19,6 +19,36 @@ class WeightEntry(models.Model):
         return f"{self.user} — {self.date}: {self.weight} lbs"
 
 
+class WeightGoal(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='weight_goals',
+    )
+    target_date = models.DateField()
+    target_weight = models.DecimalField(max_digits=5, decimal_places=1, help_text="Target weight in lbs")
+    label = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ['target_date']
+        unique_together = ['user', 'target_date']
+
+    def __str__(self):
+        return f"{self.user} — {self.target_date}: {self.target_weight} lbs goal"
+
+
+class WeightChartPrefs(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='weight_chart_prefs',
+    )
+    chart_start_date = models.DateField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user} weight chart prefs"
+
+
 YARDS_PER_MILE = 1760
 
 ACTIVITY_CHOICES = [
