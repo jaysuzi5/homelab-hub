@@ -6,7 +6,7 @@ from config.utils import get_config
 
 _CACHE_KEY = "aws_billing_cache"
 _CACHE_TS_KEY = "aws_billing_cache_updated"
-_CACHE_TTL_DAYS = 7
+_CACHE_TTL_DAYS = 1
 
 # S3 standard storage pricing tiers (US, per GB-month)
 _S3_TIERS = [
