@@ -221,20 +221,57 @@
     const portfolioData = {{ chart_data|safe }};
 
     if (portfolioData && portfolioData.length > 0) {
+        // Linear $0 draw-down reference: $4583/month off $2,200,636 starting 2026-05-01
+        const DRAWDOWN_START_BALANCE = 2200636;
+        const DRAWDOWN_MONTHLY = 4583;
+        const lastPortfolioDate = portfolioData[portfolioData.length - 1].date;
+        const drawdownPoints = [];
+        let dd = new Date('2026-05-01T00:00:00');
+        const ddEnd = new Date(lastPortfolioDate + 'T00:00:00');
+        let monthIdx = 0;
+        while (dd <= ddEnd) {
+            const ds = dd.toISOString().slice(0, 10);
+            drawdownPoints.push({ date: ds, balance: DRAWDOWN_START_BALANCE - DRAWDOWN_MONTHLY * monthIdx });
+            dd.setMonth(dd.getMonth() + 1);
+            monthIdx++;
+        }
+
+        // Union of all dates, sorted, for a shared category axis
+        const drawdownMap = {};
+        drawdownPoints.forEach(p => { drawdownMap[p.date] = p.balance; });
+        const portfolioMap = {};
+        portfolioData.forEach(p => { portfolioMap[p.date] = p.balance; });
+        const labels = Array.from(new Set([
+            ...portfolioData.map(d => d.date),
+            ...drawdownPoints.map(d => d.date)
+        ])).sort();
+
         const ctx = document.getElementById('portfolioGrowthChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
             data: {
-                labels: portfolioData.map(d => d.date),
+                labels: labels,
                 datasets: [{
                     label: 'Portfolio Value',
-                    data: portfolioData.map(d => d.balance),
+                    data: labels.map(d => d in portfolioMap ? portfolioMap[d] : null),
                     fill: true,
                     borderColor: 'rgba(34,197,94,1)',
                     backgroundColor: 'rgba(34,197,94,0.2)',
                     tension: 0.2,
                     pointRadius: 3,
-                    pointHoverRadius: 5
+                    pointHoverRadius: 5,
+                    spanGaps: true
+                }, {
+                    label: '$0 Draw-down (linear)',
+                    data: labels.map(d => d in drawdownMap ? drawdownMap[d] : null),
+                    fill: false,
+                    borderColor: 'rgba(239,68,68,1)',
+                    backgroundColor: 'rgba(239,68,68,1)',
+                    borderDash: [6, 4],
+                    tension: 0,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    spanGaps: true
                 }]
             },
             options: {
@@ -278,12 +315,13 @@
                 },
                 plugins: {
                     legend: {
-                        display: false
+                        display: true,
+                        labels: { color: 'white', font: { size: 14 } }
                     },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return '$' + context.parsed.y.toLocaleString();
+                                return context.dataset.label + ': $' + context.parsed.y.toLocaleString();
                             }
                         }
                     }
