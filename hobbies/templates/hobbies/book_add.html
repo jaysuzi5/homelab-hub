@@ -32,6 +32,85 @@
         <!-- Search Results -->
         <div id="search-status" class="text-gray-400 text-sm hidden"></div>
         <div id="search-results" class="mt-4 space-y-3 hidden"></div>
+
+        <div class="mt-4 pt-4 border-t border-gray-700 text-sm text-gray-400">
+            Can't find it?
+            <button type="button" onclick="showManual()" class="text-blue-400 hover:underline ml-1">Add it manually</button>
+        </div>
+    </div>
+
+    <!-- Manual Entry -->
+    <div id="step-manual" class="bg-gray-800 rounded-2xl shadow p-6 mb-6 hidden">
+        <h3 class="text-lg font-semibold mb-4">Add Book Manually</h3>
+
+        <form method="post" action="{% url 'book_add' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="rating" id="manual_rating" value="">
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Date Read</label>
+                <input type="date" name="date_read" value="{{ today }}" required
+                    class="bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Title</label>
+                <input type="text" name="title" required placeholder="Book title"
+                    class="bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Author</label>
+                <input type="text" name="author" placeholder="Author name"
+                    class="bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Pages</label>
+                <input type="number" name="pages" min="1" placeholder="Number of pages"
+                    class="bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Description</label>
+                <textarea name="summary" rows="4" placeholder="Book description..."
+                    class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500 resize-none"></textarea>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Cover Image</label>
+                <input type="file" name="cover_image" accept="image/*"
+                    class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                <p class="text-xs text-gray-600 mt-1">Or paste an image URL below</p>
+                <input type="url" name="cover_url" placeholder="https://..."
+                    class="mt-2 bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 w-full text-sm focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-2">Rating</label>
+                <div class="flex gap-2 items-center">
+                    <div id="manual-star-picker" class="flex gap-1">
+                        <button type="button" data-value="1" class="manual-star text-3xl text-gray-600 transition focus:outline-none" onclick="setManualRating(1)">&#9733;</button>
+                        <button type="button" data-value="2" class="manual-star text-3xl text-gray-600 transition focus:outline-none" onclick="setManualRating(2)">&#9733;</button>
+                        <button type="button" data-value="3" class="manual-star text-3xl text-gray-600 transition focus:outline-none" onclick="setManualRating(3)">&#9733;</button>
+                        <button type="button" data-value="4" class="manual-star text-3xl text-gray-600 transition focus:outline-none" onclick="setManualRating(4)">&#9733;</button>
+                        <button type="button" data-value="5" class="manual-star text-3xl text-gray-600 transition focus:outline-none" onclick="setManualRating(5)">&#9733;</button>
+                    </div>
+                    <button type="button" class="text-xs text-gray-500 hover:text-gray-300 ml-1" onclick="setManualRating(0)">Clear</button>
+                </div>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-sm text-gray-400 mb-1">Notes <span class="text-gray-600">(optional)</span></label>
+                <textarea name="comment" rows="3" placeholder="Your thoughts about this book..."
+                    class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500 resize-none"></textarea>
+            </div>
+
+            <button type="submit"
+                class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition">
+                Save to Reading List
+            </button>
+        </form>
     </div>
 
     <!-- Step 2: Confirm & Save -->
@@ -204,6 +283,21 @@
     function clearSelection() {
         document.getElementById('step-confirm').classList.add('hidden');
         document.getElementById('search_input').focus();
+    }
+
+    function showManual() {
+        const manual = document.getElementById('step-manual');
+        manual.classList.remove('hidden');
+        manual.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function setManualRating(value) {
+        document.getElementById('manual_rating').value = value || '';
+        document.querySelectorAll('.manual-star').forEach(btn => {
+            const v = parseInt(btn.dataset.value);
+            btn.classList.toggle('text-yellow-400', v <= value);
+            btn.classList.toggle('text-gray-600', v > value);
+        });
     }
 
     function setAddRating(value) {

@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from .models import Book, GuitarSession, GUITAR_CATEGORY_CHOICES, GUITAR_SKILL_FIELDS
-from .utils import download_cover
+from .utils import download_cover, save_cover_file
 from dashboard.services.darts import collect_dart_summary
 
 
@@ -142,7 +142,13 @@ def book_add(request):
             rating=rating,
             comment=comment,
         )
-        if cover_url:
+        cover_image = request.FILES.get('cover_image')
+        if cover_image:
+            local = save_cover_file(cover_image, book.pk)
+            if local:
+                book.cover_local = local
+                book.save(update_fields=['cover_local'])
+        elif cover_url:
             local = download_cover(cover_url, book.pk)
             if local:
                 book.cover_local = local
