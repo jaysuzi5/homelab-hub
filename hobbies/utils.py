@@ -1,5 +1,6 @@
 import os
 import urllib.request
+import uuid
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 
@@ -12,11 +13,9 @@ def save_cover_file(uploaded_file, book_id: int) -> str:
     if ext not in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
         ext = '.jpg'
 
-    storage_path = f"book_covers/{book_id}{ext}"
+    storage_path = f"book_covers/{book_id}-{uuid.uuid4().hex[:8]}{ext}"
 
     try:
-        if default_storage.exists(storage_path):
-            default_storage.delete(storage_path)
         default_storage.save(storage_path, ContentFile(uploaded_file.read()))
         return storage_path
     except Exception:

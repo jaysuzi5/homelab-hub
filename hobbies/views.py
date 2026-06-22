@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.db.models import Sum
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from .models import Book, GuitarSession, GUITAR_CATEGORY_CHOICES, GUITAR_SKILL_FIELDS
@@ -105,9 +106,21 @@ def book_detail(request, pk):
         book.pages = int(pages_raw) if pages_raw.isdigit() else None
         new_cover_url = request.POST.get('cover_url', '').strip()
         update_fields = ['rating', 'comment', 'summary', 'author', 'pages', 'cover_url', 'cover_local']
-        if new_cover_url != book.cover_url:
+
+        cover_image = request.FILES.get('cover_image')
+        old_local = book.cover_local
+        if cover_image:
+            local = save_cover_file(cover_image, book.pk)
+            if local:
+                book.cover_url = new_cover_url
+                book.cover_local = local
+                if old_local and old_local != local:
+                    default_storage.delete(old_local)
+        elif new_cover_url != book.cover_url:
             book.cover_url = new_cover_url
             book.cover_local = download_cover(new_cover_url, book.pk) if new_cover_url else ''
+            if old_local and old_local != book.cover_local:
+                default_storage.delete(old_local)
         book.save(update_fields=update_fields)
         return redirect('reading_list')
 
