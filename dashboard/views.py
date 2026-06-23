@@ -17,6 +17,7 @@ from dashboard.services.weather import collect_weather_summary
 from dashboard.services.aws_billing import collect_aws_billing_summary
 from dashboard.services.backup_status import collect_backup_status_summary
 from dashboard.services.status_overview import collect_status_overview
+from dashboard.services.chatbot import answer_question
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
 from config.utils import get_config
@@ -134,6 +135,21 @@ def card_status(request):
     return render(request, "dashboard/partials/_card_status.html", {
         "status": status,
     })
+
+
+@login_required
+@require_http_methods(["POST"])
+def status_chat(request):
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"error": "Invalid request."}, status=400)
+    history = payload.get("messages", [])
+    if not isinstance(history, list) or not history:
+        return JsonResponse({"error": "No message provided."}, status=400)
+    with _tracer.start_as_current_span("status.chat"):
+        result = answer_question(history)
+    return JsonResponse(result)
 
 
 @login_required

@@ -28,6 +28,7 @@ dependencies = [
     "django-storages[s3]>=1.14.6",
     "whitenoise>=6.11.0",
     "browser-cookie3>=0.20.1",
+    "openai>=1.50.0",
 ]
 
 [tool.uv]

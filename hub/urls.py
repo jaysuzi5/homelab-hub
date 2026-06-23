@@ -12,6 +12,7 @@ from dashboard.views import (
     card_k8s, card_synology, card_claude, card_network,
     card_emporia_chart, card_emporia_daily, card_splunk, card_weather,
     card_aws_billing, card_aws_billing_refresh, card_backup, card_status,
+    status_chat,
 )
 
 urlpatterns = [
@@ -48,4 +49,5 @@ urlpatterns = [
     path('dashboard/api/card/aws-billing/refresh/', card_aws_billing_refresh, name='card_aws_billing_refresh'),
     path('dashboard/api/card/backup/', card_backup, name='card_backup'),
     path('dashboard/api/card/status/', card_status, name='card_status'),
+    path('dashboard/api/status/chat/', status_chat, name='status_chat'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

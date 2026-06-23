@@ -41,5 +41,97 @@
         </div>
         {% endfor %}
     </div>
+
+    <div class="border-t border-white/15 mt-4 pt-3">
+        <button type="button" onclick="toggleStatusChat()"
+            class="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.9A7.96 7.96 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+            </svg>
+            Ask about my system
+        </button>
+
+        <div id="status-chat" class="hidden mt-3">
+            <div id="status-chat-log" class="space-y-2 max-h-72 overflow-y-auto mb-3 text-sm"></div>
+            <form id="status-chat-form" class="flex gap-2">
+                <input type="text" id="status-chat-input" autocomplete="off"
+                    placeholder="e.g. Are any pods unhealthy?"
+                    class="flex-1 bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                <button type="submit" id="status-chat-send"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition">Send</button>
+            </form>
+        </div>
+    </div>
     </div>
 </div>
+
+<script>
+(function() {
+    const CHAT_URL = "{% url 'status_chat' %}";
+    const CSRF = "{{ csrf_token }}";
+    const history = [];
+
+    window.toggleStatusChat = function() {
+        const box = document.getElementById('status-chat');
+        box.classList.toggle('hidden');
+        if (!box.classList.contains('hidden')) {
+            document.getElementById('status-chat-input').focus();
+        }
+    };
+
+    function bubble(role, text) {
+        const log = document.getElementById('status-chat-log');
+        const wrap = document.createElement('div');
+        wrap.className = role === 'user' ? 'text-right' : 'text-left';
+        const span = document.createElement('span');
+        span.className = 'inline-block rounded-lg px-3 py-2 ' +
+            (role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100');
+        span.style.whiteSpace = 'pre-wrap';
+        span.textContent = text;
+        wrap.appendChild(span);
+        log.appendChild(wrap);
+        log.scrollTop = log.scrollHeight;
+        return span;
+    }
+
+    const form = document.getElementById('status-chat-form');
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const input = document.getElementById('status-chat-input');
+            const btn = document.getElementById('status-chat-send');
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = '';
+            bubble('user', text);
+            history.push({ role: 'user', content: text });
+            const thinking = bubble('assistant', '…');
+            btn.disabled = true;
+            input.disabled = true;
+
+            try {
+                const resp = await fetch(CHAT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                    body: JSON.stringify({ messages: history }),
+                });
+                const data = await resp.json();
+                if (data.error) {
+                    thinking.textContent = '⚠ ' + data.error;
+                } else {
+                    thinking.textContent = data.reply || '(no answer)';
+                    history.push({ role: 'assistant', content: data.reply || '' });
+                }
+            } catch (err) {
+                thinking.textContent = '⚠ Request failed.';
+            } finally {
+                btn.disabled = false;
+                input.disabled = false;
+                input.focus();
+            }
+        });
+    }
+})();
+</script>
