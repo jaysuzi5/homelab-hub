@@ -2,9 +2,13 @@ from dashboard.services.k8s import collect_k8s_metrics_summary
 from dashboard.services.synology import collect_synology_summary
 from dashboard.services.network import collect_network_summary
 from dashboard.services.backup_status import collect_backup_status_summary
+from dashboard.services.aws_billing import collect_aws_billing_summary
+from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
 
 _HIGH_USAGE = 85
+_AWS_BUDGET = 2.0
+_CLAUDE_WEEKLY_LIMIT = 90
 
 
 def _check_k8s(issues):
@@ -131,6 +135,40 @@ def _check_backup(issues):
     return {"name": "Backups", "status": status, "detail": f"{len(apps)} app{'s' if len(apps) != 1 else ''} backed up"}
 
 
+def _check_aws(issues):
+    try:
+        b = collect_aws_billing_summary()
+    except Exception:
+        return {"name": "AWS Spending", "status": "warn", "detail": "Unavailable"}
+
+    if b.get("error"):
+        return {"name": "AWS Spending", "status": "warn", "detail": "Unavailable"}
+
+    mtd = b.get("mtd_total", 0) or 0
+    detail = f"${mtd:.2f} MTD (budget ${_AWS_BUDGET:.0f})"
+    if mtd >= _AWS_BUDGET:
+        issues.append({"severity": "warn", "source": "AWS Spending", "message": f"${mtd:.2f} this month exceeds ${_AWS_BUDGET:.0f} budget"})
+        return {"name": "AWS Spending", "status": "warn", "detail": detail}
+    return {"name": "AWS Spending", "status": "ok", "detail": detail}
+
+
+def _check_claude(issues):
+    try:
+        c = collect_claude_dashboard_summary()
+    except Exception:
+        return {"name": "Claude Code", "status": "warn", "detail": "Unavailable"}
+
+    pct = c.get("weekly_pct")
+    if pct is None:
+        return {"name": "Claude Code", "status": "warn", "detail": "No data"}
+
+    detail = f"{pct}% of weekly limit"
+    if pct >= _CLAUDE_WEEKLY_LIMIT:
+        issues.append({"severity": "warn", "source": "Claude Code", "message": f"Weekly usage {pct}% (limit {_CLAUDE_WEEKLY_LIMIT}%)"})
+        return {"name": "Claude Code", "status": "warn", "detail": detail}
+    return {"name": "Claude Code", "status": "ok", "detail": detail}
+
+
 def collect_status_overview():
     issues = []
     checks = [
@@ -139,6 +177,8 @@ def collect_status_overview():
         _check_network(issues),
         _check_hosts(issues),
         _check_backup(issues),
+        _check_aws(issues),
+        _check_claude(issues),
     ]
 
     if any(i["severity"] == "critical" for i in issues):

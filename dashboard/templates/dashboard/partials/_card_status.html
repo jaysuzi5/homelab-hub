@@ -1,7 +1,9 @@
-<div class="rounded-2xl shadow p-6 {% if status.overall == 'ok' %}bg-green-900{% elif status.overall == 'warn' %}bg-yellow-900{% else %}bg-red-900{% endif %}">
+<div class="bg-gray-800 rounded-2xl shadow overflow-hidden">
+    <div class="h-1.5 {% if status.overall == 'ok' %}bg-green-500{% elif status.overall == 'warn' %}bg-yellow-500{% else %}bg-red-500{% endif %}"></div>
+    <div class="p-6">
     <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
         <span>System Status</span>
-        <span class="text-2xl">
+        <span class="text-2xl {% if status.overall == 'ok' %}text-green-400{% elif status.overall == 'warn' %}text-yellow-400{% else %}text-red-400{% endif %}">
             {% if status.overall == 'ok' %}&#10003;{% else %}&#9888;{% endif %}
         </span>
     </h3>
@@ -38,5 +40,6 @@
             <span class="text-gray-300 text-xs">{{ check.detail }}</span>
         </div>
         {% endfor %}
+    </div>
     </div>
 </div>
