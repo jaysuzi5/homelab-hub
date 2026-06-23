@@ -153,6 +153,28 @@ def status_chat(request):
 
 
 @login_required
+def telemetry_agent_calls(request):
+    from dashboard.models import AgentCall
+    q = (request.GET.get("q") or "").strip()
+    only_errors = request.GET.get("errors") == "1"
+    calls = AgentCall.objects.all()
+    if q:
+        calls = calls.filter(question__icontains=q)
+    if only_errors:
+        calls = calls.exclude(error="")
+    calls = list(calls[:200])
+    total = AgentCall.objects.count()
+    error_count = AgentCall.objects.exclude(error="").count()
+    return render(request, "dashboard/telemetry_agent_calls.html", {
+        "calls": calls,
+        "q": q,
+        "only_errors": only_errors,
+        "total": total,
+        "error_count": error_count,
+    })
+
+
+@login_required
 def card_backup(request):
     with _tracer.start_as_current_span("card.backup"):
         backup = collect_backup_status_summary()

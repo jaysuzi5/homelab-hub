@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import time
 from openai import OpenAI
 from django.db import connection
 from config.utils import get_config
@@ -14,6 +15,7 @@ _BASE_URL = "https://api.groq.com/openai/v1"
 _MODEL = "llama-3.3-70b-versatile"
 _MAX_TOOL_ROUNDS = 8
 _SQL_ROW_LIMIT = 100
+_DONE_PHASES = {"Succeeded", "Completed"}
 
 _FORBIDDEN_SQL = re.compile(
     r"\b(insert|update|delete|drop|alter|truncate|grant|revoke|create|comment|copy|"
@@ -27,6 +29,8 @@ understand the current state of their self-hosted infrastructure.
 You have tools to:
 - get an aggregated system status summary (issues + per-subsystem rollup),
 - inspect the Kubernetes cluster (nodes, pod counts, problem pods),
+- find/count pods by name or namespace,
+- check backup freshness,
 - query the application PostgreSQL database (read-only) — list tables, describe a \
 table, and run SELECT queries.
 
@@ -41,13 +45,18 @@ HISTORY (e.g. every ping result over time), so a raw COUNT over them is not "now
 read current values from SQL you must take the latest row per entity. Use SQL mainly for \
 historical trends, totals, and details not covered by the status tools.
 
+To count or find pods by name (e.g. "how many API pods", "is the X pod running"), use \
+find_pods with name_contains — do NOT use k8s_overview for that. Kubernetes data is NOT \
+in the database; never use SQL for pods.
+
 IMPORTANT: backup status, AWS spending, and Claude Code usage are NOT in the database. \
 For backups (when the last backup ran, how old, which apps), call backup_status ONCE — \
 it returns the latest backup timestamp and age per app. For AWS spend or Claude usage, \
 call system_status. Never search the database for backups, AWS, or Claude.
 
-Be concise and factual. Lead with the answer. If something is wrong, say what and where. \
-If you lack data, say so rather than guessing."""
+Call exactly one tool at a time, with a small JSON argument object. Be concise and \
+factual. Lead with the answer. If something is wrong, say what and where. If you lack \
+data, say so rather than guessing."""
 
 
 def _client():
@@ -63,10 +72,23 @@ def _tool_system_status(args):
     return collect_status_overview()
 
 
+def _slim_pod(p):
+    return {
+        "namespace": p.get("namespace"),
+        "name": p.get("name"),
+        "status": p.get("status"),
+        "restarts": p.get("restarts"),
+    }
+
+
 def _tool_k8s_overview(args):
     d = collect_k8s_metrics_detailed()
     pods = d.get("pod_details") or []
-    problems = [p for p in pods if p.get("status") != "Running" or (p.get("restarts") or 0) > 0]
+    problems = [
+        p for p in pods
+        if (p.get("status") not in ("Running",) and p.get("status") not in _DONE_PHASES)
+        or (p.get("restarts") or 0) > 0
+    ]
     return {
         "pods_status": d.get("pods_status"),
         "total_pods": d.get("total_pods"),
@@ -76,8 +98,25 @@ def _tool_k8s_overview(args):
         "nodes": [{"name": n.get("name"), "ready": n.get("ready"),
                    "cpu_percent": n.get("cpu_percent"), "mem_percent": n.get("mem_percent")}
                   for n in (d.get("nodes_info") or [])],
-        "problem_pods": problems[:40],
+        "problem_pod_count": len(problems),
+        "problem_pods": [_slim_pod(p) for p in problems[:20]],
     }
+
+
+def _tool_find_pods(args):
+    a = args or {}
+    needle = (a.get("name_contains") or "").lower()
+    ns = (a.get("namespace") or "").lower()
+    d = collect_k8s_metrics_detailed()
+    pods = d.get("pod_details") or []
+    matched = []
+    for p in pods:
+        if needle and needle not in (p.get("name") or "").lower():
+            continue
+        if ns and ns != (p.get("namespace") or "").lower():
+            continue
+        matched.append(_slim_pod(p))
+    return {"count": len(matched), "pods": matched[:60]}
 
 
 def _tool_backup_status(args):
@@ -138,6 +177,7 @@ def _tool_run_sql(args):
 _TOOLS = {
     "system_status": _tool_system_status,
     "k8s_overview": _tool_k8s_overview,
+    "find_pods": _tool_find_pods,
     "backup_status": _tool_backup_status,
     "list_tables": _tool_list_tables,
     "describe_table": _tool_describe_table,
@@ -157,8 +197,22 @@ _TOOL_SPECS = [
         "type": "function",
         "function": {
             "name": "k8s_overview",
-            "description": "Kubernetes cluster state: pod phase counts, node readiness and CPU/memory, cluster alerts, and a list of problem pods (not Running or with restarts).",
+            "description": "Kubernetes cluster summary: pod phase counts, node readiness and CPU/memory, cluster alerts, and a SHORT list of genuinely problematic pods (not Running and not a completed job, or with restarts). Use for overall cluster health, not for counting specific pods.",
             "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_pods",
+            "description": "Find and count pods by a name substring and/or namespace. Returns the match count and a compact list (namespace, name, status, restarts). Use this to answer 'how many X pods' or 'is pod Y running'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name_contains": {"type": "string", "description": "Case-insensitive substring of the pod name, e.g. 'api'"},
+                    "namespace": {"type": "string", "description": "Optional exact namespace filter"},
+                },
+            },
         },
     },
     {
@@ -208,6 +262,21 @@ def _serialize(obj):
     return json.dumps(obj, default=str)
 
 
+def _record(question, result, rounds, trace, duration_ms):
+    try:
+        from dashboard.models import AgentCall
+        AgentCall.objects.create(
+            question=question or "",
+            reply=result.get("reply") or "",
+            error=result.get("error") or "",
+            rounds=rounds,
+            tool_calls=trace,
+            duration_ms=duration_ms,
+        )
+    except Exception:
+        _log.exception("failed to persist AgentCall")
+
+
 def answer_question(history):
     """history: list of {role, content}. Returns {'reply': str, 'error': str|None}."""
     client = _client()
@@ -223,21 +292,45 @@ def answer_question(history):
 
     last_user = next((t.get("content") for t in reversed(history) if t.get("role") == "user"), "")
     _log.info("chat start: %r", last_user)
+
+    trace = []
+    rounds = 0
+    retried_malformed = False
+    start = time.monotonic()
+
     try:
         for round_idx in range(_MAX_TOOL_ROUNDS):
-            resp = client.chat.completions.create(
-                model=_MODEL,
-                messages=messages,
-                tools=_TOOL_SPECS,
-                tool_choice="auto",
-                temperature=0.2,
-                max_tokens=900,
-            )
+            rounds = round_idx + 1
+            try:
+                resp = client.chat.completions.create(
+                    model=_MODEL,
+                    messages=messages,
+                    tools=_TOOL_SPECS,
+                    tool_choice="auto",
+                    temperature=0.2,
+                    max_tokens=900,
+                )
+            except Exception as e:
+                if "tool_use_failed" in str(e) and not retried_malformed:
+                    retried_malformed = True
+                    _log.warning("malformed tool call, retrying once: %s", str(e)[:200])
+                    trace.append({"round": rounds, "name": "_error", "args": {}, "note": "malformed tool call, retried"})
+                    messages.append({
+                        "role": "system",
+                        "content": "Your previous tool call was malformed. Call exactly ONE tool "
+                                   "with a small JSON argument object (do not include tool results "
+                                   "yourself), or answer the user directly in plain text.",
+                    })
+                    continue
+                raise
+
             msg = resp.choices[0].message
 
             if not msg.tool_calls:
-                _log.info("chat done in %d round(s): %r", round_idx + 1, (msg.content or "")[:200])
-                return {"reply": msg.content or "", "error": None}
+                result = {"reply": msg.content or "", "error": None}
+                _log.info("chat done in %d round(s): %r", rounds, (msg.content or "")[:200])
+                _record(last_user, result, rounds, trace, int((time.monotonic() - start) * 1000))
+                return result
 
             messages.append({
                 "role": "assistant",
@@ -252,20 +345,24 @@ def answer_question(history):
             for tc in msg.tool_calls:
                 fn = _TOOLS.get(tc.function.name)
                 try:
-                    args = json.loads(tc.function.arguments or "{}")
+                    cargs = json.loads(tc.function.arguments or "{}")
                 except Exception:
-                    args = {}
-                _log.info("round %d tool: %s args=%s", round_idx + 1, tc.function.name, _serialize(args)[:300])
-                result = fn(args) if fn else {"error": f"Unknown tool {tc.function.name}"}
+                    cargs = {}
+                _log.info("round %d tool: %s args=%s", rounds, tc.function.name, _serialize(cargs)[:300])
+                trace.append({"round": rounds, "name": tc.function.name, "args": cargs})
+                tresult = fn(cargs) if fn else {"error": f"Unknown tool {tc.function.name}"}
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": _serialize(result),
+                    "content": _serialize(tresult),
                 })
 
-        tools_used = [m.get("tool_calls") for m in messages if m.get("role") == "assistant" and m.get("tool_calls")]
-        _log.warning("chat hit max rounds (%d) for %r; tool batches=%d", _MAX_TOOL_ROUNDS, last_user, len(tools_used))
-        return {"reply": "I wasn't able to finish answering that — too many tool steps.", "error": None}
+        result = {"reply": "I wasn't able to finish answering that — too many tool steps.", "error": None}
+        _log.warning("chat hit max rounds (%d) for %r", _MAX_TOOL_ROUNDS, last_user)
+        _record(last_user, result, rounds, trace, int((time.monotonic() - start) * 1000))
+        return result
     except Exception as e:
+        result = {"reply": "", "error": str(e)}
         _log.exception("chat error for %r", last_user)
-        return {"reply": "", "error": str(e)}
+        _record(last_user, result, rounds, trace, int((time.monotonic() - start) * 1000))
+        return result

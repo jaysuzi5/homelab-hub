@@ -52,10 +52,10 @@
         <h1 class="text-2xl font-bold mb-6">🏠 HomeLab</h1>
         <nav class="flex flex-col space-y-1">
             <a href="{% url 'home' %}" onclick="closeSidebarOnMobile()" class="hover:bg-gray-700 p-2 rounded">Dashboard</a>
-            <!-- OTEL Section with Children -->
+            <!-- Telemetry Section with Children -->
             <div class="menu-group">
                 <button onclick="toggleSubmenu('otel-submenu')" class="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center">
-                    <span>OTEL</span>
+                    <span>Telemetry</span>
                     <svg id="otel-submenu-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
@@ -64,6 +64,7 @@
                     <a href="{% url 'otel_logging_overview' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Logging Explorer</a>
                     <a href="{% url 'otel_trace_overview' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Trace Explorer</a>
                     <a href="{% url 'otel_metrics_overview' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Metric Explorer</a>
+                    <a href="{% url 'telemetry_agent_calls' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Agent Calls</a>
                 </div>
             </div>
             <a href="{% url 'k8s' %}" onclick="closeSidebarOnMobile()" class="hover:bg-gray-700 p-2 rounded">Kubernetes</a>

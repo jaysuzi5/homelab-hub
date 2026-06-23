@@ -12,7 +12,7 @@ from dashboard.views import (
     card_k8s, card_synology, card_claude, card_network,
     card_emporia_chart, card_emporia_daily, card_splunk, card_weather,
     card_aws_billing, card_aws_billing_refresh, card_backup, card_status,
-    status_chat,
+    status_chat, telemetry_agent_calls,
 )
 
 urlpatterns = [
@@ -33,6 +33,7 @@ urlpatterns = [
     path('otel/trace/detail/', otel_trace_detail_view, name='otel_trace_detail'),
     path('otel/metrics/', otel_metrics_overview, name='otel_metrics_overview'),
     path('otel/metrics/query/', otel_metrics_query_view, name='otel_metrics_query'),
+    path('otel/agent-calls/', telemetry_agent_calls, name='telemetry_agent_calls'),
     path('otel/endpoint-detail/', otel_endpoint_detail, name='otel_endpoint_detail'),
     path('otel/transaction-detail/', otel_transaction_detail, name='otel_transaction_detail'),
     path('todo/tasks/', todo_tasks, name='todo_tasks'),

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Agent Calls</h1>
+            <p class="text-gray-400 text-sm mt-1">System health chatbot — questions, answers, and the tool calls behind each reply.</p>
+        </div>
+        <form method="get" class="flex items-center gap-2 flex-wrap">
+            <input type="text" name="q" value="{{ q }}" placeholder="Search questions…"
+                   class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <label class="flex items-center gap-1.5 text-gray-300 text-sm">
+                <input type="checkbox" name="errors" value="1" {% if only_errors %}checked{% endif %}
+                       onchange="this.form.submit()" class="rounded bg-gray-700 border-gray-600">
+                Errors only
+            </label>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm rounded px-3 py-1.5">Filter</button>
+        </form>
+    </div>
+
+    <!-- Summary -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-gray-800 rounded-xl p-4">
+            <div class="text-gray-400 text-xs uppercase tracking-wide">Total calls</div>
+            <div class="text-2xl font-bold text-white">{{ total }}</div>
+        </div>
+        <div class="bg-gray-800 rounded-xl p-4">
+            <div class="text-gray-400 text-xs uppercase tracking-wide">Errors</div>
+            <div class="text-2xl font-bold {% if error_count %}text-red-400{% else %}text-green-400{% endif %}">{{ error_count }}</div>
+        </div>
+        <div class="bg-gray-800 rounded-xl p-4">
+            <div class="text-gray-400 text-xs uppercase tracking-wide">Showing</div>
+            <div class="text-2xl font-bold text-white">{{ calls|length }}</div>
+        </div>
+    </div>
+
+    {% if not calls %}
+    <div class="bg-gray-800 rounded-xl p-8 text-center text-gray-400">No agent calls recorded yet.</div>
+    {% else %}
+    <div class="space-y-3">
+        {% for call in calls %}
+        <details class="bg-gray-800 rounded-xl overflow-hidden group">
+            <summary class="cursor-pointer list-none p-4 flex items-start gap-3 hover:bg-gray-750">
+                <span class="mt-1 w-2 h-2 rounded-full flex-shrink-0 {% if call.error %}bg-red-500{% else %}bg-green-500{% endif %}"></span>
+                <div class="flex-1 min-w-0">
+                    <div class="text-white font-medium truncate">{{ call.question|default:"(empty)" }}</div>
+                    <div class="text-gray-400 text-xs mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                        <span>{{ call.created_at|date:"M j, Y g:i A" }}</span>
+                        <span>{{ call.rounds }} round{{ call.rounds|pluralize }}</span>
+                        <span>{{ call.tool_calls|length }} tool call{{ call.tool_calls|length|pluralize }}</span>
+                        <span>{{ call.duration_ms }} ms</span>
+                        {% if call.error %}<span class="text-red-400 font-semibold">ERROR</span>{% endif %}
+                    </div>
+                </div>
+                <svg class="w-4 h-4 text-gray-500 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </summary>
+
+            <div class="px-4 pb-4 pt-1 border-t border-gray-700 space-y-3">
+                {% if call.error %}
+                <div>
+                    <div class="text-xs uppercase tracking-wide text-red-400 mb-1">Error</div>
+                    <pre class="bg-black/40 text-red-300 text-xs rounded-lg p-3 whitespace-pre-wrap break-words">{{ call.error }}</pre>
+                </div>
+                {% endif %}
+
+                {% if call.reply %}
+                <div>
+                    <div class="text-xs uppercase tracking-wide text-gray-400 mb-1">Reply</div>
+                    <div class="bg-gray-900 text-gray-100 text-sm rounded-lg p-3 whitespace-pre-wrap break-words">{{ call.reply }}</div>
+                </div>
+                {% endif %}
+
+                <div>
+                    <div class="text-xs uppercase tracking-wide text-gray-400 mb-1">Tool calls ({{ call.tool_calls|length }})</div>
+                    {% if call.tool_calls %}
+                    <div class="space-y-1.5">
+                        {% for t in call.tool_calls %}
+                        <div class="bg-gray-900 rounded-lg px-3 py-2 text-xs">
+                            <span class="text-gray-500">#{{ t.round }}</span>
+                            <span class="text-blue-300 font-mono font-semibold">{{ t.name }}</span>
+                            {% if t.args %}<span class="text-gray-400 font-mono break-all">({{ t.args }})</span>{% endif %}
+                            {% if t.note %}<span class="text-yellow-400 ml-1">— {{ t.note }}</span>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-gray-500 text-xs">No tools called — answered directly.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
