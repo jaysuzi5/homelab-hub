@@ -1,14 +1,18 @@
 import json
+import logging
 import re
 from openai import OpenAI
 from django.db import connection
 from config.utils import get_config
 from dashboard.services.status_overview import collect_status_overview
 from dashboard.services.k8s import collect_k8s_metrics_detailed
+from dashboard.services.backup_status import collect_backup_status_summary
+
+_log = logging.getLogger("dashboard.chatbot")
 
 _BASE_URL = "https://api.groq.com/openai/v1"
 _MODEL = "llama-3.3-70b-versatile"
-_MAX_TOOL_ROUNDS = 6
+_MAX_TOOL_ROUNDS = 8
 _SQL_ROW_LIMIT = 100
 
 _FORBIDDEN_SQL = re.compile(
@@ -36,6 +40,11 @@ k8s_overview tools — they already compute the live state. Database tables ofte
 HISTORY (e.g. every ping result over time), so a raw COUNT over them is not "now"; to \
 read current values from SQL you must take the latest row per entity. Use SQL mainly for \
 historical trends, totals, and details not covered by the status tools.
+
+IMPORTANT: backup status, AWS spending, and Claude Code usage are NOT in the database. \
+For backups (when the last backup ran, how old, which apps), call backup_status ONCE — \
+it returns the latest backup timestamp and age per app. For AWS spend or Claude usage, \
+call system_status. Never search the database for backups, AWS, or Claude.
 
 Be concise and factual. Lead with the answer. If something is wrong, say what and where. \
 If you lack data, say so rather than guessing."""
@@ -69,6 +78,10 @@ def _tool_k8s_overview(args):
                   for n in (d.get("nodes_info") or [])],
         "problem_pods": problems[:40],
     }
+
+
+def _tool_backup_status(args):
+    return collect_backup_status_summary()
 
 
 def _tool_list_tables(args):
@@ -125,6 +138,7 @@ def _tool_run_sql(args):
 _TOOLS = {
     "system_status": _tool_system_status,
     "k8s_overview": _tool_k8s_overview,
+    "backup_status": _tool_backup_status,
     "list_tables": _tool_list_tables,
     "describe_table": _tool_describe_table,
     "run_sql": _tool_run_sql,
@@ -144,6 +158,14 @@ _TOOL_SPECS = [
         "function": {
             "name": "k8s_overview",
             "description": "Kubernetes cluster state: pod phase counts, node readiness and CPU/memory, cluster alerts, and a list of problem pods (not Running or with restarts).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "backup_status",
+            "description": "Backup status for every app backed up to S3: per-app latest backup timestamp (last_modified), human age (age_label), freshness status, and which is the primary (homelab-hub). Use this for any question about backups — when the last backup ran, how old it is, or whether backups are healthy.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -199,8 +221,10 @@ def answer_question(history):
         if role in ("user", "assistant") and content:
             messages.append({"role": role, "content": content})
 
+    last_user = next((t.get("content") for t in reversed(history) if t.get("role") == "user"), "")
+    _log.info("chat start: %r", last_user)
     try:
-        for _ in range(_MAX_TOOL_ROUNDS):
+        for round_idx in range(_MAX_TOOL_ROUNDS):
             resp = client.chat.completions.create(
                 model=_MODEL,
                 messages=messages,
@@ -212,6 +236,7 @@ def answer_question(history):
             msg = resp.choices[0].message
 
             if not msg.tool_calls:
+                _log.info("chat done in %d round(s): %r", round_idx + 1, (msg.content or "")[:200])
                 return {"reply": msg.content or "", "error": None}
 
             messages.append({
@@ -230,6 +255,7 @@ def answer_question(history):
                     args = json.loads(tc.function.arguments or "{}")
                 except Exception:
                     args = {}
+                _log.info("round %d tool: %s args=%s", round_idx + 1, tc.function.name, _serialize(args)[:300])
                 result = fn(args) if fn else {"error": f"Unknown tool {tc.function.name}"}
                 messages.append({
                     "role": "tool",
@@ -237,6 +263,9 @@ def answer_question(history):
                     "content": _serialize(result),
                 })
 
+        tools_used = [m.get("tool_calls") for m in messages if m.get("role") == "assistant" and m.get("tool_calls")]
+        _log.warning("chat hit max rounds (%d) for %r; tool batches=%d", _MAX_TOOL_ROUNDS, last_user, len(tools_used))
         return {"reply": "I wasn't able to finish answering that — too many tool steps.", "error": None}
     except Exception as e:
+        _log.exception("chat error for %r", last_user)
         return {"reply": "", "error": str(e)}
