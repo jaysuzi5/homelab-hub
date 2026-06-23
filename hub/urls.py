@@ -11,7 +11,7 @@ from dashboard.views import (
     otel_metrics_overview, otel_metrics_query_view,
     card_k8s, card_synology, card_claude, card_network,
     card_emporia_chart, card_emporia_daily, card_splunk, card_weather,
-    card_aws_billing, card_aws_billing_refresh,
+    card_aws_billing, card_aws_billing_refresh, card_backup,
 )
 
 urlpatterns = [
@@ -46,4 +46,5 @@ urlpatterns = [
     path('dashboard/api/card/weather/', card_weather, name='card_weather'),
     path('dashboard/api/card/aws-billing/', card_aws_billing, name='card_aws_billing'),
     path('dashboard/api/card/aws-billing/refresh/', card_aws_billing_refresh, name='card_aws_billing_refresh'),
+    path('dashboard/api/card/backup/', card_backup, name='card_backup'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -15,6 +15,7 @@ from dashboard.services.tempo import tempo_services, tempo_recent_traces, tempo_
 from dashboard.services.prometheus_svc import prom_instant_query, prom_range_query
 from dashboard.services.weather import collect_weather_summary
 from dashboard.services.aws_billing import collect_aws_billing_summary
+from dashboard.services.backup_status import collect_backup_status_summary
 from claude_usage.services import collect_claude_dashboard_summary
 from monitoring.services import collect_host_status
 from config.utils import get_config
@@ -122,6 +123,15 @@ def card_aws_billing(request):
         billing = collect_aws_billing_summary()
     return render(request, "dashboard/partials/_card_aws_billing.html", {
         "billing": billing,
+    })
+
+
+@login_required
+def card_backup(request):
+    with _tracer.start_as_current_span("card.backup"):
+        backup = collect_backup_status_summary()
+    return render(request, "dashboard/partials/_card_backup.html", {
+        "backup": backup,
     })
 
 

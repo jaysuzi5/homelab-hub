@@ -1,0 +1,77 @@
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+        <span>Backup Status</span>
+        <span class="text-sm text-gray-400 font-normal">{{ backup.bucket }}</span>
+    </h3>
+
+    {% if backup.error %}
+    <p class="text-red-400 text-sm">Unable to read backups: {{ backup.error }}</p>
+    {% else %}
+
+    {% if backup.primary %}
+    {% with p=backup.primary %}
+    <div class="rounded-lg p-4 mb-4 {% if p.status == 'ok' %}bg-green-800{% elif p.status == 'warn' %}bg-yellow-700{% else %}bg-red-800{% endif %}">
+        <div class="flex justify-between items-center">
+            <div>
+                <span class="text-lg font-bold">{{ p.app }}</span>
+                <span class="ml-2 text-sm text-gray-200">
+                    {% if p.status == 'ok' %}Last backup successful{% elif p.status == 'warn' %}Backup aging{% else %}Backup overdue{% endif %}
+                </span>
+            </div>
+            <span class="text-2xl">
+                {% if p.status == 'ok' %}&#10003;{% else %}&#9888;{% endif %}
+            </span>
+        </div>
+        <div class="mt-2 text-sm text-gray-200">
+            <span class="font-semibold">{{ p.age_label }}</span> &middot; {{ p.last_modified }}
+        </div>
+        <div class="text-xs text-gray-300 mt-1">
+            {{ p.count }} file{{ p.count|pluralize }} &middot; {{ p.size_mb }} MB total
+        </div>
+    </div>
+    {% endwith %}
+    {% endif %}
+
+    <h4 class="text-md font-semibold text-gray-200 mb-2">Other Applications</h4>
+    {% if backup.others %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-2 py-1">Application</th>
+                    <th class="px-2 py-1 text-center">Latest</th>
+                    <th class="px-2 py-1 text-center">Files</th>
+                    <th class="px-2 py-1 text-center">Size</th>
+                    <th class="px-2 py-1 text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in backup.others %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700">
+                    <td class="px-2 py-1">{{ a.app }}</td>
+                    <td class="px-2 py-1 text-center" title="{{ a.last_modified }}">{{ a.age_label }}</td>
+                    <td class="px-2 py-1 text-center">{{ a.count }}</td>
+                    <td class="px-2 py-1 text-center">{{ a.size_mb }} MB</td>
+                    <td class="px-2 py-1 text-center">
+                        {% if a.status == 'ok' %}
+                            <span class="text-green-400 font-semibold">OK</span>
+                        {% elif a.status == 'warn' %}
+                            <span class="text-yellow-400 font-semibold">Aging</span>
+                        {% else %}
+                            <span class="text-red-400 font-semibold">Stale</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm">No other applications backing up to this bucket.</p>
+    {% endif %}
+
+    {% if backup.cached_at %}
+    <p class="text-xs text-gray-500 mt-3">Cached {{ backup.cached_at }}{% if backup.stale %} (stale){% endif %}</p>
+    {% endif %}
+    {% endif %}
+</div>
