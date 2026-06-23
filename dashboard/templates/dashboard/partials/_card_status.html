@@ -1,0 +1,42 @@
+<div class="rounded-2xl shadow p-6 {% if status.overall == 'ok' %}bg-green-900{% elif status.overall == 'warn' %}bg-yellow-900{% else %}bg-red-900{% endif %}">
+    <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+        <span>System Status</span>
+        <span class="text-2xl">
+            {% if status.overall == 'ok' %}&#10003;{% else %}&#9888;{% endif %}
+        </span>
+    </h3>
+
+    {% if status.issues %}
+    <div class="mb-4">
+        <p class="text-sm font-semibold text-gray-200 mb-2">
+            {{ status.issues|length }} issue{{ status.issues|length|pluralize }} need attention
+        </p>
+        <ul class="space-y-2">
+            {% for issue in status.issues %}
+            <li class="flex items-start gap-2 text-sm bg-black/25 rounded-lg px-3 py-2">
+                <span class="mt-0.5 {% if issue.severity == 'critical' %}text-red-400{% else %}text-yellow-300{% endif %}">
+                    {% if issue.severity == 'critical' %}&#9679;{% else %}&#9650;{% endif %}
+                </span>
+                <span class="text-gray-100">
+                    <span class="font-semibold">{{ issue.source }}:</span> {{ issue.message }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% else %}
+    <p class="text-green-200 text-sm mb-4 font-semibold">All systems normal.</p>
+    {% endif %}
+
+    <div class="border-t border-white/15 pt-3 space-y-1.5">
+        {% for check in status.checks %}
+        <div class="flex justify-between items-center text-sm">
+            <span class="flex items-center gap-2">
+                <span class="{% if check.status == 'ok' %}text-green-400{% elif check.status == 'warn' %}text-yellow-300{% else %}text-red-400{% endif %}">&#9679;</span>
+                <span class="text-gray-100">{{ check.name }}</span>
+            </span>
+            <span class="text-gray-300 text-xs">{{ check.detail }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>

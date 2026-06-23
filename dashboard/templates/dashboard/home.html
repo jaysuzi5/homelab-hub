@@ -49,6 +49,17 @@
         </div>
     </div>
 
+    <!-- Upper-right: aggregated system status -->
+    <div id="card-status" data-url="{% url 'card_status' %}" class="bg-gray-800 rounded-2xl shadow p-6">
+        <div class="animate-pulse space-y-3">
+            <div class="h-6 bg-gray-700 rounded w-1/2"></div>
+            <div class="h-16 bg-gray-700 rounded w-full"></div>
+            <div class="h-4 bg-gray-700 rounded w-full"></div>
+            <div class="h-4 bg-gray-700 rounded w-5/6"></div>
+            <div class="h-4 bg-gray-700 rounded w-2/3"></div>
+        </div>
+    </div>
+
     <div id="card-synology" data-url="{% url 'card_synology' %}" class="bg-gray-800 rounded-2xl shadow p-6">
         <div class="animate-pulse space-y-3">
             <div class="h-6 bg-gray-700 rounded w-3/4"></div>
@@ -178,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    ['card-aws-billing', 'card-claude', 'card-k8s', 'card-synology', 'card-network',
+    ['card-status', 'card-aws-billing', 'card-claude', 'card-k8s', 'card-synology', 'card-network',
      'card-emporia-chart', 'card-emporia-daily', 'card-backup', 'card-splunk', 'card-weather'].forEach(loadCard);
 });
 </script>
