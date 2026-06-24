@@ -9,12 +9,12 @@
     </h3>
 
     <div class="grid grid-cols-4 gap-2 text-center mb-4">
-        <div class="rounded p-2 {% if network_metrics.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
-            <span class="font-bold">{{ network_metrics.tcp_latency|floatformat:1 }} ms</span><br>
+        <div class="rounded p-2 {% if network_metrics.tcp_latency_timeout or network_metrics.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
+            <span class="font-bold">{% if network_metrics.tcp_latency_timeout %}Timeout{% else %}{{ network_metrics.tcp_latency|floatformat:1 }} ms{% endif %}</span><br>
             <span class="text-gray-300 text-sm">TCP Latency</span>
         </div>
-        <div class="rounded p-2 {% if network_metrics.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
-            <span class="font-bold">{{ network_metrics.internet_ping|floatformat:1 }} ms</span><br>
+        <div class="rounded p-2 {% if network_metrics.internet_ping_timeout or network_metrics.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
+            <span class="font-bold">{% if network_metrics.internet_ping_timeout %}Timeout{% else %}{{ network_metrics.internet_ping|floatformat:1 }} ms{% endif %}</span><br>
             <span class="text-gray-300 text-sm">Ping</span>
         </div>
         <div class="rounded p-2 {% if network_metrics.internet_download < 250 %}bg-red-700{% else %}bg-green-700{% endif %}">

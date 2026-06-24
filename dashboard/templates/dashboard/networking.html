@@ -26,15 +26,15 @@
         <!-- Current Metrics Grid -->
         {% if network_metrics %}
         <div class="grid grid-cols-4 gap-4 mb-4">
-            <div class="rounded p-4 {% if network_metrics.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
+            <div class="rounded p-4 {% if network_metrics.tcp_latency_timeout or network_metrics.tcp_latency > 5 %}bg-red-700{% else %}bg-green-700{% endif %}">
                 <span class="font-bold text-2xl">
-                    {{ network_metrics.tcp_latency|floatformat:1 }} ms
+                    {% if network_metrics.tcp_latency_timeout %}Timeout{% else %}{{ network_metrics.tcp_latency|floatformat:1 }} ms{% endif %}
                 </span><br>
                 <span class="text-gray-300 text-sm">TCP Latency</span>
             </div>
-            <div class="rounded p-4 {% if network_metrics.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
+            <div class="rounded p-4 {% if network_metrics.internet_ping_timeout or network_metrics.internet_ping > 50 %}bg-red-700{% else %}bg-green-700{% endif %}">
                 <span class="font-bold text-2xl">
-                    {{ network_metrics.internet_ping|floatformat:1 }} ms
+                    {% if network_metrics.internet_ping_timeout %}Timeout{% else %}{{ network_metrics.internet_ping|floatformat:1 }} ms{% endif %}
                 </span><br>
                 <span class="text-gray-300 text-sm">Ping</span>
             </div>

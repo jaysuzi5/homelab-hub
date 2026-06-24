@@ -5,6 +5,10 @@ from urllib.parse import urlparse, urlunparse
 
 NETWORK_URL = get_config("NETWORK_URL")
 
+# Collector writes a large sentinel (~1,800,000 ms = 30 min) when a ping/speedtest
+# times out. Any value at or above this threshold is a timeout, not a real latency.
+_TIMEOUT_MS = 10000
+
 
 def _get_metrics():
     """
@@ -75,10 +79,22 @@ def _get_metrics():
             if result['internet_upload'] is None and record.get('internet_upload') is not None:
                 result['internet_upload'] = record.get('internet_upload')
 
-        # Set defaults for any metrics still null
-        if result['tcp_latency'] is None:
+        # Flag timeout sentinels and blank the value so the UI shows "Timeout"
+        result['tcp_latency_timeout'] = (
+            result['tcp_latency'] is not None and result['tcp_latency'] >= _TIMEOUT_MS
+        )
+        result['internet_ping_timeout'] = (
+            result['internet_ping'] is not None and result['internet_ping'] >= _TIMEOUT_MS
+        )
+        if result['tcp_latency_timeout']:
+            result['tcp_latency'] = None
+        if result['internet_ping_timeout']:
+            result['internet_ping'] = None
+
+        # Set defaults for any metrics still null (but keep None for timeouts)
+        if result['tcp_latency'] is None and not result['tcp_latency_timeout']:
             result['tcp_latency'] = 0
-        if result['internet_ping'] is None:
+        if result['internet_ping'] is None and not result['internet_ping_timeout']:
             result['internet_ping'] = 0
         if result['internet_download'] is None:
             result['internet_download'] = 0
@@ -206,9 +222,9 @@ def _get_metrics_by_month(year, month):
                     daily_data[date_only]["download"].append(download)
                 if upload is not None:
                     daily_data[date_only]["upload"].append(upload)
-                if ping is not None:
+                if ping is not None and ping < _TIMEOUT_MS:
                     daily_data[date_only]["ping"].append(ping)
-                if tcp_latency is not None:
+                if tcp_latency is not None and tcp_latency < _TIMEOUT_MS:
                     daily_data[date_only]["tcp_latency"].append(tcp_latency)
 
         # Calculate averages for each day
