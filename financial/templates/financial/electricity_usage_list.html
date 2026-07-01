@@ -33,6 +33,36 @@
     </div>
 </div>
 
+<!-- Solar Payoff Stats -->
+<div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-sm">Cost of Solar</p>
+        <p class="text-3xl font-bold text-red-400">${{ cost_of_solar|floatformat:0|intcomma }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-sm">Total Solar Savings</p>
+        <p class="text-3xl font-bold text-green-400">${{ total_savings|floatformat:0|intcomma }}</p>
+        <p class="text-gray-400 text-xs mt-1">lifetime</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-sm">Total Credits</p>
+        <p class="text-3xl font-bold text-green-400">${{ total_credits|floatformat:0|intcomma }}</p>
+        <p class="text-gray-400 text-xs mt-1">lifetime</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-sm">Net Cost of Solar</p>
+        <p class="text-3xl font-bold text-yellow-400">${{ net_cost_of_solar|floatformat:0|intcomma }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-sm">Total Years to Payoff</p>
+        <p class="text-3xl font-bold text-white">{{ total_years_payoff|floatformat:1|default:"—" }}</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl shadow p-5">
+        <p class="text-gray-400 text-sm">Remaining Years to Payoff</p>
+        <p class="text-3xl font-bold text-white">{{ remaining_years_payoff|floatformat:1|default:"—" }}</p>
+    </div>
+</div>
+
 <!-- Charts -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <div class="bg-gray-800 rounded-2xl shadow p-6" style="min-height: 24rem;">

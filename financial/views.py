@@ -339,6 +339,21 @@ def electricity_usage_list(request):
     year_cost = sum(r.total_cost or 0 for r in year_records)
     year_savings = sum(r.savings_plus_credits or 0 for r in year_records)
 
+    # Solar payoff stats
+    cost_of_solar = 16435.0
+    solar_start = date_type(2022, 11, 1)
+    total_savings = float(sum(r.savings or 0 for r in records))
+    total_credits = float(sum(r.credits or 0 for r in records))
+    net_cost_of_solar = cost_of_solar - total_savings - total_credits
+
+    today = datetime.now().date()
+    months_elapsed = (today.year - solar_start.year) * 12 + (today.month - solar_start.month)
+    months_elapsed = max(months_elapsed, 1)
+    avg_monthly = (total_savings + total_credits) / months_elapsed
+    annual_rate = avg_monthly * 12
+    total_years_payoff = cost_of_solar / annual_rate if annual_rate else None
+    remaining_years_payoff = net_cost_of_solar / annual_rate if annual_rate else None
+
     context = {
         'records': records,
         'chart_data': json.dumps(chart_data, cls=DjangoJSONEncoder),
@@ -349,6 +364,12 @@ def electricity_usage_list(request):
         'year_produced': year_produced,
         'year_cost': year_cost,
         'year_savings': year_savings,
+        'cost_of_solar': cost_of_solar,
+        'total_savings': total_savings,
+        'total_credits': total_credits,
+        'net_cost_of_solar': net_cost_of_solar,
+        'total_years_payoff': total_years_payoff,
+        'remaining_years_payoff': remaining_years_payoff,
     }
 
     return render(request, "financial/electricity_usage_list.html", context)
