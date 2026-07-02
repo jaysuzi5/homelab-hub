@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: homelab-hub-pull-agent-calls
+  namespace: homelab-hub
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pull-agent-calls
+              image: jaysuzi5/homelab-hub:latest
+              imagePullPolicy: Always
+              command: ["python", "manage.py", "pull_agent_calls"]
+              envFrom:
+                - configMapRef:
+                    name: homelab-config
+                - secretRef:
+                    name: homelab-hub-secrets

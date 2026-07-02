@@ -12,6 +12,13 @@
         <form method="get" class="flex items-center gap-2 flex-wrap">
             <input type="text" name="q" value="{{ q }}" placeholder="Search questions…"
                    class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <select name="source" onchange="this.form.submit()"
+                    class="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="">All sources</option>
+                {% for s in sources %}
+                <option value="{{ s }}" {% if source == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
             <label class="flex items-center gap-1.5 text-gray-300 text-sm">
                 <input type="checkbox" name="errors" value="1" {% if only_errors %}checked{% endif %}
                        onchange="this.form.submit()" class="rounded bg-gray-700 border-gray-600">
@@ -47,7 +54,8 @@
                 <span class="mt-1 w-2 h-2 rounded-full flex-shrink-0 {% if call.error %}bg-red-500{% else %}bg-green-500{% endif %}"></span>
                 <div class="flex-1 min-w-0">
                     <div class="text-white font-medium truncate">{{ call.question|default:"(empty)" }}</div>
-                    <div class="text-gray-400 text-xs mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                    <div class="text-gray-400 text-xs mt-1 flex flex-wrap gap-x-3 gap-y-0.5 items-center">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide {% if call.source == 'money-tracker' %}bg-purple-900 text-purple-200{% else %}bg-blue-900 text-blue-200{% endif %}">{{ call.source }}</span>
                         <span>{{ call.created_at|date:"M j, Y g:i A" }}</span>
                         <span>{{ call.rounds }} round{{ call.rounds|pluralize }}</span>
                         <span>{{ call.tool_calls|length }} tool call{{ call.tool_calls|length|pluralize }}</span>

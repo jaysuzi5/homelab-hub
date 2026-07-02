@@ -157,18 +157,24 @@ def telemetry_agent_calls(request):
     from dashboard.models import AgentCall
     q = (request.GET.get("q") or "").strip()
     only_errors = request.GET.get("errors") == "1"
+    source = (request.GET.get("source") or "").strip()
     calls = AgentCall.objects.all()
     if q:
         calls = calls.filter(question__icontains=q)
     if only_errors:
         calls = calls.exclude(error="")
+    if source:
+        calls = calls.filter(source=source)
     calls = list(calls[:200])
     total = AgentCall.objects.count()
     error_count = AgentCall.objects.exclude(error="").count()
+    sources = list(AgentCall.objects.order_by("source").values_list("source", flat=True).distinct())
     return render(request, "dashboard/telemetry_agent_calls.html", {
         "calls": calls,
         "q": q,
         "only_errors": only_errors,
+        "source": source,
+        "sources": sources,
         "total": total,
         "error_count": error_count,
     })
