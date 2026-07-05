@@ -4,7 +4,10 @@ from collections import defaultdict
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .models import WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, ACTIVITY_CHOICES, YARDS_PER_MILE
+from .models import WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, StepEntry, ACTIVITY_CHOICES, YARDS_PER_MILE
+
+STEP_GOAL = 50000
+WEEKS_PER_PAGE = 52
 
 ACTIVITIES = [a[0] for a in ACTIVITY_CHOICES]
 ACTIVITY_LABELS = dict(ACTIVITY_CHOICES)
@@ -365,4 +368,110 @@ def exercise_edit(request, pk):
         'activity_choices': ACTIVITY_CHOICES,
         'display_distance': display_distance,
         'week_str': week_str,
+    })
+
+
+# ── steps views ─────────────────────────────────────────────────────────────
+
+def week_start_sunday(d):
+    """Return the Sunday that starts the week containing date d."""
+    return d - timedelta(days=(d.weekday() + 1) % 7)
+
+
+def steps_week_label(ws):
+    return f"{ws.strftime('%b %d')} – {(ws + timedelta(days=6)).strftime('%b %d, %Y')}"
+
+
+@login_required
+def steps_save(request):
+    """Upsert a single day's step count. Used by the entry form and per-day edits."""
+    if request.method == 'POST':
+        entry_date = request.POST.get('date', '').strip()
+        steps_raw = request.POST.get('steps', '').strip()
+        try:
+            steps_val = int(steps_raw)
+            if steps_val < 0:
+                raise ValueError
+            if not entry_date:
+                raise ValueError
+            StepEntry.objects.update_or_create(
+                user=request.user,
+                date=entry_date,
+                defaults={'steps': steps_val},
+            )
+        except (ValueError, TypeError):
+            messages.error(request, 'Please enter a valid step count.')
+    page = request.POST.get('_page', '').strip()
+    return redirect(f"/health/steps/?page={page}" if page else '/health/steps/')
+
+
+@login_required
+def steps_list(request):
+    entries = list(StepEntry.objects.filter(user=request.user))
+    steps_by_date = {e.date: e.steps for e in entries}
+    today = date.today()
+
+    cur_ws = week_start_sunday(today)
+    cur_total = sum(s for d, s in steps_by_date.items() if cur_ws <= d <= cur_ws + timedelta(days=6))
+    cur_pct = min(100, round(cur_total / STEP_GOAL * 100)) if STEP_GOAL else 0
+
+    first_ws = week_start_sunday(min(steps_by_date)) if steps_by_date else cur_ws
+
+    weeks = []
+    ws = cur_ws
+    while ws >= first_ws:
+        we = ws + timedelta(days=6)
+        days = []
+        recorded = []
+        for i in range(7):
+            d = ws + timedelta(days=i)
+            s = steps_by_date.get(d)
+            days.append({'date': d.isoformat(), 'label': d.strftime('%a %b %d'), 'steps': s})
+            if s is not None:
+                recorded.append((d, s))
+        total = sum(s for _, s in recorded)
+        low = min(recorded, key=lambda x: x[1]) if recorded else None
+        high = max(recorded, key=lambda x: x[1]) if recorded else None
+        weeks.append({
+            'week_start': ws.isoformat(),
+            'label': steps_week_label(ws),
+            'total': total,
+            'pct': min(100, round(total / STEP_GOAL * 100)) if STEP_GOAL else 0,
+            'low_steps': low[1] if low else None,
+            'low_date': low[0].strftime('%a %b %d') if low else None,
+            'high_steps': high[1] if high else None,
+            'high_date': high[0].strftime('%a %b %d') if high else None,
+            'days': days,
+        })
+        ws -= timedelta(days=7)
+
+    try:
+        page = max(1, int(request.GET.get('page', 1)))
+    except (ValueError, TypeError):
+        page = 1
+    total_pages = max(1, (len(weeks) + WEEKS_PER_PAGE - 1) // WEEKS_PER_PAGE)
+    page = min(page, total_pages)
+    start = (page - 1) * WEEKS_PER_PAGE
+    page_weeks = weeks[start:start + WEEKS_PER_PAGE]
+
+    # Chart: oldest→newest across the current page
+    chart_weeks = list(reversed(page_weeks))
+    chart_data = [{'label': w['label'], 'total': w['total']} for w in chart_weeks]
+
+    return render(request, 'health/steps.html', {
+        'today': today.isoformat(),
+        'goal': STEP_GOAL,
+        'cur_total': cur_total,
+        'cur_pct': cur_pct,
+        'cur_remaining': max(0, STEP_GOAL - cur_total),
+        'cur_label': steps_week_label(cur_ws),
+        'page_weeks': page_weeks,
+        'weeks_json': json.dumps(page_weeks),
+        'chart_data': json.dumps(chart_data),
+        'page': page,
+        'total_pages': total_pages,
+        'has_prev': page > 1,
+        'has_next': page < total_pages,
+        'prev_page': page - 1,
+        'next_page': page + 1,
     })

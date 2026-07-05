@@ -124,6 +124,7 @@
                     </svg>
                 </button>
                 <div id="health-submenu" class="ml-4 mt-1 space-y-1 hidden">
+                    <a href="{% url 'steps_list' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Steps</a>
                     <a href="{% url 'weight_list' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Weight</a>
                     <a href="{% url 'exercise' %}" onclick="closeSidebarOnMobile()" class="block hover:bg-gray-700 p-2 rounded text-sm">Exercise</a>
                 </div>

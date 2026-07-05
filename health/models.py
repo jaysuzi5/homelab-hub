@@ -49,6 +49,23 @@ class WeightChartPrefs(models.Model):
         return f"{self.user} weight chart prefs"
 
 
+class StepEntry(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='step_entries',
+    )
+    date = models.DateField()
+    steps = models.PositiveIntegerField(help_text="Steps taken that day")
+
+    class Meta:
+        ordering = ['-date']
+        unique_together = ['user', 'date']
+
+    def __str__(self):
+        return f"{self.user} — {self.date}: {self.steps} steps"
+
+
 YARDS_PER_MILE = 1760
 
 ACTIVITY_CHOICES = [

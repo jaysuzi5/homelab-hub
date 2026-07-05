@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-semibold">Step Tracker</h2>
+</div>
+
+{% if messages %}
+{% for message in messages %}
+<div class="mb-4 text-sm text-red-400">{{ message }}</div>
+{% endfor %}
+{% endif %}
+
+<!-- Daily Entry (mobile-first, top of page) -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">Log Steps</h3>
+    <form method="post" action="{% url 'steps_save' %}" class="flex flex-col sm:flex-row sm:items-end gap-4">
+        {% csrf_token %}
+        <input type="hidden" name="_page" value="{{ page }}">
+        <div class="flex-1">
+            <label class="block text-gray-400 text-sm mb-1" for="date">Date</label>
+            <input type="date" id="date" name="date" value="{{ today }}" required
+                class="w-full bg-gray-700 text-white text-lg rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="flex-1">
+            <label class="block text-gray-400 text-sm mb-1" for="steps">Steps</label>
+            <input type="number" id="steps" name="steps" inputmode="numeric" pattern="[0-9]*" min="0" max="200000"
+                placeholder="e.g. 8500" required
+                class="w-full bg-gray-700 text-white text-lg rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <button type="submit"
+            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold px-6 py-3 rounded-lg transition">
+            Save
+        </button>
+    </form>
+    <p class="text-gray-500 text-xs mt-3">Re-entering a date overwrites that day. Edit past days by clicking a week in the table below.</p>
+</div>
+
+<!-- Current Week Running Total -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <div class="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+        <div>
+            <p class="text-gray-400 text-sm">This Week ({{ cur_label }})</p>
+            <p class="text-4xl font-bold {% if cur_total >= goal %}text-green-400{% else %}text-blue-400{% endif %}">
+                {{ cur_total|stringformat:"d" }}<span class="text-xl text-gray-400"> / {{ goal }}</span>
+            </p>
+        </div>
+        <p class="text-gray-400 text-sm">
+            {% if cur_total >= goal %}Goal reached! 🎉{% else %}{{ cur_remaining }} to go{% endif %}
+        </p>
+    </div>
+    <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
+        <div class="h-4 {% if cur_total >= goal %}bg-green-500{% else %}bg-blue-500{% endif %} transition-all"
+             style="width: {{ cur_pct }}%"></div>
+    </div>
+</div>
+
+<!-- Weekly Chart -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">Steps per Week <span class="text-sm font-normal text-gray-400">(goal {{ goal }})</span></h3>
+    <div class="w-full h-72">
+        <canvas id="stepsChart" class="w-full h-full"></canvas>
+    </div>
+</div>
+
+<!-- Weekly Table -->
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h3 class="text-xl font-bold">Weekly History <span class="text-sm font-normal text-gray-400 ml-2">— click a column to sort, a row to edit</span></h3>
+        <div class="text-gray-400 text-sm">Page {{ page }} of {{ total_pages }}</div>
+    </div>
+    <div class="overflow-x-auto">
+        <table id="weekTable" class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-400 text-sm border-b border-gray-700">
+                    <th class="px-4 py-2 cursor-pointer hover:text-white select-none" onclick="sortWeeks(0,'date')">Week <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(1,'num')">Total Steps <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(2,'num')">Lowest Day <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(3,'num')">Highest Day <span class="sort-icon">↕</span></th>
+                </tr>
+            </thead>
+            <tbody id="weekTbody">
+                {% for w in page_weeks %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700 cursor-pointer"
+                    data-idx="{{ forloop.counter0 }}" onclick="openWeek({{ forloop.counter0 }})">
+                    <td class="px-4 py-3 font-semibold" data-val="{{ w.week_start }}">{{ w.label }}</td>
+                    <td class="px-4 py-3 text-right font-bold {% if w.total >= goal %}text-green-400{% else %}text-white{% endif %}" data-val="{{ w.total }}">{{ w.total }}</td>
+                    <td class="px-4 py-3 text-right" data-val="{{ w.low_steps|default:'-1' }}">
+                        {% if w.low_steps is not None %}{{ w.low_steps }}<span class="text-gray-500 text-xs block">{{ w.low_date }}</span>{% else %}—{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right" data-val="{{ w.high_steps|default:'-1' }}">
+                        {% if w.high_steps is not None %}{{ w.high_steps }}<span class="text-gray-500 text-xs block">{{ w.high_date }}</span>{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">No steps logged yet. Use the form above.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="flex items-center justify-between mt-4">
+        {% if has_prev %}
+        <a href="?page={{ prev_page }}" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-4 py-2 rounded-lg">← Newer</a>
+        {% else %}<span></span>{% endif %}
+        {% if has_next %}
+        <a href="?page={{ next_page }}" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-4 py-2 rounded-lg">Older →</a>
+        {% else %}<span></span>{% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Week Detail Modal -->
+<div id="weekModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4" onclick="if(event.target===this)closeWeek()">
+    <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 id="modalTitle" class="text-lg font-bold text-white"></h3>
+            <button onclick="closeWeek()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        <p class="text-gray-400 text-sm mb-4">Week total: <span id="modalTotal" class="text-white font-semibold"></span></p>
+        <div id="modalDays" class="space-y-2"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const weeksData = {{ weeks_json|safe }};
+    const chartData = {{ chart_data|safe }};
+    const GOAL = {{ goal }};
+    const CUR_PAGE = "{{ page }}";
+    const CSRF = "{{ csrf_token }}";
+
+    // ── Chart ──
+    if (chartData.length) {
+        const ctx = document.getElementById('stepsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.map(d => d.label),
+                datasets: [
+                    {
+                        label: 'Weekly Steps',
+                        data: chartData.map(d => d.total),
+                        backgroundColor: chartData.map(d => d.total >= GOAL ? 'rgba(34,197,94,0.7)' : 'rgba(59,130,246,0.7)'),
+                        borderRadius: 4,
+                        order: 2,
+                    },
+                    {
+                        label: 'Goal',
+                        type: 'line',
+                        data: chartData.map(() => GOAL),
+                        borderColor: 'rgba(249,115,22,1)',
+                        borderDash: [8, 4],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        order: 1,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: 'white', font: { size: 10 }, maxRotation: 60, minRotation: 45 }, grid: { display: false } },
+                    y: { beginAtZero: true, ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                },
+                plugins: {
+                    legend: { labels: { color: 'white', usePointStyle: true } },
+                    tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.parsed.y.toLocaleString() } }
+                }
+            }
+        });
+    }
+
+    // ── Sorting ──
+    let sortState = {};
+    function sortWeeks(col, type) {
+        const tbody = document.getElementById('weekTbody');
+        const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.querySelector('[data-val]'));
+        const asc = !(sortState[col] === 'asc');
+        sortState = { [col]: asc ? 'asc' : 'desc' };
+        rows.sort((a, b) => {
+            let x = a.children[col].getAttribute('data-val');
+            let y = b.children[col].getAttribute('data-val');
+            if (type === 'num') { x = parseFloat(x); y = parseFloat(y); }
+            if (x < y) return asc ? -1 : 1;
+            if (x > y) return asc ? 1 : -1;
+            return 0;
+        });
+        rows.forEach(r => tbody.appendChild(r));
+    }
+
+    // ── Week detail modal ──
+    function openWeek(idx) {
+        const w = weeksData[idx];
+        if (!w) return;
+        document.getElementById('modalTitle').textContent = w.label;
+        document.getElementById('modalTotal').textContent = w.total.toLocaleString();
+        const container = document.getElementById('modalDays');
+        container.innerHTML = '';
+        w.days.forEach(day => {
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.action = "{% url 'steps_save' %}";
+            form.className = 'flex items-center gap-2 bg-gray-700 rounded-lg px-3 py-2';
+            form.innerHTML = `
+                <input type="hidden" name="csrfmiddlewaretoken" value="${CSRF}">
+                <input type="hidden" name="date" value="${day.date}">
+                <input type="hidden" name="_page" value="${CUR_PAGE}">
+                <span class="text-gray-300 text-sm w-28 flex-shrink-0">${day.label}</span>
+                <input type="number" name="steps" inputmode="numeric" min="0" max="200000"
+                    value="${day.steps === null ? '' : day.steps}" placeholder="—"
+                    class="flex-1 bg-gray-800 text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded flex-shrink-0">Save</button>
+            `;
+            container.appendChild(form);
+        });
+        const m = document.getElementById('weekModal');
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+    }
+    function closeWeek() {
+        const m = document.getElementById('weekModal');
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+    }
+</script>
+
+{% endblock %}
