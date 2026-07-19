@@ -142,6 +142,13 @@ def weight_list(request):
     lowest = min(entries, key=lambda e: e.weight) if entries else None
     highest = max(entries, key=lambda e: e.weight) if entries else None
 
+    weight_loss = float(highest.weight) - float(latest.weight) if entries else None
+    if entries and len(entries) > 1:
+        oldest = entries[-1]
+        avg_loss_per_week = (float(oldest.weight) - float(latest.weight)) / (len(entries) - 1)
+    else:
+        avg_loss_per_week = None
+
     return render(request, 'health/weight.html', {
         'entries_with_change': entries_with_change,
         'chart_data': chart_data,
@@ -153,6 +160,8 @@ def weight_list(request):
         'latest': latest,
         'lowest': lowest,
         'highest': highest,
+        'weight_loss': weight_loss,
+        'avg_loss_per_week': avg_loss_per_week,
         'total_entries': len(entries),
     })
 
