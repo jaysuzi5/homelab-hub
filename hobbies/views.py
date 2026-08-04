@@ -186,7 +186,7 @@ def book_search(request):
 
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'HomelabHub/1.0 (jaysuzi5@gmail.com)'})
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
     except Exception:
         return JsonResponse({'results': [], 'error': 'Search failed'})
@@ -217,7 +217,7 @@ def book_works(request):
     url = f"https://openlibrary.org{key}.json"
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'HomelabHub/1.0 (jaysuzi5@gmail.com)'})
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
     except Exception:
         return JsonResponse({'summary': ''})
