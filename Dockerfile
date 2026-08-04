@@ -33,4 +33,4 @@ EXPOSE 8000
 
 # Command to run the application using Gunicorn
 # Adjust 'your_project_name.wsgi' to your actual project name
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "hub.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--timeout", "60", "hub.wsgi:application"]
