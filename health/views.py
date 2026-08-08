@@ -5,7 +5,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .models import (WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, StepEntry, StepPrefs,
-                     ACTIVITY_CHOICES, YARDS_PER_MILE, DEFAULT_STEPS_PER_MILE)
+                     ACTIVITY_CHOICES, YARDS_PER_MILE, DEFAULT_STEPS_PER_MILE,
+                     DEFAULT_STEPS_PER_BIKE_MILE)
 
 STEP_GOAL = 50000
 WEEKS_PER_PAGE = 52
@@ -392,30 +393,36 @@ def steps_week_label(ws):
     return f"{ws.strftime('%b %d')} – {(ws + timedelta(days=6)).strftime('%b %d, %Y')}"
 
 
-def steps_per_mile_for(user):
+def step_prefs_for(user):
     prefs = StepPrefs.objects.filter(user=user).first()
-    return prefs.steps_per_mile if prefs else DEFAULT_STEPS_PER_MILE
+    if prefs:
+        return prefs.steps_per_mile, prefs.steps_per_bike_mile
+    return DEFAULT_STEPS_PER_MILE, DEFAULT_STEPS_PER_BIKE_MILE
 
 
 def steps_to_miles(steps, spm):
     return round(steps / spm, 2) if spm else 0
 
 
+def bike_miles_to_steps(bike_miles, spbm):
+    return int(round(float(bike_miles) * spbm))
+
+
 @login_required
 def steps_prefs_save(request):
     """Update the steps-per-mile conversion used for mileage display."""
     if request.method == 'POST':
-        raw = request.POST.get('steps_per_mile', '').strip()
         try:
-            spm = int(raw)
-            if spm < 1:
+            spm = int(request.POST.get('steps_per_mile', '').strip())
+            spbm = int(request.POST.get('steps_per_bike_mile', '').strip())
+            if spm < 1 or spbm < 1:
                 raise ValueError
             StepPrefs.objects.update_or_create(
                 user=request.user,
-                defaults={'steps_per_mile': spm},
+                defaults={'steps_per_mile': spm, 'steps_per_bike_mile': spbm},
             )
         except (ValueError, TypeError):
-            messages.error(request, 'Please enter a valid steps-per-mile value.')
+            messages.error(request, 'Please enter valid steps-per-mile values.')
     page = request.POST.get('_page', '').strip()
     return redirect(f"/health/steps/?page={page}" if page else '/health/steps/')
 
@@ -426,19 +433,21 @@ def steps_save(request):
     if request.method == 'POST':
         entry_date = request.POST.get('date', '').strip()
         steps_raw = request.POST.get('steps', '').strip()
+        bike_raw = request.POST.get('bike_miles', '').strip()
         try:
             steps_val = int(steps_raw)
-            if steps_val < 0:
+            bike_val = round(float(bike_raw), 1) if bike_raw else 0.0
+            if steps_val < 0 or bike_val < 0:
                 raise ValueError
             if not entry_date:
                 raise ValueError
             StepEntry.objects.update_or_create(
                 user=request.user,
                 date=entry_date,
-                defaults={'steps': steps_val},
+                defaults={'steps': steps_val, 'bike_miles': bike_val},
             )
         except (ValueError, TypeError):
-            messages.error(request, 'Please enter a valid step count.')
+            messages.error(request, 'Please enter a valid step count and bike mileage.')
     page = request.POST.get('_page', '').strip()
     return redirect(f"/health/steps/?page={page}" if page else '/health/steps/')
 
@@ -446,17 +455,33 @@ def steps_save(request):
 @login_required
 def steps_list(request):
     entries = list(StepEntry.objects.filter(user=request.user))
-    steps_by_date = {e.date: e.steps for e in entries}
     today = date.today()
-    spm = steps_per_mile_for(request.user)
+    spm, spbm = step_prefs_for(request.user)
+
+    by_date = {}
+    for e in entries:
+        bike_steps = bike_miles_to_steps(e.bike_miles, spbm)
+        by_date[e.date] = {
+            'steps': e.steps,
+            'bike_miles': float(e.bike_miles),
+            'bike_steps': bike_steps,
+            'total': e.steps + bike_steps,
+        }
 
     cur_ws = week_start_sunday(today)
-    cur_total = sum(s for d, s in steps_by_date.items() if cur_ws <= d <= cur_ws + timedelta(days=6))
+    cur_week = [v for d, v in by_date.items() if cur_ws <= d <= cur_ws + timedelta(days=6)]
+    cur_steps = sum(v['steps'] for v in cur_week)
+    cur_bike_miles = round(sum(v['bike_miles'] for v in cur_week), 1)
+    cur_bike_steps = sum(v['bike_steps'] for v in cur_week)
+    cur_total = cur_steps + cur_bike_steps
     cur_pct = min(100, round(cur_total / STEP_GOAL * 100)) if STEP_GOAL else 0
 
-    all_total = sum(steps_by_date.values())
+    all_steps = sum(v['steps'] for v in by_date.values())
+    all_bike_miles = round(sum(v['bike_miles'] for v in by_date.values()), 1)
+    all_bike_steps = sum(v['bike_steps'] for v in by_date.values())
+    all_total = all_steps + all_bike_steps
 
-    first_ws = week_start_sunday(min(steps_by_date)) if steps_by_date else cur_ws
+    first_ws = week_start_sunday(min(by_date)) if by_date else cur_ws
 
     weeks = []
     ws = cur_ws
@@ -466,23 +491,36 @@ def steps_list(request):
         recorded = []
         for i in range(7):
             d = ws + timedelta(days=i)
-            s = steps_by_date.get(d)
-            days.append({'date': d.isoformat(), 'label': d.strftime('%a %b %d'), 'steps': s,
-                         'miles': steps_to_miles(s, spm) if s is not None else None})
-            if s is not None:
-                recorded.append((d, s))
-        total = sum(s for _, s in recorded)
-        low = min(recorded, key=lambda x: x[1]) if recorded else None
-        high = max(recorded, key=lambda x: x[1]) if recorded else None
+            v = by_date.get(d)
+            days.append({
+                'date': d.isoformat(),
+                'label': d.strftime('%a %b %d'),
+                'steps': v['steps'] if v else None,
+                'bike_miles': v['bike_miles'] if v else None,
+                'bike_steps': v['bike_steps'] if v else None,
+                'total': v['total'] if v else None,
+                'miles': steps_to_miles(v['total'], spm) if v else None,
+            })
+            if v is not None:
+                recorded.append((d, v))
+        steps_only = sum(v['steps'] for _, v in recorded)
+        bike_miles = round(sum(v['bike_miles'] for _, v in recorded), 1)
+        bike_steps = sum(v['bike_steps'] for _, v in recorded)
+        total = steps_only + bike_steps
+        low = min(recorded, key=lambda x: x[1]['total']) if recorded else None
+        high = max(recorded, key=lambda x: x[1]['total']) if recorded else None
         weeks.append({
             'week_start': ws.isoformat(),
             'label': steps_week_label(ws),
+            'steps_only': steps_only,
+            'bike_miles': bike_miles,
+            'bike_steps': bike_steps,
             'total': total,
             'miles': steps_to_miles(total, spm),
             'pct': min(100, round(total / STEP_GOAL * 100)) if STEP_GOAL else 0,
-            'low_steps': low[1] if low else None,
+            'low_steps': low[1]['total'] if low else None,
             'low_date': low[0].strftime('%a %b %d') if low else None,
-            'high_steps': high[1] if high else None,
+            'high_steps': high[1]['total'] if high else None,
             'high_date': high[0].strftime('%a %b %d') if high else None,
             'days': days,
         })
@@ -499,15 +537,23 @@ def steps_list(request):
 
     # Chart: oldest→newest across the current page
     chart_weeks = list(reversed(page_weeks))
-    chart_data = [{'label': w['label'], 'total': w['total']} for w in chart_weeks]
+    chart_data = [{'label': w['label'], 'steps_only': w['steps_only'],
+                   'bike_steps': w['bike_steps'], 'total': w['total']} for w in chart_weeks]
 
     return render(request, 'health/steps.html', {
         'today': today.isoformat(),
         'goal': STEP_GOAL,
         'steps_per_mile': spm,
+        'steps_per_bike_mile': spbm,
         'goal_miles': steps_to_miles(STEP_GOAL, spm),
+        'cur_steps': cur_steps,
+        'cur_bike_miles': cur_bike_miles,
+        'cur_bike_steps': cur_bike_steps,
         'cur_total': cur_total,
         'cur_miles': steps_to_miles(cur_total, spm),
+        'all_steps': all_steps,
+        'all_bike_miles': all_bike_miles,
+        'all_bike_steps': all_bike_steps,
         'all_total': all_total,
         'all_miles': steps_to_miles(all_total, spm),
         'cur_pct': cur_pct,

@@ -28,6 +28,12 @@
                 placeholder="e.g. 8500" required
                 class="w-full bg-gray-700 text-white text-lg rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
+        <div class="flex-1">
+            <label class="block text-gray-400 text-sm mb-1" for="bike_miles">Bike Miles</label>
+            <input type="number" id="bike_miles" name="bike_miles" inputmode="decimal" step="0.1" min="0" max="1000"
+                value="0.0"
+                class="w-full bg-gray-700 text-white text-lg rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
         <button type="submit"
             class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold px-6 py-3 rounded-lg transition">
             Save
@@ -45,6 +51,9 @@
                 {{ cur_total|stringformat:"d" }}<span class="text-xl text-gray-400"> / {{ goal }}</span>
             </p>
             <p class="text-gray-400 text-sm mt-1">{{ cur_miles }} mi <span class="text-gray-500">/ {{ goal_miles }} mi</span></p>
+            <p class="text-gray-500 text-sm mt-1">
+                {{ cur_steps }} steps + {{ cur_bike_miles }} bike mi ({{ cur_bike_steps }} steps)
+            </p>
         </div>
         <p class="text-gray-400 text-sm">
             {% if cur_total >= goal %}Goal reached! 🎉{% else %}{{ cur_remaining }} to go{% endif %}
@@ -61,7 +70,16 @@
     <div class="flex flex-wrap items-end justify-between gap-6">
         <div class="flex flex-wrap gap-8">
             <div>
-                <p class="text-gray-400 text-sm">Total Steps</p>
+                <p class="text-gray-400 text-sm">Steps Only</p>
+                <p class="text-3xl font-bold text-white">{{ all_steps }}</p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Bike Miles</p>
+                <p class="text-3xl font-bold text-amber-400">{{ all_bike_miles }}</p>
+                <p class="text-gray-500 text-xs">{{ all_bike_steps }} steps</p>
+            </div>
+            <div>
+                <p class="text-gray-400 text-sm">Steps + Bike</p>
                 <p class="text-3xl font-bold text-white">{{ all_total }}</p>
             </div>
             <div>
@@ -76,6 +94,12 @@
                 <label class="block text-gray-400 text-sm mb-1" for="steps_per_mile">Steps per Mile</label>
                 <input type="number" id="steps_per_mile" name="steps_per_mile" inputmode="numeric" min="1" max="100000"
                     value="{{ steps_per_mile }}" required
+                    class="w-32 bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-400 text-sm mb-1" for="steps_per_bike_mile">Steps per Bike Mile</label>
+                <input type="number" id="steps_per_bike_mile" name="steps_per_bike_mile" inputmode="numeric" min="1" max="100000"
+                    value="{{ steps_per_bike_mile }}" required
                     class="w-32 bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <button type="submit"
@@ -105,10 +129,12 @@
             <thead>
                 <tr class="text-gray-400 text-sm border-b border-gray-700">
                     <th class="px-4 py-2 cursor-pointer hover:text-white select-none" onclick="sortWeeks(0,'date')">Week <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(1,'num')">Total Steps <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(2,'num')">Miles <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(3,'num')">Lowest Day <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(4,'num')">Highest Day <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(1,'num')">Steps Only <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(2,'num')">Bike Miles <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(3,'num')">Steps + Bike <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(4,'num')">Miles <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(5,'num')">Lowest Day <span class="sort-icon">↕</span></th>
+                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(6,'num')">Highest Day <span class="sort-icon">↕</span></th>
                 </tr>
             </thead>
             <tbody id="weekTbody">
@@ -116,6 +142,10 @@
                 <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700 cursor-pointer"
                     data-idx="{{ forloop.counter0 }}" onclick="openWeek({{ forloop.counter0 }})">
                     <td class="px-4 py-3 font-semibold" data-val="{{ w.week_start }}">{{ w.label }}</td>
+                    <td class="px-4 py-3 text-right" data-val="{{ w.steps_only }}">{{ w.steps_only }}</td>
+                    <td class="px-4 py-3 text-right text-amber-300" data-val="{{ w.bike_miles }}">
+                        {{ w.bike_miles }}<span class="text-gray-500 text-xs block">{{ w.bike_steps }} steps</span>
+                    </td>
                     <td class="px-4 py-3 text-right font-bold {% if w.total >= goal %}text-green-400{% else %}text-white{% endif %}" data-val="{{ w.total }}">{{ w.total }}</td>
                     <td class="px-4 py-3 text-right text-blue-300" data-val="{{ w.miles }}">{{ w.miles }}</td>
                     <td class="px-4 py-3 text-right" data-val="{{ w.low_steps|default:'-1' }}">
@@ -126,7 +156,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">No steps logged yet. Use the form above.</td></tr>
+                <tr><td colspan="7" class="px-4 py-6 text-center text-gray-400">No steps logged yet. Use the form above.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -152,8 +182,9 @@
             <h3 id="modalTitle" class="text-lg font-bold text-white"></h3>
             <button onclick="closeWeek()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
         </div>
-        <p class="text-gray-400 text-sm mb-4">Week total: <span id="modalTotal" class="text-white font-semibold"></span>
+        <p class="text-gray-400 text-sm mb-1">Week total: <span id="modalTotal" class="text-white font-semibold"></span>
             <span id="modalMiles" class="text-blue-300 ml-2"></span></p>
+        <p class="text-gray-500 text-sm mb-4"><span id="modalBreakdown"></span></p>
         <div id="modalDays" class="space-y-2"></div>
     </div>
 </div>
@@ -175,9 +206,18 @@
                 labels: chartData.map(d => d.label),
                 datasets: [
                     {
-                        label: 'Weekly Steps',
-                        data: chartData.map(d => d.total),
-                        backgroundColor: chartData.map(d => d.total >= GOAL ? 'rgba(34,197,94,0.7)' : 'rgba(59,130,246,0.7)'),
+                        label: 'Steps',
+                        data: chartData.map(d => d.steps_only),
+                        backgroundColor: 'rgba(59,130,246,0.7)',
+                        stack: 'steps',
+                        borderRadius: 4,
+                        order: 2,
+                    },
+                    {
+                        label: 'Bike Steps',
+                        data: chartData.map(d => d.bike_steps),
+                        backgroundColor: 'rgba(245,158,11,0.7)',
+                        stack: 'steps',
                         borderRadius: 4,
                         order: 2,
                     },
@@ -198,8 +238,8 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { ticks: { color: 'white', font: { size: 10 }, maxRotation: 60, minRotation: 45 }, grid: { display: false } },
-                    y: { beginAtZero: true, ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    x: { stacked: true, ticks: { color: 'white', font: { size: 10 }, maxRotation: 60, minRotation: 45 }, grid: { display: false } },
+                    y: { stacked: true, beginAtZero: true, ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.1)' } }
                 },
                 plugins: {
                     legend: { labels: { color: 'white', usePointStyle: true } },
@@ -234,6 +274,8 @@
         document.getElementById('modalTitle').textContent = w.label;
         document.getElementById('modalTotal').textContent = w.total.toLocaleString();
         document.getElementById('modalMiles').textContent = w.miles + ' mi';
+        document.getElementById('modalBreakdown').textContent =
+            w.steps_only.toLocaleString() + ' steps + ' + w.bike_miles + ' bike mi (' + w.bike_steps.toLocaleString() + ' steps)';
         const container = document.getElementById('modalDays');
         container.innerHTML = '';
         w.days.forEach(day => {
@@ -245,11 +287,14 @@
                 <input type="hidden" name="csrfmiddlewaretoken" value="${CSRF}">
                 <input type="hidden" name="date" value="${day.date}">
                 <input type="hidden" name="_page" value="${CUR_PAGE}">
-                <span class="text-gray-300 text-sm w-28 flex-shrink-0">${day.label}</span>
-                <span class="text-gray-500 text-xs w-16 flex-shrink-0 text-right">${day.miles === null ? '' : day.miles + ' mi'}</span>
+                <span class="text-gray-300 text-sm w-24 flex-shrink-0">${day.label}</span>
                 <input type="number" name="steps" inputmode="numeric" min="0" max="200000"
-                    value="${day.steps === null ? '' : day.steps}" placeholder="—"
-                    class="flex-1 bg-gray-800 text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    value="${day.steps === null ? '' : day.steps}" placeholder="steps"
+                    class="w-24 bg-gray-800 text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <input type="number" name="bike_miles" inputmode="decimal" step="0.1" min="0" max="1000"
+                    value="${day.bike_miles === null ? '0.0' : day.bike_miles.toFixed(1)}" placeholder="bike mi"
+                    class="w-20 bg-gray-800 text-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <span class="text-gray-500 text-xs flex-1 text-right">${day.total === null ? '' : day.total.toLocaleString() + ' • ' + day.miles + ' mi'}</span>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded flex-shrink-0">Save</button>
             `;
             container.appendChild(form);

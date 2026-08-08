@@ -57,6 +57,8 @@ class StepEntry(models.Model):
     )
     date = models.DateField()
     steps = models.PositiveIntegerField(help_text="Steps taken that day")
+    bike_miles = models.DecimalField(max_digits=5, decimal_places=1, default=0,
+                                     help_text="Miles biked that day")
 
     class Meta:
         ordering = ['-date']
@@ -67,6 +69,7 @@ class StepEntry(models.Model):
 
 
 DEFAULT_STEPS_PER_MILE = 2200
+DEFAULT_STEPS_PER_BIKE_MILE = 1400
 
 
 class StepPrefs(models.Model):
@@ -78,6 +81,10 @@ class StepPrefs(models.Model):
     steps_per_mile = models.PositiveIntegerField(
         default=DEFAULT_STEPS_PER_MILE,
         help_text="Steps counted as one mile",
+    )
+    steps_per_bike_mile = models.PositiveIntegerField(
+        default=DEFAULT_STEPS_PER_BIKE_MILE,
+        help_text="Steps credited for one mile biked",
     )
 
     def __str__(self):
