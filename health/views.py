@@ -4,7 +4,8 @@ from collections import defaultdict
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .models import WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, StepEntry, ACTIVITY_CHOICES, YARDS_PER_MILE
+from .models import (WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, StepEntry, StepPrefs,
+                     ACTIVITY_CHOICES, YARDS_PER_MILE, DEFAULT_STEPS_PER_MILE)
 
 STEP_GOAL = 50000
 WEEKS_PER_PAGE = 52
@@ -391,6 +392,34 @@ def steps_week_label(ws):
     return f"{ws.strftime('%b %d')} – {(ws + timedelta(days=6)).strftime('%b %d, %Y')}"
 
 
+def steps_per_mile_for(user):
+    prefs = StepPrefs.objects.filter(user=user).first()
+    return prefs.steps_per_mile if prefs else DEFAULT_STEPS_PER_MILE
+
+
+def steps_to_miles(steps, spm):
+    return round(steps / spm, 2) if spm else 0
+
+
+@login_required
+def steps_prefs_save(request):
+    """Update the steps-per-mile conversion used for mileage display."""
+    if request.method == 'POST':
+        raw = request.POST.get('steps_per_mile', '').strip()
+        try:
+            spm = int(raw)
+            if spm < 1:
+                raise ValueError
+            StepPrefs.objects.update_or_create(
+                user=request.user,
+                defaults={'steps_per_mile': spm},
+            )
+        except (ValueError, TypeError):
+            messages.error(request, 'Please enter a valid steps-per-mile value.')
+    page = request.POST.get('_page', '').strip()
+    return redirect(f"/health/steps/?page={page}" if page else '/health/steps/')
+
+
 @login_required
 def steps_save(request):
     """Upsert a single day's step count. Used by the entry form and per-day edits."""
@@ -419,10 +448,13 @@ def steps_list(request):
     entries = list(StepEntry.objects.filter(user=request.user))
     steps_by_date = {e.date: e.steps for e in entries}
     today = date.today()
+    spm = steps_per_mile_for(request.user)
 
     cur_ws = week_start_sunday(today)
     cur_total = sum(s for d, s in steps_by_date.items() if cur_ws <= d <= cur_ws + timedelta(days=6))
     cur_pct = min(100, round(cur_total / STEP_GOAL * 100)) if STEP_GOAL else 0
+
+    all_total = sum(steps_by_date.values())
 
     first_ws = week_start_sunday(min(steps_by_date)) if steps_by_date else cur_ws
 
@@ -435,7 +467,8 @@ def steps_list(request):
         for i in range(7):
             d = ws + timedelta(days=i)
             s = steps_by_date.get(d)
-            days.append({'date': d.isoformat(), 'label': d.strftime('%a %b %d'), 'steps': s})
+            days.append({'date': d.isoformat(), 'label': d.strftime('%a %b %d'), 'steps': s,
+                         'miles': steps_to_miles(s, spm) if s is not None else None})
             if s is not None:
                 recorded.append((d, s))
         total = sum(s for _, s in recorded)
@@ -445,6 +478,7 @@ def steps_list(request):
             'week_start': ws.isoformat(),
             'label': steps_week_label(ws),
             'total': total,
+            'miles': steps_to_miles(total, spm),
             'pct': min(100, round(total / STEP_GOAL * 100)) if STEP_GOAL else 0,
             'low_steps': low[1] if low else None,
             'low_date': low[0].strftime('%a %b %d') if low else None,
@@ -470,7 +504,12 @@ def steps_list(request):
     return render(request, 'health/steps.html', {
         'today': today.isoformat(),
         'goal': STEP_GOAL,
+        'steps_per_mile': spm,
+        'goal_miles': steps_to_miles(STEP_GOAL, spm),
         'cur_total': cur_total,
+        'cur_miles': steps_to_miles(cur_total, spm),
+        'all_total': all_total,
+        'all_miles': steps_to_miles(all_total, spm),
         'cur_pct': cur_pct,
         'cur_remaining': max(0, STEP_GOAL - cur_total),
         'cur_label': steps_week_label(cur_ws),

@@ -9,6 +9,7 @@ urlpatterns = [
     path('weight/prefs/', views.weight_chart_prefs_save, name='weight_chart_prefs_save'),
     path('steps/', views.steps_list, name='steps_list'),
     path('steps/save/', views.steps_save, name='steps_save'),
+    path('steps/prefs/', views.steps_prefs_save, name='steps_prefs_save'),
     path('exercise/', views.exercise, name='exercise'),
     path('exercise/<int:pk>/edit/', views.exercise_edit, name='exercise_edit'),
     path('exercise/<int:pk>/delete/', views.exercise_delete, name='exercise_delete'),

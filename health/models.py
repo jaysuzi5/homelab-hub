@@ -66,6 +66,24 @@ class StepEntry(models.Model):
         return f"{self.user} — {self.date}: {self.steps} steps"
 
 
+DEFAULT_STEPS_PER_MILE = 2200
+
+
+class StepPrefs(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='step_prefs',
+    )
+    steps_per_mile = models.PositiveIntegerField(
+        default=DEFAULT_STEPS_PER_MILE,
+        help_text="Steps counted as one mile",
+    )
+
+    def __str__(self):
+        return f"{self.user} — {self.steps_per_mile} steps/mile"
+
+
 YARDS_PER_MILE = 1760
 
 ACTIVITY_CHOICES = [
