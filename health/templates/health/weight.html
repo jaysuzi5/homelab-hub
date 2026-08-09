@@ -5,6 +5,34 @@
     <h2 class="text-3xl font-semibold">Weight Tracker</h2>
 </div>
 
+<!-- Log Weight -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">Log Weight</h3>
+    {% if messages %}
+    {% for message in messages %}
+    <div class="mb-3 text-sm text-red-400">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+    <form method="post" action="{% url 'weight_list' %}" class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:items-end">
+        {% csrf_token %}
+        <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
+        <div>
+            <label class="block text-gray-400 text-sm mb-1" for="date">Date</label>
+            <input type="date" id="date" name="date" value="{{ today }}" required
+                class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label class="block text-gray-400 text-sm mb-1" for="weight">Weight (lbs)</label>
+            <input type="number" id="weight" name="weight" step="0.1" min="1" max="999" placeholder="e.g. 185.5" required
+                class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <button type="submit"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition">
+            Save Entry
+        </button>
+    </form>
+</div>
+
 <!-- Summary Stats -->
 <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
     <div class="bg-gray-800 rounded-2xl shadow p-6">
@@ -94,146 +122,116 @@
     </div>
 </div>
 
-<!-- Log Weight / Goals / Data Table -->
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-    <!-- Log Weight -->
-    <div class="bg-gray-800 rounded-2xl shadow p-6">
-        <h3 class="text-xl font-bold mb-4">Log Weight</h3>
-        {% if messages %}
-        {% for message in messages %}
-        <div class="mb-3 text-sm text-red-400">{{ message }}</div>
-        {% endfor %}
-        {% endif %}
-        <form method="post" action="{% url 'weight_list' %}">
-            {% csrf_token %}
-            <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
-            <div class="mb-4">
-                <label class="block text-gray-400 text-sm mb-1" for="date">Date</label>
-                <input type="date" id="date" name="date" value="{{ today }}" required
-                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div class="mb-4">
-                <label class="block text-gray-400 text-sm mb-1" for="weight">Weight (lbs)</label>
-                <input type="number" id="weight" name="weight" step="0.1" min="1" max="999" placeholder="e.g. 185.5" required
-                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <button type="submit"
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition">
-                Save Entry
-            </button>
-        </form>
-    </div>
-
-    <!-- Goals -->
-    <div class="bg-gray-800 rounded-2xl shadow p-6">
-        <h3 class="text-xl font-bold mb-4">Goals</h3>
-        <form method="post" action="{% url 'weight_goal_add' %}">
-            {% csrf_token %}
-            <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
-            <div class="mb-3">
-                <label class="block text-gray-400 text-sm mb-1">Goal Line</label>
-                <select name="tier"
-                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                    {% for value, label in goal_tiers %}
-                    <option value="{{ value }}">{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="block text-gray-400 text-sm mb-1">Target Date</label>
-                <input type="date" name="target_date" required
-                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-            <div class="mb-3">
-                <label class="block text-gray-400 text-sm mb-1">Target Weight (lbs)</label>
-                <input type="number" name="target_weight" step="0.1" min="1" max="999" placeholder="e.g. 175.0" required
-                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-            <div class="mb-4">
-                <label class="block text-gray-400 text-sm mb-1">Label <span class="text-gray-500">(optional)</span></label>
-                <input type="text" name="label" maxlength="100" placeholder="e.g. 6-month goal"
-                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-            <button type="submit"
-                class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 rounded-lg transition">
-                Add Goal
-            </button>
-        </form>
-
-        {% if goals %}
-        {% for group in goal_groups %}
-        {% if group.goals %}
-        <div class="mt-4">
-            <p class="text-xs uppercase tracking-wide {{ group.text_class }} mb-2">{{ group.title }}</p>
-            <div class="space-y-2">
-                {% for goal in group.goals %}
-                <div class="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2 text-sm">
-                    <div>
-                        <span class="{{ group.text_class }} font-semibold">{{ goal.target_weight }} lbs</span>
-                        <span class="text-gray-400 ml-2">{{ goal.target_date|date:"M d, Y" }}</span>
-                        {% if goal.label %}
-                        <p class="text-gray-500 text-xs mt-0.5">{{ goal.label }}</p>
+<!-- Data Table -->
+<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">All Records</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left table-auto">
+            <thead>
+                <tr class="text-gray-300 text-sm border-b border-gray-700">
+                    <th class="px-4 py-2">Date</th>
+                    <th class="px-4 py-2 text-right">Weight (lbs)</th>
+                    <th class="px-4 py-2 text-right">Change</th>
+                    <th class="px-4 py-2 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in entries_with_change %}
+                <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700">
+                    <td class="px-4 py-2">{{ row.entry.date|date:"M d, Y" }}</td>
+                    <td class="px-4 py-2 text-right font-semibold text-white">{{ row.entry.weight }}</td>
+                    <td class="px-4 py-2 text-right font-semibold
+                        {% if row.change is not None %}{% if row.change < 0 %}text-green-400{% elif row.change > 0 %}text-red-400{% else %}text-gray-400{% endif %}{% endif %}">
+                        {% if row.change is not None %}
+                            {% if row.change > 0 %}+{% endif %}{{ row.change|floatformat:1 }}
+                        {% else %}
+                            —
                         {% endif %}
-                    </div>
-                    <form method="post" action="{% url 'weight_goal_delete' goal.pk %}" onsubmit="return confirm('Delete this goal?');" class="inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
-                        <button type="submit" class="text-red-400 hover:underline text-xs ml-2">Delete</button>
-                    </form>
-                </div>
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                        <form method="post" action="{% url 'weight_delete' row.entry.pk %}" onsubmit="return confirm('Delete this entry?');" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="text-red-400 hover:underline text-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="text-gray-400 text-sm">
+                    <td colspan="4" class="px-4 py-4 text-center">No entries yet. Log your first weight using the form.</td>
+                </tr>
                 {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-        {% endfor %}
-        {% else %}
-        <p class="text-gray-500 text-sm mt-4">No goals set yet.</p>
-        {% endif %}
+            </tbody>
+        </table>
     </div>
+</div>
 
-    <!-- Data Table -->
-    <div class="lg:col-span-2 bg-gray-800 rounded-2xl shadow p-6">
-        <h3 class="text-xl font-bold mb-4">All Records</h3>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left table-auto">
-                <thead>
-                    <tr class="text-gray-300 text-sm border-b border-gray-700">
-                        <th class="px-4 py-2">Date</th>
-                        <th class="px-4 py-2 text-right">Weight (lbs)</th>
-                        <th class="px-4 py-2 text-right">Change</th>
-                        <th class="px-4 py-2 text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in entries_with_change %}
-                    <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700">
-                        <td class="px-4 py-2">{{ row.entry.date|date:"M d, Y" }}</td>
-                        <td class="px-4 py-2 text-right font-semibold text-white">{{ row.entry.weight }}</td>
-                        <td class="px-4 py-2 text-right font-semibold
-                            {% if row.change is not None %}{% if row.change < 0 %}text-green-400{% elif row.change > 0 %}text-red-400{% else %}text-gray-400{% endif %}{% endif %}">
-                            {% if row.change is not None %}
-                                {% if row.change > 0 %}+{% endif %}{{ row.change|floatformat:1 }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td class="px-4 py-2 text-center">
-                            <form method="post" action="{% url 'weight_delete' row.entry.pk %}" onsubmit="return confirm('Delete this entry?');" class="inline">
-                                {% csrf_token %}
-                                <button type="submit" class="text-red-400 hover:underline text-sm">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr class="text-gray-400 text-sm">
-                        <td colspan="4" class="px-4 py-4 text-center">No entries yet. Log your first weight using the form.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<!-- Goals -->
+<div class="bg-gray-800 rounded-2xl shadow p-6">
+    <h3 class="text-xl font-bold mb-4">Goals</h3>
+    <form method="post" action="{% url 'weight_goal_add' %}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:items-end">
+        {% csrf_token %}
+        <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
+        <div>
+            <label class="block text-gray-400 text-sm mb-1">Goal Line</label>
+            <select name="tier"
+                class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                {% for value, label in goal_tiers %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-gray-400 text-sm mb-1">Target Date</label>
+            <input type="date" name="target_date" required
+                class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        </div>
+        <div>
+            <label class="block text-gray-400 text-sm mb-1">Target Weight (lbs)</label>
+            <input type="number" name="target_weight" step="0.1" min="1" max="999" placeholder="e.g. 175.0" required
+                class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        </div>
+        <div>
+            <label class="block text-gray-400 text-sm mb-1">Label <span class="text-gray-500">(optional)</span></label>
+            <input type="text" name="label" maxlength="100" placeholder="e.g. 6-month goal"
+                class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        </div>
+        <button type="submit"
+            class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 rounded-lg transition">
+            Add Goal
+        </button>
+    </form>
+
+    {% if goals %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    {% for group in goal_groups %}
+    {% if group.goals %}
+    <div class="mt-4">
+        <p class="text-xs uppercase tracking-wide {{ group.text_class }} mb-2">{{ group.title }}</p>
+        <div class="space-y-2">
+            {% for goal in group.goals %}
+            <div class="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2 text-sm">
+                <div>
+                    <span class="{{ group.text_class }} font-semibold">{{ goal.target_weight }} lbs</span>
+                    <span class="text-gray-400 ml-2">{{ goal.target_date|date:"M d, Y" }}</span>
+                    {% if goal.label %}
+                    <p class="text-gray-500 text-xs mt-0.5">{{ goal.label }}</p>
+                    {% endif %}
+                </div>
+                <form method="post" action="{% url 'weight_goal_delete' goal.pk %}" onsubmit="return confirm('Delete this goal?');" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
+                    <button type="submit" class="text-red-400 hover:underline text-xs ml-2">Delete</button>
+                </form>
+            </div>
+            {% endfor %}
         </div>
     </div>
+    {% endif %}
+    {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-500 text-sm mt-4">No goals set yet.</p>
+    {% endif %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
