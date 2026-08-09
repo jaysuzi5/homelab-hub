@@ -19,6 +19,12 @@ class WeightEntry(models.Model):
         return f"{self.user} — {self.date}: {self.weight} lbs"
 
 
+GOAL_TIER_CHOICES = [
+    ('primary', 'Primary'),
+    ('secondary', 'Secondary'),
+]
+
+
 class WeightGoal(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -28,13 +34,14 @@ class WeightGoal(models.Model):
     target_date = models.DateField()
     target_weight = models.DecimalField(max_digits=5, decimal_places=1, help_text="Target weight in lbs")
     label = models.CharField(max_length=100, blank=True)
+    tier = models.CharField(max_length=10, choices=GOAL_TIER_CHOICES, default='primary')
 
     class Meta:
         ordering = ['target_date']
-        unique_together = ['user', 'target_date']
+        unique_together = ['user', 'target_date', 'tier']
 
     def __str__(self):
-        return f"{self.user} — {self.target_date}: {self.target_weight} lbs goal"
+        return f"{self.user} — {self.target_date}: {self.target_weight} lbs {self.tier} goal"
 
 
 class WeightChartPrefs(models.Model):

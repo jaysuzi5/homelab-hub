@@ -6,8 +6,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from config.utils import get_config
 from .models import (WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, StepEntry,
-                     ACTIVITY_CHOICES, YARDS_PER_MILE, DEFAULT_STEPS_PER_MILE,
-                     DEFAULT_STEPS_PER_BIKE_MILE)
+                     ACTIVITY_CHOICES, GOAL_TIER_CHOICES, YARDS_PER_MILE,
+                     DEFAULT_STEPS_PER_MILE, DEFAULT_STEPS_PER_BIKE_MILE)
 
 STEP_GOAL = 50000
 WEEKS_PER_PAGE = 52
@@ -95,6 +95,8 @@ def weight_list(request):
 
     entries = list(WeightEntry.objects.filter(user=request.user).order_by('-date'))
     goals = list(WeightGoal.objects.filter(user=request.user).order_by('target_date'))
+    primary_goals = [g for g in goals if g.tier == 'primary']
+    secondary_goals = [g for g in goals if g.tier == 'secondary']
 
     # Saved chart start preference
     try:
@@ -136,10 +138,14 @@ def weight_list(request):
         for e in reversed(entries)
     ])
 
-    goals_data = json.dumps([
-        {'date': str(g.target_date), 'weight': float(g.target_weight), 'label': g.label}
-        for g in goals
-    ])
+    def goals_json(goal_list):
+        return json.dumps([
+            {'date': str(g.target_date), 'weight': float(g.target_weight), 'label': g.label}
+            for g in goal_list
+        ])
+
+    primary_goals_data = goals_json(primary_goals)
+    secondary_goals_data = goals_json(secondary_goals)
 
     latest = entries[0] if entries else None
     lowest = min(entries, key=lambda e: e.weight) if entries else None
@@ -155,8 +161,14 @@ def weight_list(request):
     return render(request, 'health/weight.html', {
         'entries_with_change': entries_with_change,
         'chart_data': chart_data,
-        'goals_data': goals_data,
+        'primary_goals_data': primary_goals_data,
+        'secondary_goals_data': secondary_goals_data,
         'goals': goals,
+        'goal_groups': [
+            {'title': 'Primary', 'goals': primary_goals, 'text_class': 'text-orange-400'},
+            {'title': 'Secondary', 'goals': secondary_goals, 'text_class': 'text-purple-400'},
+        ],
+        'goal_tiers': GOAL_TIER_CHOICES,
         'chart_start': start_str,
         'chart_end': end_str,
         'today': date.today().isoformat(),
@@ -183,13 +195,17 @@ def weight_goal_add(request):
         target_date = request.POST.get('target_date', '').strip()
         weight_raw = request.POST.get('target_weight', '').strip()
         label = request.POST.get('label', '').strip()
+        tier = request.POST.get('tier', 'primary').strip()
         try:
             weight_val = float(weight_raw)
             if weight_val <= 0:
                 raise ValueError
+            if tier not in dict(GOAL_TIER_CHOICES):
+                raise ValueError
             WeightGoal.objects.update_or_create(
                 user=request.user,
                 target_date=target_date,
+                tier=tier,
                 defaults={'target_weight': weight_val, 'label': label},
             )
         except (ValueError, TypeError):

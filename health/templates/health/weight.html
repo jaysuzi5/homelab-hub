@@ -132,6 +132,15 @@
             {% csrf_token %}
             <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
             <div class="mb-3">
+                <label class="block text-gray-400 text-sm mb-1">Goal Line</label>
+                <select name="tier"
+                    class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    {% for value, label in goal_tiers %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
                 <label class="block text-gray-400 text-sm mb-1">Target Date</label>
                 <input type="date" name="target_date" required
                     class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
@@ -153,24 +162,31 @@
         </form>
 
         {% if goals %}
-        <div class="mt-4 space-y-2">
-            {% for goal in goals %}
-            <div class="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2 text-sm">
-                <div>
-                    <span class="text-orange-400 font-semibold">{{ goal.target_weight }} lbs</span>
-                    <span class="text-gray-400 ml-2">{{ goal.target_date|date:"M d, Y" }}</span>
-                    {% if goal.label %}
-                    <p class="text-gray-500 text-xs mt-0.5">{{ goal.label }}</p>
-                    {% endif %}
+        {% for group in goal_groups %}
+        {% if group.goals %}
+        <div class="mt-4">
+            <p class="text-xs uppercase tracking-wide {{ group.text_class }} mb-2">{{ group.title }}</p>
+            <div class="space-y-2">
+                {% for goal in group.goals %}
+                <div class="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2 text-sm">
+                    <div>
+                        <span class="{{ group.text_class }} font-semibold">{{ goal.target_weight }} lbs</span>
+                        <span class="text-gray-400 ml-2">{{ goal.target_date|date:"M d, Y" }}</span>
+                        {% if goal.label %}
+                        <p class="text-gray-500 text-xs mt-0.5">{{ goal.label }}</p>
+                        {% endif %}
+                    </div>
+                    <form method="post" action="{% url 'weight_goal_delete' goal.pk %}" onsubmit="return confirm('Delete this goal?');" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
+                        <button type="submit" class="text-red-400 hover:underline text-xs ml-2">Delete</button>
+                    </form>
                 </div>
-                <form method="post" action="{% url 'weight_goal_delete' goal.pk %}" onsubmit="return confirm('Delete this goal?');" class="inline">
-                    {% csrf_token %}
-                    <input type="hidden" name="_range_params" value="start={{ chart_start }}&end={{ chart_end }}">
-                    <button type="submit" class="text-red-400 hover:underline text-xs ml-2">Delete</button>
-                </form>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
+        {% endif %}
+        {% endfor %}
         {% else %}
         <p class="text-gray-500 text-sm mt-4">No goals set yet.</p>
         {% endif %}
@@ -224,7 +240,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script>
     const chartData = {{ chart_data|safe }};
-    const goalsData = {{ goals_data|safe }};
+    const primaryGoalsData = {{ primary_goals_data|safe }};
+    const secondaryGoalsData = {{ secondary_goals_data|safe }};
+    const goalsData = primaryGoalsData.concat(secondaryGoalsData);
     const chartStart = '{{ chart_start }}';
     const chartEnd = '{{ chart_end }}';
 
@@ -246,8 +264,8 @@
                         order: 2,
                     },
                     {
-                        label: 'Goal',
-                        data: goalsData.map(d => ({x: d.date, y: d.weight, goalLabel: d.label})),
+                        label: 'Primary Goal',
+                        data: primaryGoalsData.map(d => ({x: d.date, y: d.weight, goalLabel: d.label})),
                         borderColor: 'rgba(249,115,22,1)',
                         backgroundColor: 'rgba(249,115,22,0.15)',
                         fill: false,
@@ -256,6 +274,19 @@
                         pointRadius: 7,
                         pointStyle: 'rectRot',
                         pointHoverRadius: 9,
+                        order: 1,
+                    },
+                    {
+                        label: 'Secondary Goal',
+                        data: secondaryGoalsData.map(d => ({x: d.date, y: d.weight, goalLabel: d.label})),
+                        borderColor: 'rgba(168,85,247,1)',
+                        backgroundColor: 'rgba(168,85,247,0.15)',
+                        fill: false,
+                        tension: 0,
+                        borderDash: [2, 4],
+                        pointRadius: 5,
+                        pointStyle: 'triangle',
+                        pointHoverRadius: 7,
                         order: 1,
                     }
                 ]
@@ -291,9 +322,10 @@
                         callbacks: {
                             label: function(context) {
                                 const val = context.parsed.y;
-                                if (context.dataset.label === 'Goal') {
+                                const name = context.dataset.label;
+                                if (name.endsWith('Goal')) {
                                     const gl = context.raw.goalLabel;
-                                    return gl ? `Goal (${gl}): ${val} lbs` : `Goal: ${val} lbs`;
+                                    return gl ? `${name} (${gl}): ${val} lbs` : `${name}: ${val} lbs`;
                                 }
                                 return `${val} lbs`;
                             }
