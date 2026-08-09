@@ -2,7 +2,7 @@ from django.db import migrations
 
 DEFAULTS = {
     'STEPS_PER_MILE': '2200',
-    'STEPS_PER_BIKE_MILE': '1400',
+    'STEPS_PER_BIKE_MILE': '500',
 }
 
 
