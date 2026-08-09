@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% load humanize %}
 {% block content %}
 
-<div class="flex items-center justify-between mb-6">
-    <h2 class="text-3xl font-semibold">Step Tracker</h2>
+<div class="flex items-center justify-between mb-4 sm:mb-6">
+    <h2 class="text-2xl sm:text-3xl font-semibold">Step Tracker</h2>
 </div>
 
 {% if messages %}
@@ -12,147 +13,142 @@
 {% endif %}
 
 <!-- Daily Entry (mobile-first, top of page) -->
-<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
-    <h3 class="text-xl font-bold mb-4">Log Steps</h3>
-    <form method="post" action="{% url 'steps_save' %}" class="flex flex-col sm:flex-row sm:items-end gap-4">
+<div class="bg-gray-800 rounded-2xl shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h3 class="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Log Steps</h3>
+    <form method="post" action="{% url 'steps_save' %}" class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 sm:items-end">
         {% csrf_token %}
         <input type="hidden" name="_page" value="{{ page }}">
-        <div class="flex-1">
-            <label class="block text-gray-400 text-sm mb-1" for="date">Date</label>
+        <div class="col-span-2 sm:col-span-1">
+            <label class="block text-gray-400 text-xs sm:text-sm mb-1" for="date">Date</label>
             <input type="date" id="date" name="date" value="{{ today }}" required
-                class="w-full bg-gray-700 text-white text-lg rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                class="w-full bg-gray-700 text-white text-base sm:text-lg rounded-lg px-3 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
-        <div class="flex-1">
-            <label class="block text-gray-400 text-sm mb-1" for="steps">Steps</label>
+        <div>
+            <label class="block text-gray-400 text-xs sm:text-sm mb-1" for="steps">Steps</label>
             <input type="number" id="steps" name="steps" inputmode="numeric" pattern="[0-9]*" min="0" max="200000"
-                placeholder="e.g. 8500" required
-                class="w-full bg-gray-700 text-white text-lg rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                placeholder="8500" required
+                class="w-full bg-gray-700 text-white text-base sm:text-lg rounded-lg px-3 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
-        <div class="flex-1">
-            <label class="block text-gray-400 text-sm mb-1" for="bike_miles">Bike Miles</label>
+        <div>
+            <label class="block text-gray-400 text-xs sm:text-sm mb-1" for="bike_miles">Bike Miles</label>
             <input type="number" id="bike_miles" name="bike_miles" inputmode="decimal" step="0.1" min="0" max="1000"
                 value="0.0"
-                class="w-full bg-gray-700 text-white text-lg rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                class="w-full bg-gray-700 text-amber-300 text-base sm:text-lg rounded-lg px-3 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-amber-500">
         </div>
         <button type="submit"
-            class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold px-6 py-3 rounded-lg transition">
+            class="col-span-2 sm:col-span-1 bg-blue-600 hover:bg-blue-700 text-white text-base sm:text-lg font-semibold px-6 py-3 rounded-lg transition">
             Save
         </button>
     </form>
-    <p class="text-gray-500 text-xs mt-3">Re-entering a date overwrites that day. Edit past days by clicking a week in the table below.</p>
+    <p class="text-gray-500 text-xs mt-3">Re-entering a date overwrites that day. Tap a week below to edit past days.</p>
 </div>
 
 <!-- Current Week Running Total -->
-<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
-    <div class="flex flex-wrap items-baseline justify-between gap-2 mb-3">
-        <div>
-            <p class="text-gray-400 text-sm">This Week ({{ cur_label }})</p>
-            <p class="text-4xl font-bold {% if cur_total >= goal %}text-green-400{% else %}text-blue-400{% endif %}">
-                {{ cur_total|stringformat:"d" }}<span class="text-xl text-gray-400"> / {{ goal }}</span>
-            </p>
-            <p class="text-gray-400 text-sm mt-1">{{ cur_miles }} mi <span class="text-gray-500">/ {{ goal_miles }} mi</span></p>
-            <p class="text-gray-500 text-sm mt-1">
-                {{ cur_steps }} steps + {{ cur_bike_miles }} bike mi ({{ cur_bike_steps }} steps)
-            </p>
-        </div>
-        <p class="text-gray-400 text-sm">
-            {% if cur_total >= goal %}Goal reached! 🎉{% else %}{{ cur_remaining }} to go{% endif %}
+<div class="bg-gray-800 rounded-2xl shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <div class="flex items-baseline justify-between gap-3 mb-2">
+        <p class="text-gray-400 text-xs sm:text-sm">This Week</p>
+        <p class="text-gray-500 text-xs sm:text-sm">{{ cur_label }}</p>
+    </div>
+    <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-3">
+        <p class="text-3xl sm:text-4xl font-bold {% if cur_total >= goal %}text-green-400{% else %}text-blue-400{% endif %}">
+            {{ cur_total|intcomma }}<span class="text-lg sm:text-xl text-gray-400"> / {{ goal|intcomma }}</span>
+        </p>
+        <p class="text-gray-400 text-xs sm:text-sm">
+            {% if cur_total >= goal %}Goal reached! 🎉{% else %}{{ cur_remaining|intcomma }} to go{% endif %}
         </p>
     </div>
-    <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
-        <div class="h-4 {% if cur_total >= goal %}bg-green-500{% else %}bg-blue-500{% endif %} transition-all"
+    <div class="w-full bg-gray-700 rounded-full h-3 sm:h-4 overflow-hidden mb-3">
+        <div class="h-3 sm:h-4 {% if cur_total >= goal %}bg-green-500{% else %}bg-blue-500{% endif %} transition-all"
              style="width: {{ cur_pct }}%"></div>
+    </div>
+    <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-gray-900/40 rounded-lg py-2">
+            <p class="text-gray-500 text-[11px] sm:text-xs">Steps</p>
+            <p class="text-white text-sm sm:text-base font-semibold">{{ cur_steps|intcomma }}</p>
+        </div>
+        <div class="bg-gray-900/40 rounded-lg py-2">
+            <p class="text-gray-500 text-[11px] sm:text-xs">Bike</p>
+            <p class="text-amber-300 text-sm sm:text-base font-semibold">{{ cur_bike_miles }} mi</p>
+            <p class="text-gray-500 text-[11px]">{{ cur_bike_steps|intcomma }} steps</p>
+        </div>
+        <div class="bg-gray-900/40 rounded-lg py-2">
+            <p class="text-gray-500 text-[11px] sm:text-xs">Miles</p>
+            <p class="text-blue-300 text-sm sm:text-base font-semibold">{{ cur_miles }}</p>
+            <p class="text-gray-500 text-[11px]">of {{ goal_miles }}</p>
+        </div>
     </div>
 </div>
 
-<!-- All-Time Totals + Conversion -->
-<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
-    <div class="flex flex-wrap items-end justify-between gap-6">
-        <div class="flex flex-wrap gap-8">
-            <div>
-                <p class="text-gray-400 text-sm">Steps Only</p>
-                <p class="text-3xl font-bold text-white">{{ all_steps }}</p>
-            </div>
-            <div>
-                <p class="text-gray-400 text-sm">Bike Miles</p>
-                <p class="text-3xl font-bold text-amber-400">{{ all_bike_miles }}</p>
-                <p class="text-gray-500 text-xs">{{ all_bike_steps }} steps</p>
-            </div>
-            <div>
-                <p class="text-gray-400 text-sm">Steps + Bike</p>
-                <p class="text-3xl font-bold text-white">{{ all_total }}</p>
-            </div>
-            <div>
-                <p class="text-gray-400 text-sm">Total Miles</p>
-                <p class="text-3xl font-bold text-blue-400">{{ all_miles }}</p>
-            </div>
+<!-- All-Time Totals -->
+<div class="bg-gray-800 rounded-2xl shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h3 class="text-lg sm:text-xl font-bold mb-3 sm:mb-4">All Time</h3>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6">
+        <div>
+            <p class="text-gray-400 text-xs sm:text-sm">Steps Only</p>
+            <p class="text-xl sm:text-3xl font-bold text-white">{{ all_steps|intcomma }}</p>
         </div>
-        <form method="post" action="{% url 'steps_prefs_save' %}" class="flex items-end gap-3">
-            {% csrf_token %}
-            <input type="hidden" name="_page" value="{{ page }}">
-            <div>
-                <label class="block text-gray-400 text-sm mb-1" for="steps_per_mile">Steps per Mile</label>
-                <input type="number" id="steps_per_mile" name="steps_per_mile" inputmode="numeric" min="1" max="100000"
-                    value="{{ steps_per_mile }}" required
-                    class="w-32 bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <label class="block text-gray-400 text-sm mb-1" for="steps_per_bike_mile">Steps per Bike Mile</label>
-                <input type="number" id="steps_per_bike_mile" name="steps_per_bike_mile" inputmode="numeric" min="1" max="100000"
-                    value="{{ steps_per_bike_mile }}" required
-                    class="w-32 bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <button type="submit"
-                class="bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
-                Update
-            </button>
-        </form>
+        <div>
+            <p class="text-gray-400 text-xs sm:text-sm">Bike Miles</p>
+            <p class="text-xl sm:text-3xl font-bold text-amber-400">{{ all_bike_miles }}</p>
+            <p class="text-gray-500 text-[11px] sm:text-xs">{{ all_bike_steps|intcomma }} steps</p>
+        </div>
+        <div>
+            <p class="text-gray-400 text-xs sm:text-sm">Steps + Bike</p>
+            <p class="text-xl sm:text-3xl font-bold text-white">{{ all_total|intcomma }}</p>
+        </div>
+        <div>
+            <p class="text-gray-400 text-xs sm:text-sm">Total Miles</p>
+            <p class="text-xl sm:text-3xl font-bold text-blue-400">{{ all_miles }}</p>
+        </div>
     </div>
 </div>
 
 <!-- Weekly Chart -->
-<div class="bg-gray-800 rounded-2xl shadow p-6 mb-6">
-    <h3 class="text-xl font-bold mb-4">Steps per Week <span class="text-sm font-normal text-gray-400">(goal {{ goal }})</span></h3>
-    <div class="w-full h-72">
+<div class="bg-gray-800 rounded-2xl shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h3 class="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Steps per Week
+        <span class="text-xs sm:text-sm font-normal text-gray-400">(goal {{ goal|intcomma }})</span>
+    </h3>
+    <div class="w-full h-56 sm:h-72">
         <canvas id="stepsChart" class="w-full h-full"></canvas>
     </div>
 </div>
 
 <!-- Weekly Table -->
-<div class="bg-gray-800 rounded-2xl shadow p-6">
-    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h3 class="text-xl font-bold">Weekly History <span class="text-sm font-normal text-gray-400 ml-2">— click a column to sort, a row to edit</span></h3>
-        <div class="text-gray-400 text-sm">Page {{ page }} of {{ total_pages }}</div>
+<div class="bg-gray-800 rounded-2xl shadow p-4 sm:p-6">
+    <div class="flex items-baseline justify-between mb-3 sm:mb-4 gap-2">
+        <h3 class="text-lg sm:text-xl font-bold">Weekly History</h3>
+        <div class="text-gray-400 text-xs sm:text-sm">Page {{ page }} of {{ total_pages }}</div>
     </div>
-    <div class="overflow-x-auto">
+    <p class="text-gray-500 text-xs mb-3">Tap a row to edit days; tap a header to sort.</p>
+    <div class="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
         <table id="weekTable" class="w-full text-left table-auto">
             <thead>
-                <tr class="text-gray-400 text-sm border-b border-gray-700">
-                    <th class="px-4 py-2 cursor-pointer hover:text-white select-none" onclick="sortWeeks(0,'date')">Week <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(1,'num')">Steps Only <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(2,'num')">Bike Miles <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(3,'num')">Steps + Bike <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(4,'num')">Miles <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(5,'num')">Lowest Day <span class="sort-icon">↕</span></th>
-                    <th class="px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(6,'num')">Highest Day <span class="sort-icon">↕</span></th>
+                <tr class="text-gray-400 text-xs sm:text-sm border-b border-gray-700">
+                    <th class="px-2 sm:px-4 py-2 cursor-pointer hover:text-white select-none" onclick="sortWeeks(0,'date')">Week <span class="sort-icon">↕</span></th>
+                    <th class="hidden md:table-cell px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(1,'num')">Steps Only <span class="sort-icon">↕</span></th>
+                    <th class="hidden md:table-cell px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(2,'num')">Bike Miles <span class="sort-icon">↕</span></th>
+                    <th class="px-2 sm:px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(3,'num')">Steps + Bike <span class="sort-icon">↕</span></th>
+                    <th class="px-2 sm:px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(4,'num')">Miles <span class="sort-icon">↕</span></th>
+                    <th class="hidden md:table-cell px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(5,'num')">Lowest Day <span class="sort-icon">↕</span></th>
+                    <th class="hidden md:table-cell px-4 py-2 text-right cursor-pointer hover:text-white select-none" onclick="sortWeeks(6,'num')">Highest Day <span class="sort-icon">↕</span></th>
                 </tr>
             </thead>
             <tbody id="weekTbody">
                 {% for w in page_weeks %}
-                <tr class="text-gray-200 text-sm border-b border-gray-700 hover:bg-gray-700 cursor-pointer"
+                <tr class="text-gray-200 text-xs sm:text-sm border-b border-gray-700 hover:bg-gray-700 cursor-pointer"
                     data-idx="{{ forloop.counter0 }}" onclick="openWeek({{ forloop.counter0 }})">
-                    <td class="px-4 py-3 font-semibold" data-val="{{ w.week_start }}">{{ w.label }}</td>
-                    <td class="px-4 py-3 text-right" data-val="{{ w.steps_only }}">{{ w.steps_only }}</td>
-                    <td class="px-4 py-3 text-right text-amber-300" data-val="{{ w.bike_miles }}">
-                        {{ w.bike_miles }}<span class="text-gray-500 text-xs block">{{ w.bike_steps }} steps</span>
+                    <td class="px-2 sm:px-4 py-3 font-semibold whitespace-nowrap" data-val="{{ w.week_start }}">{{ w.label }}</td>
+                    <td class="hidden md:table-cell px-4 py-3 text-right" data-val="{{ w.steps_only }}">{{ w.steps_only|intcomma }}</td>
+                    <td class="hidden md:table-cell px-4 py-3 text-right text-amber-300" data-val="{{ w.bike_miles }}">
+                        {{ w.bike_miles }}<span class="text-gray-500 text-xs block">{{ w.bike_steps|intcomma }} steps</span>
                     </td>
-                    <td class="px-4 py-3 text-right font-bold {% if w.total >= goal %}text-green-400{% else %}text-white{% endif %}" data-val="{{ w.total }}">{{ w.total }}</td>
-                    <td class="px-4 py-3 text-right text-blue-300" data-val="{{ w.miles }}">{{ w.miles }}</td>
-                    <td class="px-4 py-3 text-right" data-val="{{ w.low_steps|default:'-1' }}">
-                        {% if w.low_steps is not None %}{{ w.low_steps }}<span class="text-gray-500 text-xs block">{{ w.low_date }}</span>{% else %}—{% endif %}
+                    <td class="px-2 sm:px-4 py-3 text-right font-bold {% if w.total >= goal %}text-green-400{% else %}text-white{% endif %}" data-val="{{ w.total }}">{{ w.total|intcomma }}</td>
+                    <td class="px-2 sm:px-4 py-3 text-right text-blue-300" data-val="{{ w.miles }}">{{ w.miles }}</td>
+                    <td class="hidden md:table-cell px-4 py-3 text-right" data-val="{{ w.low_steps|default:'-1' }}">
+                        {% if w.low_steps is not None %}{{ w.low_steps|intcomma }}<span class="text-gray-500 text-xs block">{{ w.low_date }}</span>{% else %}—{% endif %}
                     </td>
-                    <td class="px-4 py-3 text-right" data-val="{{ w.high_steps|default:'-1' }}">
-                        {% if w.high_steps is not None %}{{ w.high_steps }}<span class="text-gray-500 text-xs block">{{ w.high_date }}</span>{% else %}—{% endif %}
+                    <td class="hidden md:table-cell px-4 py-3 text-right" data-val="{{ w.high_steps|default:'-1' }}">
+                        {% if w.high_steps is not None %}{{ w.high_steps|intcomma }}<span class="text-gray-500 text-xs block">{{ w.high_date }}</span>{% else %}—{% endif %}
                     </td>
                 </tr>
                 {% empty %}
@@ -176,15 +172,27 @@
 </div>
 
 <!-- Week Detail Modal -->
-<div id="weekModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4" onclick="if(event.target===this)closeWeek()">
-    <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h3 id="modalTitle" class="text-lg font-bold text-white"></h3>
-            <button onclick="closeWeek()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+<div id="weekModal" class="fixed inset-0 bg-black/60 hidden items-end sm:items-center justify-center z-50 sm:p-4" onclick="if(event.target===this)closeWeek()">
+    <div class="bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <div class="flex items-center justify-between mb-3">
+            <h3 id="modalTitle" class="text-base sm:text-lg font-bold text-white"></h3>
+            <button onclick="closeWeek()" class="text-gray-400 hover:text-white text-3xl leading-none px-2">&times;</button>
         </div>
-        <p class="text-gray-400 text-sm mb-1">Week total: <span id="modalTotal" class="text-white font-semibold"></span>
-            <span id="modalMiles" class="text-blue-300 ml-2"></span></p>
-        <p class="text-gray-500 text-sm mb-4"><span id="modalBreakdown"></span></p>
+        <div class="grid grid-cols-3 gap-2 text-center mb-4">
+            <div class="bg-gray-900/40 rounded-lg py-2">
+                <p class="text-gray-500 text-[11px]">Steps</p>
+                <p id="modalSteps" class="text-white text-sm font-semibold"></p>
+            </div>
+            <div class="bg-gray-900/40 rounded-lg py-2">
+                <p class="text-gray-500 text-[11px]">Bike</p>
+                <p id="modalBike" class="text-amber-300 text-sm font-semibold"></p>
+            </div>
+            <div class="bg-gray-900/40 rounded-lg py-2">
+                <p class="text-gray-500 text-[11px]">Total</p>
+                <p id="modalTotal" class="text-white text-sm font-semibold"></p>
+                <p id="modalMiles" class="text-blue-300 text-[11px]"></p>
+            </div>
+        </div>
         <div id="modalDays" class="space-y-2"></div>
     </div>
 </div>
@@ -272,30 +280,36 @@
         const w = weeksData[idx];
         if (!w) return;
         document.getElementById('modalTitle').textContent = w.label;
+        document.getElementById('modalSteps').textContent = w.steps_only.toLocaleString();
+        document.getElementById('modalBike').textContent = w.bike_miles + ' mi';
         document.getElementById('modalTotal').textContent = w.total.toLocaleString();
         document.getElementById('modalMiles').textContent = w.miles + ' mi';
-        document.getElementById('modalBreakdown').textContent =
-            w.steps_only.toLocaleString() + ' steps + ' + w.bike_miles + ' bike mi (' + w.bike_steps.toLocaleString() + ' steps)';
         const container = document.getElementById('modalDays');
         container.innerHTML = '';
         w.days.forEach(day => {
             const form = document.createElement('form');
             form.method = 'post';
             form.action = "{% url 'steps_save' %}";
-            form.className = 'flex items-center gap-2 bg-gray-700 rounded-lg px-3 py-2';
+            form.className = 'bg-gray-700 rounded-lg px-3 py-2';
             form.innerHTML = `
                 <input type="hidden" name="csrfmiddlewaretoken" value="${CSRF}">
                 <input type="hidden" name="date" value="${day.date}">
                 <input type="hidden" name="_page" value="${CUR_PAGE}">
-                <span class="text-gray-300 text-sm w-24 flex-shrink-0">${day.label}</span>
-                <input type="number" name="steps" inputmode="numeric" min="0" max="200000"
-                    value="${day.steps === null ? '' : day.steps}" placeholder="steps"
-                    class="w-24 bg-gray-800 text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <input type="number" name="bike_miles" inputmode="decimal" step="0.1" min="0" max="1000"
-                    value="${day.bike_miles === null ? '0.0' : day.bike_miles.toFixed(1)}" placeholder="bike mi"
-                    class="w-20 bg-gray-800 text-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <span class="text-gray-500 text-xs flex-1 text-right">${day.total === null ? '' : day.total.toLocaleString() + ' • ' + day.miles + ' mi'}</span>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded flex-shrink-0">Save</button>
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-gray-300 text-sm font-medium">${day.label}</span>
+                    <span class="text-gray-500 text-xs">${day.total === null ? '—' : day.total.toLocaleString() + ' • ' + day.miles + ' mi'}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-gray-500 text-xs w-10 flex-shrink-0">Steps</label>
+                    <input type="number" name="steps" inputmode="numeric" min="0" max="200000"
+                        value="${day.steps === null ? '' : day.steps}" placeholder="0"
+                        class="flex-1 min-w-0 bg-gray-800 text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <label class="text-gray-500 text-xs w-8 flex-shrink-0 text-right">Bike</label>
+                    <input type="number" name="bike_miles" inputmode="decimal" step="0.1" min="0" max="1000"
+                        value="${day.bike_miles === null ? '0.0' : day.bike_miles.toFixed(1)}"
+                        class="w-20 flex-shrink-0 bg-gray-800 text-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded flex-shrink-0">Save</button>
+                </div>
             `;
             container.appendChild(form);
         });

@@ -4,7 +4,8 @@ from collections import defaultdict
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .models import (WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, StepEntry, StepPrefs,
+from config.utils import get_config
+from .models import (WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, StepEntry,
                      ACTIVITY_CHOICES, YARDS_PER_MILE, DEFAULT_STEPS_PER_MILE,
                      DEFAULT_STEPS_PER_BIKE_MILE)
 
@@ -393,11 +394,17 @@ def steps_week_label(ws):
     return f"{ws.strftime('%b %d')} – {(ws + timedelta(days=6)).strftime('%b %d, %Y')}"
 
 
-def step_prefs_for(user):
-    prefs = StepPrefs.objects.filter(user=user).first()
-    if prefs:
-        return prefs.steps_per_mile, prefs.steps_per_bike_mile
-    return DEFAULT_STEPS_PER_MILE, DEFAULT_STEPS_PER_BIKE_MILE
+def step_conversions():
+    """Steps-per-mile and steps-per-bike-mile from config (env → db → default)."""
+    def as_int(key, default):
+        try:
+            val = int(get_config(key, default))
+        except (ValueError, TypeError):
+            return default
+        return val if val > 0 else default
+
+    return (as_int('STEPS_PER_MILE', DEFAULT_STEPS_PER_MILE),
+            as_int('STEPS_PER_BIKE_MILE', DEFAULT_STEPS_PER_BIKE_MILE))
 
 
 def steps_to_miles(steps, spm):
@@ -406,25 +413,6 @@ def steps_to_miles(steps, spm):
 
 def bike_miles_to_steps(bike_miles, spbm):
     return int(round(float(bike_miles) * spbm))
-
-
-@login_required
-def steps_prefs_save(request):
-    """Update the steps-per-mile conversion used for mileage display."""
-    if request.method == 'POST':
-        try:
-            spm = int(request.POST.get('steps_per_mile', '').strip())
-            spbm = int(request.POST.get('steps_per_bike_mile', '').strip())
-            if spm < 1 or spbm < 1:
-                raise ValueError
-            StepPrefs.objects.update_or_create(
-                user=request.user,
-                defaults={'steps_per_mile': spm, 'steps_per_bike_mile': spbm},
-            )
-        except (ValueError, TypeError):
-            messages.error(request, 'Please enter valid steps-per-mile values.')
-    page = request.POST.get('_page', '').strip()
-    return redirect(f"/health/steps/?page={page}" if page else '/health/steps/')
 
 
 @login_required
@@ -456,7 +444,7 @@ def steps_save(request):
 def steps_list(request):
     entries = list(StepEntry.objects.filter(user=request.user))
     today = date.today()
-    spm, spbm = step_prefs_for(request.user)
+    spm, spbm = step_conversions()
 
     by_date = {}
     for e in entries:
@@ -543,8 +531,6 @@ def steps_list(request):
     return render(request, 'health/steps.html', {
         'today': today.isoformat(),
         'goal': STEP_GOAL,
-        'steps_per_mile': spm,
-        'steps_per_bike_mile': spbm,
         'goal_miles': steps_to_miles(STEP_GOAL, spm),
         'cur_steps': cur_steps,
         'cur_bike_miles': cur_bike_miles,
