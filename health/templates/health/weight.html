@@ -104,17 +104,6 @@
                     Apply
                 </button>
             </form>
-            <!-- Save default start (POST) -->
-            <form method="post" action="{% url 'weight_chart_prefs_save' %}">
-                {% csrf_token %}
-                <input type="hidden" name="start" value="{{ chart_start }}">
-                <input type="hidden" name="end" value="{{ chart_end }}">
-                <button type="submit"
-                    class="bg-gray-600 hover:bg-gray-500 text-white text-sm px-3 py-1 rounded-lg transition"
-                    title="Save current start date as default">
-                    Set Default Start
-                </button>
-            </form>
         </div>
     </div>
     <div class="w-full h-72">

@@ -1,4 +1,5 @@
 import json
+from calendar import monthrange
 from datetime import date, timedelta
 from collections import defaultdict
 from django.contrib.auth.decorators import login_required
@@ -23,6 +24,13 @@ def fmt_duration(minutes):
         return '—'
     h, m = divmod(int(minutes), 60)
     return f"{h}h {m:02d}m" if h else f"{m}m"
+
+
+def add_one_month(d):
+    """Same day next month, clamped to the last day of that month."""
+    year, month = (d.year + 1, 1) if d.month == 12 else (d.year, d.month + 1)
+    day = min(d.day, monthrange(year, month)[1])
+    return date(year, month, day)
 
 
 def get_week_start(d):
@@ -118,12 +126,7 @@ def weight_list(request):
             start_str = date.today().isoformat()
 
     if not end_str:
-        if goals:
-            end_str = str(goals[-1].target_date)
-        elif entries:
-            end_str = str(entries[0].date)  # newest
-        else:
-            end_str = date.today().isoformat()
+        end_str = add_one_month(date.today()).isoformat()
 
     entries_with_change = []
     for i, entry in enumerate(entries):
@@ -221,30 +224,6 @@ def weight_goal_delete(request, pk):
         goal.delete()
     params = request.POST.get('_range_params', '')
     return redirect(f"/health/weight/?{params}" if params else '/health/weight/')
-
-
-@login_required
-def weight_chart_prefs_save(request):
-    if request.method == 'POST':
-        start_str = request.POST.get('start', '').strip()
-        end_str = request.POST.get('end', '').strip()
-        if start_str:
-            try:
-                start_date = date.fromisoformat(start_str)
-                WeightChartPrefs.objects.update_or_create(
-                    user=request.user,
-                    defaults={'chart_start_date': start_date},
-                )
-            except ValueError:
-                pass
-        params = []
-        if start_str:
-            params.append(f"start={start_str}")
-        if end_str:
-            params.append(f"end={end_str}")
-        qs = '&'.join(params)
-        return redirect(f"/health/weight/?{qs}" if qs else '/health/weight/')
-    return redirect('weight_list')
 
 
 # ── exercise views ────────────────────────────────────────────────────────────

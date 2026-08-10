@@ -6,7 +6,6 @@ urlpatterns = [
     path('weight/<int:pk>/delete/', views.weight_delete, name='weight_delete'),
     path('weight/goal/add/', views.weight_goal_add, name='weight_goal_add'),
     path('weight/goal/<int:pk>/delete/', views.weight_goal_delete, name='weight_goal_delete'),
-    path('weight/prefs/', views.weight_chart_prefs_save, name='weight_chart_prefs_save'),
     path('steps/', views.steps_list, name='steps_list'),
     path('steps/save/', views.steps_save, name='steps_save'),
     path('exercise/', views.exercise, name='exercise'),
