@@ -126,7 +126,14 @@ def weight_list(request):
             start_str = date.today().isoformat()
 
     if not end_str:
-        end_str = add_one_month(date.today()).isoformat()
+        # Two secondary goals out, so the near-term goal lines stay in frame
+        upcoming_secondary = [g for g in secondary_goals if g.target_date > date.today()]
+        if len(upcoming_secondary) >= 2:
+            end_str = upcoming_secondary[1].target_date.isoformat()
+        elif upcoming_secondary:
+            end_str = upcoming_secondary[-1].target_date.isoformat()
+        else:
+            end_str = add_one_month(date.today()).isoformat()
 
     entries_with_change = []
     for i, entry in enumerate(entries):
