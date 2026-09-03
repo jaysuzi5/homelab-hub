@@ -5,6 +5,7 @@ class MonitoredHost(models.Model):
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=255, help_text="IP address or hostname")
     is_active = models.BooleanField(default=True)
+    is_optional = models.BooleanField(default=False, help_text="Not always on (e.g. desktop that sleeps) — excluded from System Status card issues")
 
     class Meta:
         ordering = ['name']

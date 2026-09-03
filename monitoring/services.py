@@ -32,6 +32,7 @@ def collect_host_status():
                     'latency_ms': latest.latency_ms,
                     'checked_at': latest.checked_at,
                     'stale': latest.checked_at < stale_cutoff,
+                    'is_optional': host.is_optional,
                 })
             else:
                 result.append({
@@ -41,6 +42,7 @@ def collect_host_status():
                     'latency_ms': None,
                     'checked_at': None,
                     'stale': True,
+                    'is_optional': host.is_optional,
                 })
 
         result.sort(key=_sort_key)

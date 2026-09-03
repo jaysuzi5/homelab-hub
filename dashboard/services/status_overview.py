@@ -96,9 +96,10 @@ def _check_hosts(issues):
     except Exception:
         return {"name": "Monitored Hosts", "status": "warn", "detail": "Unavailable"}
 
-    total = len(hosts)
-    down = [h for h in hosts if h.get("is_up") is False]
-    stale = [h for h in hosts if h.get("is_up") is not False and h.get("stale")]
+    required = [h for h in hosts if not h.get("is_optional")]
+    total = len(required)
+    down = [h for h in required if h.get("is_up") is False]
+    stale = [h for h in required if h.get("is_up") is not False and h.get("stale")]
 
     status = "ok"
     for h in down:

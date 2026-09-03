@@ -4,8 +4,8 @@ from .models import MonitoredHost, HostPingResult
 
 @admin.register(MonitoredHost)
 class MonitoredHostAdmin(admin.ModelAdmin):
-    list_display = ['name', 'address', 'is_active']
-    list_filter = ['is_active']
+    list_display = ['name', 'address', 'is_active', 'is_optional']
+    list_filter = ['is_active', 'is_optional']
     search_fields = ['name', 'address']
 
 
