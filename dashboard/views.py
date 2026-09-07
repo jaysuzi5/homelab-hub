@@ -7,7 +7,7 @@ from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from dashboard.services.k8s import collect_k8s_metrics_summary, collect_k8s_metrics_detailed
 from dashboard.services.synology import collect_synology_summary
-from dashboard.services.network import collect_network_summary, collect_network_monthly_summary
+from dashboard.services.network import collect_network_summary, collect_network_monthly_summary, collect_network_last_12_months_summary
 from dashboard.services.emporia import collect_emporia_summary, collect_emporia_daily_summary, collect_emporia_monthly_summary, collect_emporia_monthly_category_summary
 from dashboard.services.enphase import collect_enhase_summary
 from dashboard.services.splunk import splunk_collector_summary, otel_response_summary, otel_service_status_summary, otel_endpoint_summary, otel_transaction_list, otel_recent_transactions, otel_summary, otel_filtered_transactions
@@ -265,12 +265,14 @@ def networking(request):
 
     # Collect monthly historical metrics
     network_monthly_metrics = collect_network_monthly_summary(selected_year, selected_month)
+    network_yearly_metrics = collect_network_last_12_months_summary()
 
     context = {
         'selected_month': selected_month,
         'selected_year': selected_year,
         'network_metrics': network_metrics,
         'network_monthly_metrics': json.dumps(network_monthly_metrics, cls=DjangoJSONEncoder),
+        'network_yearly_metrics': json.dumps(network_yearly_metrics, cls=DjangoJSONEncoder),
     }
     request.otel_page_summary = {
         "page": "networking",

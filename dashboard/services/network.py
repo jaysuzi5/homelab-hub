@@ -133,28 +133,30 @@ def _get_metrics():
         return None
 
 
-def _get_daily_rollup_from_db(start_dt, end_dt):
+def _run_network_rollup(start_dt, end_dt, bucket_sql):
     """
-    Roll up daily network averages directly from the collector's Postgres database,
-    so the aggregation runs in Postgres instead of over the REST API in Python.
+    Roll up network averages directly from the collector's Postgres database,
+    grouped by whatever bucket expression is passed in (a day or a month), so the
+    aggregation runs in Postgres instead of over the REST API in Python.
 
-    Returns None (rather than []) on any connection/query failure, so callers can
-    fall back to the REST API path instead of reporting "no data".
+    Returns a list of (bucket_date, download, upload, ping, tcp_latency) rows, or
+    None (rather than []) on any connection/query failure, so callers can fall back
+    to the REST API path instead of reporting "no data".
     """
     if not (_NETWORK_DB_HOST and _NETWORK_DB_NAME and _NETWORK_DB_USER):
         return None
 
-    query = """
+    query = f"""
         SELECT
-            (create_date AT TIME ZONE 'UTC')::date AS day,
+            {bucket_sql} AS bucket,
             AVG(internet_download) AS download,
             AVG(internet_upload) AS upload,
             AVG(internet_ping) FILTER (WHERE internet_ping < %(timeout)s) AS ping,
             AVG(tcp_latency) FILTER (WHERE tcp_latency < %(timeout)s) AS tcp_latency
         FROM network
         WHERE create_date >= %(start)s AND create_date < %(end)s
-        GROUP BY day
-        ORDER BY day;
+        GROUP BY bucket
+        ORDER BY bucket;
     """
     try:
         with psycopg2.connect(
@@ -167,21 +169,43 @@ def _get_daily_rollup_from_db(start_dt, end_dt):
         ) as conn:
             with conn.cursor() as cur:
                 cur.execute(query, {"start": start_dt, "end": end_dt, "timeout": _TIMEOUT_MS})
-                rows = cur.fetchall()
+                return cur.fetchall()
     except psycopg2.Error as e:
         print(f"[DEBUG] Network DB rollup failed, falling back to REST API: {e}")
         return None
 
+
+def _get_daily_rollup_from_db(start_dt, end_dt):
+    rows = _run_network_rollup(start_dt, end_dt, "(create_date AT TIME ZONE 'UTC')::date")
+    if rows is None:
+        return None
+
     return [
         {
-            "date": day.strftime("%Y-%m-%d"),
+            "date": bucket.strftime("%Y-%m-%d"),
             "download": float(download) if download is not None else 0,
             "upload": float(upload) if upload is not None else 0,
             "ping": float(ping) if ping is not None else 0,
             "tcp_latency": float(tcp_latency) if tcp_latency is not None else 0,
         }
-        for day, download, upload, ping, tcp_latency in rows
+        for bucket, download, upload, ping, tcp_latency in rows
     ]
+
+
+def _get_monthly_rollup_from_db(start_dt, end_dt):
+    rows = _run_network_rollup(start_dt, end_dt, "date_trunc('month', create_date AT TIME ZONE 'UTC')::date")
+    if rows is None:
+        return None
+
+    return {
+        (bucket.year, bucket.month): {
+            "download": float(download) if download is not None else 0,
+            "upload": float(upload) if upload is not None else 0,
+            "ping": float(ping) if ping is not None else 0,
+            "tcp_latency": float(tcp_latency) if tcp_latency is not None else 0,
+        }
+        for bucket, download, upload, ping, tcp_latency in rows
+    }
 
 
 def _get_metrics_by_month_via_api(year, month, start_date, end_date):
@@ -353,6 +377,11 @@ def _get_metrics_by_month(year, month):
     )
 
 
+def _add_months(year, month, delta):
+    total = (year * 12 + (month - 1)) + delta
+    return total // 12, total % 12 + 1
+
+
 def collect_network_summary():
     return _get_metrics()
 
@@ -377,3 +406,45 @@ def collect_network_monthly_summary(year, month):
         cache.set(cache_key, result, timeout=None)
 
     return result
+
+
+def collect_network_last_12_months_summary():
+    """
+    Monthly-averaged network metrics for the trailing 12 months (current month
+    included, partial). One point per month so the trend chart stays light
+    regardless of how much daily/raw data backs it.
+    """
+    now = datetime.now(timezone.utc)
+    start_year, start_month = _add_months(now.year, now.month, -11)
+    start_dt = datetime(start_year, start_month, 1, tzinfo=timezone.utc)
+    end_year, end_month = _add_months(now.year, now.month, 1)
+    end_dt = datetime(end_year, end_month, 1, tzinfo=timezone.utc)
+
+    by_month = _get_monthly_rollup_from_db(start_dt, end_dt)
+
+    if by_month is None:
+        # DB unreachable: fall back to averaging each month's daily API data.
+        by_month = {}
+        for i in range(12):
+            y, m = _add_months(start_year, start_month, i)
+            daily = _get_metrics_by_month(y, m)
+            if daily:
+                by_month[(y, m)] = {
+                    "download": sum(d["download"] for d in daily) / len(daily),
+                    "upload": sum(d["upload"] for d in daily) / len(daily),
+                    "ping": sum(d["ping"] for d in daily) / len(daily),
+                    "tcp_latency": sum(d["tcp_latency"] for d in daily) / len(daily),
+                }
+
+    metrics = []
+    for i in range(12):
+        y, m = _add_months(start_year, start_month, i)
+        values = by_month.get((y, m), {"download": 0, "upload": 0, "ping": 0, "tcp_latency": 0})
+        metrics.append({
+            "year": y,
+            "month": m,
+            "label": datetime(y, m, 1).strftime("%b %Y"),
+            **values,
+        })
+
+    return metrics
