@@ -1,11 +1,21 @@
 import requests
 import concurrent.futures
+import psycopg2
 from datetime import datetime, timezone
 from django.core.cache import cache
 from config.utils import get_config
 from urllib.parse import urlparse, urlunparse
 
 NETWORK_URL = get_config("NETWORK_URL")
+
+# The network collector (a separate service) writes to its own Postgres database.
+# Reading it directly lets Postgres do the daily rollup instead of us paging through
+# the collector's REST API and averaging tens of thousands of raw rows in Python.
+_NETWORK_DB_HOST = get_config("NETWORK_DB_HOST")
+_NETWORK_DB_PORT = get_config("NETWORK_DB_PORT", "5432")
+_NETWORK_DB_NAME = get_config("NETWORK_DB_NAME")
+_NETWORK_DB_USER = get_config("NETWORK_DB_USER")
+_NETWORK_DB_PASSWORD = get_config("NETWORK_DB_PASSWORD")
 
 # Collector writes a large sentinel (~1,800,000 ms = 30 min) when a ping/speedtest
 # times out. Any value at or above this threshold is a timeout, not a real latency.
@@ -123,28 +133,71 @@ def _get_metrics():
         return None
 
 
-def _get_metrics_by_month(year, month):
+def _get_daily_rollup_from_db(start_dt, end_dt):
     """
-    Fetch network metrics for a specific month.
+    Roll up daily network averages directly from the collector's Postgres database,
+    so the aggregation runs in Postgres instead of over the REST API in Python.
+
+    Returns None (rather than []) on any connection/query failure, so callers can
+    fall back to the REST API path instead of reporting "no data".
+    """
+    if not (_NETWORK_DB_HOST and _NETWORK_DB_NAME and _NETWORK_DB_USER):
+        return None
+
+    query = """
+        SELECT
+            (create_date AT TIME ZONE 'UTC')::date AS day,
+            AVG(internet_download) AS download,
+            AVG(internet_upload) AS upload,
+            AVG(internet_ping) FILTER (WHERE internet_ping < %(timeout)s) AS ping,
+            AVG(tcp_latency) FILTER (WHERE tcp_latency < %(timeout)s) AS tcp_latency
+        FROM network
+        WHERE create_date >= %(start)s AND create_date < %(end)s
+        GROUP BY day
+        ORDER BY day;
+    """
+    try:
+        with psycopg2.connect(
+            host=_NETWORK_DB_HOST,
+            port=_NETWORK_DB_PORT,
+            dbname=_NETWORK_DB_NAME,
+            user=_NETWORK_DB_USER,
+            password=_NETWORK_DB_PASSWORD,
+            connect_timeout=5,
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, {"start": start_dt, "end": end_dt, "timeout": _TIMEOUT_MS})
+                rows = cur.fetchall()
+    except psycopg2.Error as e:
+        print(f"[DEBUG] Network DB rollup failed, falling back to REST API: {e}")
+        return None
+
+    return [
+        {
+            "date": day.strftime("%Y-%m-%d"),
+            "download": float(download) if download is not None else 0,
+            "upload": float(upload) if upload is not None else 0,
+            "ping": float(ping) if ping is not None else 0,
+            "tcp_latency": float(tcp_latency) if tcp_latency is not None else 0,
+        }
+        for day, download, upload, ping, tcp_latency in rows
+    ]
+
+
+def _get_metrics_by_month_via_api(year, month, start_date, end_date):
+    """
+    Fallback for when the collector's database isn't reachable: fetch raw records
+    via its REST API (paginated, no server-side date filter) and average in Python.
 
     Args:
         year: Year (e.g., 2025)
         month: Month number (1-12)
+        start_date / end_date: "YYYY-MM-DD" bounds of the selected month.
 
     Returns:
         List of daily network metrics for the month, sorted by date.
     """
-    # Calculate the first day of the month
     start_dt = datetime(year, month, 1, tzinfo=timezone.utc)
-
-    # Calculate the last day of the month
-    if month == 12:
-        end_dt = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
-    else:
-        end_dt = datetime(year, month + 1, 1, tzinfo=timezone.utc)
-
-    start_date = start_dt.strftime("%Y-%m-%d")
-    end_date = end_dt.strftime("%Y-%m-%d")
 
     try:
         # Parse the URL to get base URL without query parameters
@@ -272,6 +325,32 @@ def _get_metrics_by_month(year, month):
     except requests.RequestException as e:
         print(f"Error fetching network metrics for {year}-{month}: {e}")
         return []
+
+
+def _get_metrics_by_month(year, month):
+    """
+    Fetch daily-averaged network metrics for a specific month.
+
+    Args:
+        year: Year (e.g., 2025)
+        month: Month number (1-12)
+
+    Returns:
+        List of daily network metrics for the month, sorted by date.
+    """
+    start_dt = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        end_dt = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end_dt = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+
+    rollup = _get_daily_rollup_from_db(start_dt, end_dt)
+    if rollup is not None:
+        return rollup
+
+    return _get_metrics_by_month_via_api(
+        year, month, start_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d")
+    )
 
 
 def collect_network_summary():
