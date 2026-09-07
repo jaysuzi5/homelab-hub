@@ -1,5 +1,7 @@
 import requests
+import concurrent.futures
 from datetime import datetime, timezone
+from django.core.cache import cache
 from config.utils import get_config
 from urllib.parse import urlparse, urlunparse
 
@@ -8,6 +10,19 @@ NETWORK_URL = get_config("NETWORK_URL")
 # Collector writes a large sentinel (~1,800,000 ms = 30 min) when a ping/speedtest
 # times out. Any value at or above this threshold is a timeout, not a real latency.
 _TIMEOUT_MS = 10000
+
+_REQUEST_TIMEOUT = 10  # seconds, per HTTP call to the network collector API
+_PAGE_WORKERS = 10  # parallel page fetches per batch
+
+
+def _fetch_page(base_url, page, limit=100):
+    try:
+        response = requests.get(base_url, params={'page': page, 'limit': limit}, timeout=_REQUEST_TIMEOUT)
+        response.raise_for_status()
+        return page, response.json()
+    except requests.RequestException as e:
+        print(f"[DEBUG] Error fetching network page {page}: {e}")
+        return page, None
 
 
 def _get_metrics():
@@ -154,41 +169,43 @@ def _get_metrics_by_month(year, month):
 
         print(f"[DEBUG] Selected month is ~{days_back} days back, fetching ~{max_pages} pages")
 
-        # Fetch historical data using pagination (API max limit is 100)
-        # Keep fetching until we have data covering the entire selected month
+        # Fetch historical data using pagination (API max limit is 100, no server-side
+        # date filtering available). Records are newest-first, so we page forward in
+        # parallel batches (doubling batch size) until we pass the start of the month,
+        # instead of issuing hundreds of pages one request at a time.
         network_items = []
         page = 0
+        next_page = 1
+        batch_size = _PAGE_WORKERS
+        reached_start = False
 
-        for page in range(1, max_pages + 1):
-            params = {'page': page, 'limit': 100}
-            response = requests.get(base_url, params=params)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_PAGE_WORKERS) as executor:
+            while next_page <= max_pages and not reached_start:
+                batch_pages = list(range(next_page, min(next_page + batch_size, max_pages + 1)))
+                futures = {executor.submit(_fetch_page, base_url, p): p for p in batch_pages}
+                pages_data = {}
+                for fut, p in futures.items():
+                    pages_data[p] = fut.result()[1]
 
-            if response.status_code != 200:
-                print(f"[DEBUG] Stopped pagination at page {page}: status {response.status_code}")
-                break
+                for p in batch_pages:
+                    page = p
+                    page_data = pages_data.get(p)
+                    if not page_data:
+                        print(f"[DEBUG] No more data (or fetch error) at page {p}")
+                        reached_start = True
+                        break
 
-            page_data = response.json()
-            if not page_data:
-                print(f"[DEBUG] No more data at page {page}")
-                break
+                    network_items.extend(page_data)
 
-            network_items.extend(page_data)
+                    # Check the oldest date in this page
+                    oldest_date = page_data[-1].get('create_date', '').split('T')[0]
+                    if oldest_date and oldest_date < start_date:
+                        print(f"[DEBUG] Reached data before month start ({oldest_date}) at page {p}, stopping")
+                        reached_start = True
+                        break
 
-            # Check dates in this page to see if we've reached the start of the month
-            for item in page_data:
-                item_date = item.get('create_date', '').split('T')[0]
-                if item_date and item_date >= start_date and item_date < end_date:
-                    # We found data within our target month
-                    if item_date[:7] == start_date[:7]:  # Check if it's from the start of the month
-                        has_start_of_month = True
-
-            # Check the oldest date in this page
-            if page_data:
-                oldest_date = page_data[-1].get('create_date', '').split('T')[0]
-                # If we've gone past the start of the month, we can stop
-                if oldest_date and oldest_date < start_date:
-                    print(f"[DEBUG] Reached data before month start ({oldest_date}) at page {page}, stopping")
-                    break
+                next_page = batch_pages[-1] + 1
+                batch_size = min(batch_size * 2, 50)
 
         print(f"[DEBUG] Monthly Network total records fetched: {len(network_items)} items after {page} pages")
 
@@ -262,4 +279,22 @@ def collect_network_summary():
 
 
 def collect_network_monthly_summary(year, month):
-    return _get_metrics_by_month(year, month)
+    now = datetime.now(timezone.utc)
+    is_current_month = (year == now.year and month == now.month)
+
+    cache_key = f"network_monthly_summary:{year}:{month:02d}"
+    if not is_current_month:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+    result = _get_metrics_by_month(year, month)
+
+    if is_current_month:
+        # In-progress month: short TTL so today's data keeps updating.
+        cache.set(cache_key, result, timeout=300)
+    elif result:
+        # Completed month: history never changes, cache indefinitely.
+        cache.set(cache_key, result, timeout=None)
+
+    return result
