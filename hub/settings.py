@@ -18,6 +18,16 @@ DEBUG = config("DJANGO_DEBUG") == 'True'
 
 ALLOWED_HOSTS = ["*"]
 
+# Cloudflare Tunnel / ingress terminate TLS upstream and forward plain HTTP to
+# gunicorn, setting X-Forwarded-Proto. Without this Django treats every
+# request as http, so allauth builds http:// callback URLs that mismatch the
+# https redirect URI registered in Google Cloud Console.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    default="https://homelab-hub.jaycurtis.org,https://homelab-hub.home.arpa",
+).split(",")
+
 
 # Application definition
 
