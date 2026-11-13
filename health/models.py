@@ -66,6 +66,8 @@ class StepEntry(models.Model):
     steps = models.PositiveIntegerField(help_text="Steps taken that day")
     bike_miles = models.DecimalField(max_digits=5, decimal_places=1, default=0,
                                      help_text="Miles biked that day")
+    walk_miles = models.DecimalField(max_digits=5, decimal_places=1, default=0,
+                                     help_text="Intentional walk/hike miles (subset of steps)")
 
     class Meta:
         ordering = ['-date']

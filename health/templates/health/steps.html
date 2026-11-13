@@ -15,10 +15,10 @@
 <!-- Daily Entry (mobile-first, top of page) -->
 <div class="bg-gray-800 rounded-2xl shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h3 class="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Log Steps</h3>
-    <form method="post" action="{% url 'steps_save' %}" class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 sm:items-end">
+    <form method="post" action="{% url 'steps_save' %}" class="grid grid-cols-3 sm:grid-cols-5 gap-3 sm:gap-4 sm:items-end">
         {% csrf_token %}
         <input type="hidden" name="_page" value="{{ page }}">
-        <div class="col-span-2 sm:col-span-1">
+        <div class="col-span-3 sm:col-span-1">
             <label class="block text-gray-400 text-xs sm:text-sm mb-1" for="date">Date</label>
             <input type="date" id="date" name="date" value="{{ today }}" required
                 class="w-full bg-gray-700 text-white text-base sm:text-lg rounded-lg px-3 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -35,12 +35,61 @@
                 value="0.0"
                 class="w-full bg-gray-700 text-amber-300 text-base sm:text-lg rounded-lg px-3 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-amber-500">
         </div>
+        <div>
+            <label class="block text-gray-400 text-xs sm:text-sm mb-1" for="walk_miles">Walk Miles</label>
+            <input type="number" id="walk_miles" name="walk_miles" inputmode="decimal" step="0.1" min="0" max="200"
+                value="0.0"
+                class="w-full bg-gray-700 text-emerald-300 text-base sm:text-lg rounded-lg px-3 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
         <button type="submit"
-            class="col-span-2 sm:col-span-1 bg-blue-600 hover:bg-blue-700 text-white text-base sm:text-lg font-semibold px-6 py-3 rounded-lg transition">
+            class="col-span-3 sm:col-span-1 bg-blue-600 hover:bg-blue-700 text-white text-base sm:text-lg font-semibold px-6 py-3 rounded-lg transition">
             Save
         </button>
     </form>
-    <p class="text-gray-500 text-xs mt-3">Re-entering a date overwrites that day. Tap a week below to edit past days.</p>
+    <p class="text-gray-500 text-xs mt-3">Re-entering a date overwrites that day. Tap a week below to edit past days. Walk miles are intentional walks/hikes (already counted in steps).</p>
+</div>
+
+<!-- Walking Challenge -->
+<div class="bg-gray-800 rounded-2xl shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <div class="flex items-baseline justify-between gap-3 mb-2">
+        <p class="text-gray-400 text-xs sm:text-sm">{{ walk.goal|intcomma }} Mile Walking Challenge</p>
+        <p class="text-gray-500 text-xs sm:text-sm">{{ walk.start|date:"M j, Y" }} – {{ walk.end|date:"M j, Y" }}</p>
+    </div>
+    <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-3">
+        <p class="text-3xl sm:text-4xl font-bold {% if walk.miles >= walk.goal %}text-green-400{% else %}text-emerald-400{% endif %}">
+            {{ walk.miles }}<span class="text-lg sm:text-xl text-gray-400"> / {{ walk.goal|intcomma }} mi</span>
+        </p>
+        <p class="text-xs sm:text-sm font-semibold">
+            {% if walk.miles >= walk.goal %}<span class="text-green-400">Goal reached!</span>
+            {% elif not walk.started %}<span class="text-gray-400">Starts {{ walk.start|date:"M j" }}</span>
+            {% elif walk.on_pace %}<span class="text-green-400">On pace · {{ walk.diff }} mi ahead</span>
+            {% else %}<span class="text-red-400">Behind pace · {{ walk.diff }} mi behind</span>{% endif %}
+        </p>
+    </div>
+    <div class="relative w-full bg-gray-700 rounded-full h-3 sm:h-4 overflow-hidden mb-3">
+        <div class="h-3 sm:h-4 {% if walk.on_pace %}bg-emerald-500{% else %}bg-red-500{% endif %} transition-all"
+             style="width: {{ walk.pct }}%"></div>
+        <div class="absolute top-0 h-full w-0.5 bg-white/80" style="left: {{ walk.expected_pct }}%" title="Pace: {{ walk.expected }} mi"></div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+        <div class="bg-gray-900/40 rounded-lg py-2">
+            <p class="text-gray-500 text-[11px] sm:text-xs">Days Left</p>
+            <p class="text-white text-sm sm:text-base font-semibold">{{ walk.days_remaining }}</p>
+        </div>
+        <div class="bg-gray-900/40 rounded-lg py-2">
+            <p class="text-gray-500 text-[11px] sm:text-xs">Pace Target</p>
+            <p class="text-white text-sm sm:text-base font-semibold">{{ walk.expected }} mi</p>
+        </div>
+        <div class="bg-gray-900/40 rounded-lg py-2">
+            <p class="text-gray-500 text-[11px] sm:text-xs">Needed / Day</p>
+            <p class="text-emerald-300 text-sm sm:text-base font-semibold">{{ walk.needed_per_day }} mi</p>
+            <p class="text-gray-500 text-[11px]">{{ walk.miles_remaining }} mi to go</p>
+        </div>
+        <div class="bg-gray-900/40 rounded-lg py-2">
+            <p class="text-gray-500 text-[11px] sm:text-xs">Projected</p>
+            <p class="text-white text-sm sm:text-base font-semibold">{{ walk.projected|intcomma }} mi</p>
+        </div>
+    </div>
 </div>
 
 <!-- Current Week Running Total -->
@@ -178,7 +227,7 @@
             <h3 id="modalTitle" class="text-base sm:text-lg font-bold text-white"></h3>
             <button onclick="closeWeek()" class="text-gray-400 hover:text-white text-3xl leading-none px-2">&times;</button>
         </div>
-        <div class="grid grid-cols-3 gap-2 text-center mb-4">
+        <div class="grid grid-cols-4 gap-2 text-center mb-4">
             <div class="bg-gray-900/40 rounded-lg py-2">
                 <p class="text-gray-500 text-[11px]">Steps</p>
                 <p id="modalSteps" class="text-white text-sm font-semibold"></p>
@@ -186,6 +235,10 @@
             <div class="bg-gray-900/40 rounded-lg py-2">
                 <p class="text-gray-500 text-[11px]">Bike</p>
                 <p id="modalBike" class="text-amber-300 text-sm font-semibold"></p>
+            </div>
+            <div class="bg-gray-900/40 rounded-lg py-2">
+                <p class="text-gray-500 text-[11px]">Walk</p>
+                <p id="modalWalk" class="text-emerald-300 text-sm font-semibold"></p>
             </div>
             <div class="bg-gray-900/40 rounded-lg py-2">
                 <p class="text-gray-500 text-[11px]">Total</p>
@@ -282,6 +335,7 @@
         document.getElementById('modalTitle').textContent = w.label;
         document.getElementById('modalSteps').textContent = w.steps_only.toLocaleString();
         document.getElementById('modalBike').textContent = w.bike_miles + ' mi';
+        document.getElementById('modalWalk').textContent = w.walk_miles + ' mi';
         document.getElementById('modalTotal').textContent = w.total.toLocaleString();
         document.getElementById('modalMiles').textContent = w.miles + ' mi';
         const container = document.getElementById('modalDays');
@@ -307,7 +361,11 @@
                     <label class="text-gray-500 text-xs w-8 flex-shrink-0 text-right">Bike</label>
                     <input type="number" name="bike_miles" inputmode="decimal" step="0.1" min="0" max="1000"
                         value="${day.bike_miles === null ? '0.0' : day.bike_miles.toFixed(1)}"
-                        class="w-20 flex-shrink-0 bg-gray-800 text-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        class="w-16 flex-shrink-0 bg-gray-800 text-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    <label class="text-gray-500 text-xs w-8 flex-shrink-0 text-right">Walk</label>
+                    <input type="number" name="walk_miles" inputmode="decimal" step="0.1" min="0" max="200"
+                        value="${day.walk_miles === null ? '0.0' : day.walk_miles.toFixed(1)}"
+                        class="w-16 flex-shrink-0 bg-gray-800 text-emerald-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500">
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded flex-shrink-0">Save</button>
                 </div>
             `;

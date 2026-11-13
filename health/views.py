@@ -11,6 +11,9 @@ from .models import (WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, S
                      DEFAULT_STEPS_PER_MILE, DEFAULT_STEPS_PER_BIKE_MILE)
 
 STEP_GOAL = 50000
+WALK_GOAL_MILES = 1000
+WALK_START = date(2026, 11, 1)
+WALK_END = date(2027, 10, 31)
 WEEKS_PER_PAGE = 52
 
 ACTIVITIES = [a[0] for a in ACTIVITY_CHOICES]
@@ -417,6 +420,33 @@ def bike_miles_to_steps(bike_miles, spbm):
     return int(round(float(bike_miles) * spbm))
 
 
+def walk_challenge(by_date, today):
+    """Progress toward WALK_GOAL_MILES of intentional walking between WALK_START and WALK_END."""
+    total_days = (WALK_END - WALK_START).days + 1
+    miles = round(sum(v['walk_miles'] for d, v in by_date.items() if WALK_START <= d <= WALK_END), 1)
+    started = today >= WALK_START
+    elapsed = min(max((today - WALK_START).days + 1, 0), total_days)
+    days_remaining = total_days - elapsed + (1 if started and today <= WALK_END else 0)
+    expected = round(WALK_GOAL_MILES * elapsed / total_days, 1)
+    miles_remaining = round(max(0, WALK_GOAL_MILES - miles), 1)
+    return {
+        'goal': WALK_GOAL_MILES,
+        'start': WALK_START,
+        'end': WALK_END,
+        'started': started,
+        'miles': miles,
+        'pct': min(100, round(miles / WALK_GOAL_MILES * 100)),
+        'expected_pct': min(100, round(elapsed / total_days * 100)),
+        'expected': expected,
+        'diff': round(abs(miles - expected), 1),
+        'on_pace': miles >= expected,
+        'days_remaining': days_remaining,
+        'miles_remaining': miles_remaining,
+        'needed_per_day': round(miles_remaining / days_remaining, 2) if days_remaining else 0,
+        'projected': round(miles / elapsed * total_days) if elapsed else 0,
+    }
+
+
 @login_required
 def steps_save(request):
     """Upsert a single day's step count. Used by the entry form and per-day edits."""
@@ -424,20 +454,22 @@ def steps_save(request):
         entry_date = request.POST.get('date', '').strip()
         steps_raw = request.POST.get('steps', '').strip()
         bike_raw = request.POST.get('bike_miles', '').strip()
+        walk_raw = request.POST.get('walk_miles', '').strip()
         try:
             steps_val = int(steps_raw)
             bike_val = round(float(bike_raw), 1) if bike_raw else 0.0
-            if steps_val < 0 or bike_val < 0:
+            walk_val = round(float(walk_raw), 1) if walk_raw else 0.0
+            if steps_val < 0 or bike_val < 0 or walk_val < 0:
                 raise ValueError
             if not entry_date:
                 raise ValueError
             StepEntry.objects.update_or_create(
                 user=request.user,
                 date=entry_date,
-                defaults={'steps': steps_val, 'bike_miles': bike_val},
+                defaults={'steps': steps_val, 'bike_miles': bike_val, 'walk_miles': walk_val},
             )
         except (ValueError, TypeError):
-            messages.error(request, 'Please enter a valid step count and bike mileage.')
+            messages.error(request, 'Please enter a valid step count, bike and walk mileage.')
     page = request.POST.get('_page', '').strip()
     return redirect(f"/health/steps/?page={page}" if page else '/health/steps/')
 
@@ -455,6 +487,7 @@ def steps_list(request):
             'steps': e.steps,
             'bike_miles': float(e.bike_miles),
             'bike_steps': bike_steps,
+            'walk_miles': float(e.walk_miles),
             'total': e.steps + bike_steps,
         }
 
@@ -470,6 +503,8 @@ def steps_list(request):
     all_bike_miles = round(sum(v['bike_miles'] for v in by_date.values()), 1)
     all_bike_steps = sum(v['bike_steps'] for v in by_date.values())
     all_total = all_steps + all_bike_steps
+
+    walk = walk_challenge(by_date, today)
 
     first_ws = week_start_sunday(min(by_date)) if by_date else cur_ws
 
@@ -488,6 +523,7 @@ def steps_list(request):
                 'steps': v['steps'] if v else None,
                 'bike_miles': v['bike_miles'] if v else None,
                 'bike_steps': v['bike_steps'] if v else None,
+                'walk_miles': v['walk_miles'] if v else None,
                 'total': v['total'] if v else None,
                 'miles': steps_to_miles(v['total'], spm) if v else None,
             })
@@ -496,6 +532,7 @@ def steps_list(request):
         steps_only = sum(v['steps'] for _, v in recorded)
         bike_miles = round(sum(v['bike_miles'] for _, v in recorded), 1)
         bike_steps = sum(v['bike_steps'] for _, v in recorded)
+        walk_miles = round(sum(v['walk_miles'] for _, v in recorded), 1)
         total = steps_only + bike_steps
         low = min(recorded, key=lambda x: x[1]['total']) if recorded else None
         high = max(recorded, key=lambda x: x[1]['total']) if recorded else None
@@ -505,6 +542,7 @@ def steps_list(request):
             'steps_only': steps_only,
             'bike_miles': bike_miles,
             'bike_steps': bike_steps,
+            'walk_miles': walk_miles,
             'total': total,
             'miles': steps_to_miles(total, spm),
             'pct': min(100, round(total / STEP_GOAL * 100)) if STEP_GOAL else 0,
@@ -547,6 +585,7 @@ def steps_list(request):
         'cur_pct': cur_pct,
         'cur_remaining': max(0, STEP_GOAL - cur_total),
         'cur_label': steps_week_label(cur_ws),
+        'walk': walk,
         'page_weeks': page_weeks,
         'weeks_json': json.dumps(page_weeks),
         'chart_data': json.dumps(chart_data),
