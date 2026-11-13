@@ -353,20 +353,26 @@
                     <span class="text-gray-300 text-sm font-medium">${day.label}</span>
                     <span class="text-gray-500 text-xs">${day.total === null ? '—' : day.total.toLocaleString() + ' • ' + day.miles + ' mi'}</span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-gray-500 text-xs w-10 flex-shrink-0">Steps</label>
-                    <input type="number" name="steps" inputmode="numeric" min="0" max="200000"
-                        value="${day.steps === null ? '' : day.steps}" placeholder="0"
-                        class="flex-1 min-w-0 bg-gray-800 text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <label class="text-gray-500 text-xs w-8 flex-shrink-0 text-right">Bike</label>
-                    <input type="number" name="bike_miles" inputmode="decimal" step="0.1" min="0" max="1000"
-                        value="${day.bike_miles === null ? '0.0' : day.bike_miles.toFixed(1)}"
-                        class="w-16 flex-shrink-0 bg-gray-800 text-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
-                    <label class="text-gray-500 text-xs w-8 flex-shrink-0 text-right">Walk</label>
-                    <input type="number" name="walk_miles" inputmode="decimal" step="0.1" min="0" max="200"
-                        value="${day.walk_miles === null ? '0.0' : day.walk_miles.toFixed(1)}"
-                        class="w-16 flex-shrink-0 bg-gray-800 text-emerald-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded flex-shrink-0">Save</button>
+                <div class="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 items-end">
+                    <div class="min-w-0">
+                        <label class="block text-gray-500 text-xs mb-0.5">Steps</label>
+                        <input type="number" name="steps" inputmode="numeric" min="0" max="200000"
+                            value="${day.steps === null ? '' : day.steps}" placeholder="0"
+                            class="w-full bg-gray-800 text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div class="min-w-0">
+                        <label class="block text-gray-500 text-xs mb-0.5">Bike</label>
+                        <input type="number" name="bike_miles" inputmode="decimal" step="0.1" min="0" max="1000"
+                            value="${day.bike_miles === null ? '0.0' : day.bike_miles.toFixed(1)}"
+                            class="w-full bg-gray-800 text-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    </div>
+                    <div class="min-w-0">
+                        <label class="block text-gray-500 text-xs mb-0.5">Walk</label>
+                        <input type="number" name="walk_miles" inputmode="decimal" step="0.1" min="0" max="200"
+                            value="${day.walk_miles === null ? '0.0' : day.walk_miles.toFixed(1)}"
+                            class="w-full bg-gray-800 text-emerald-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    </div>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">Save</button>
                 </div>
             `;
             container.appendChild(form);
