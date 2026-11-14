@@ -12,8 +12,8 @@ from .models import (WeightEntry, WeightGoal, WeightChartPrefs, ExerciseEntry, S
 
 STEP_GOAL = 50000
 WALK_GOAL_MILES = 1000
-WALK_START = date(2026, 11, 1)
-WALK_END = date(2027, 10, 31)
+WALK_START = date(2026, 10, 15)
+WALK_END = date(2027, 10, 14)
 WEEKS_PER_PAGE = 52
 
 ACTIVITIES = [a[0] for a in ACTIVITY_CHOICES]
